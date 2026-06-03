@@ -1,0 +1,25 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+
+# Secrets
+.env
+.claude/settings.local.json
+
+# IDE
+.idea/
+*.iml
+
+# Runtime artifacts
+charts/*.png
+charts/annotated/*.png
+logs/*.log
+logs/*.db
+logs/*.db-shm
+logs/*.db-wal
+
+# Verdicts (regenerated per session)
+verdicts/*.json

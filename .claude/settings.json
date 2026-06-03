@@ -1,0 +1,33 @@
+{
+  "project": {
+    "name": "Helix V3",
+    "description": "Enterprise MMM Algorithmic Execution System - Market Maker Method trading on MT5 via Python with dual-LLM vision consensus, pair-gated risk management, and automated WhatsApp notifications.",
+    "version": "0.1.0",
+    "language": "python",
+    "framework": "MetaTrader5 + asyncio",
+    "timezone": "Africa/Nairobi"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(pip install*)",
+      "Bash(python*)",
+      "Bash(.venv/Scripts/python*)",
+      "Bash(git *)",
+      "Bash(mkdir *)",
+      "Bash(ls *)",
+      "Bash(grep *)",
+      "Read(*)",
+      "Write(helix_v3/**)",
+      "Write(config/**)",
+      "Write(tests/**)",
+      "Write(.claude/**)",
+      "Edit(helix_v3/**)",
+      "Edit(config/**)",
+      "Edit(tests/**)"
+    ],
+    "deny": [
+      "Write(.env)",
+      "Bash(rm -rf *)"
+    ]
+  }
+}
