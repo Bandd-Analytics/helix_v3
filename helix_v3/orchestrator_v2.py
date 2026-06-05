@@ -20,19 +20,23 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Set
 
 from config.settings import settings
-from config.pair_profiles import get_pair_profile
 from helix_v3.consensus.validator import MMMConsensusValidator
+from helix_v3.core.advisory_confidence import (
+    AdvisorySetup,
+    advisory_setup_from_mtf,
+    score_advisory_setup,
+)
 from helix_v3.core.mtf_analyzer import MTFAnalyzer, MTFAnalysis
 from helix_v3.core.quant_engine import MMMQuantitativeEngine
 from helix_v3.core.tdi import (
-    compute_tdi, compute_pivots, compute_adr, compute_adr_marker,
-    compute_hud, compute_crossover_arrows, compute_daily_hilo,
+    compute_tdi, compute_pivots, compute_adr, compute_daily_hilo,
 )
 from helix_v3.core.patterns import scan_patterns
 from helix_v3.core.reentry_guard import ReentryGuard
 from helix_v3.execution.gatekeeper import MT5ExecutionGatekeeper
 from helix_v3.journal.flashcards import FlashcardSystem
 from helix_v3.notifications.whatsapp import WhatsAppNotifier
+from helix_v3.notifications.telegram import TelegramNotifier
 from helix_v3.scanner.market_scanner import MarketScanner
 from helix_v3.utils.logger import get_logger
 from helix_v3.visualization.annotated_chart import AnnotatedChartGenerator
@@ -94,6 +98,8 @@ def _mtf_to_flashcard_context(a: MTFAnalysis) -> Dict:
             "stop_hunt_pips": a.fifteen_min.stop_hunt_pips,
             "push_count": a.fifteen_min.push_count,
             "m_w_forming": a.fifteen_min.m_w_forming,
+            "m_w_pattern": a.fifteen_min.m_w_pattern
+            or _infer_m_w_pattern(a.fifteen_min.m_w_forming, a.fifteen_min.entry_direction.value),
             "rrt_detected": a.fifteen_min.rrt_detected,
             "entry_direction": a.fifteen_min.entry_direction.value,
             "entry_confidence": a.fifteen_min.entry_confidence,
@@ -112,6 +118,82 @@ def _mtf_to_flashcard_context(a: MTFAnalysis) -> Dict:
             "max_risk_pct": a.pair_profile.max_risk_pct,
         },
     }
+
+
+def _infer_m_w_pattern(m_w_forming: bool, direction: str) -> str:
+    if not m_w_forming:
+        return ""
+    if direction == "BUY":
+        return "W_BOTTOM"
+    if direction == "SELL":
+        return "M_TOP"
+    return ""
+
+
+def _tdi_to_flashcard_context(tdi_result) -> Dict:
+    signals = [s.value for s in tdi_result.signals if s.value != "NONE"]
+    return {
+        "signals": signals,
+        "shark_fin_active": tdi_result.shark_fin_active,
+        "shark_fin_direction": tdi_result.shark_fin_direction,
+        "vb_squeeze": tdi_result.vb_squeeze,
+        "divergence": tdi_result.divergence,
+        "crossed_signal": tdi_result.rsi_crossed_signal,
+        "rsi": tdi_result.rsi,
+        "signal": tdi_result.signal,
+        "base": tdi_result.base,
+    }
+
+
+def _patterns_to_flashcard_context(patterns) -> Dict:
+    return {
+        "trade_type": patterns.trade_type.value,
+        "pattern_count": len(patterns.patterns),
+        "pattern_types": [p.pattern.value for p in patterns.patterns],
+        "rrt_count": patterns.rrt_count,
+        "spike_count": patterns.spike_count,
+        "pin_bar_count": patterns.pin_bar_count,
+        "m_w_detected": patterns.m_w_detected,
+        "half_batman": patterns.half_batman,
+    }
+
+
+def _currency_theme_tags(symbol: str, direction: str) -> list[str]:
+    if direction not in ("BUY", "SELL"):
+        return []
+    if symbol == "XAUUSD":
+        base, quote = "XAU", "USD"
+    else:
+        base, quote = symbol[:3], symbol[3:6]
+    if direction == "BUY":
+        return [f"{base}_STRENGTH", f"{quote}_WEAKNESS"]
+    return [f"{base}_WEAKNESS", f"{quote}_STRENGTH"]
+
+
+def _enrich_flashcard_context(
+    analysis: MTFAnalysis,
+    tdi_result,
+    patterns,
+    advisory=None,
+) -> Dict:
+    context = _mtf_to_flashcard_context(analysis)
+    direction = analysis.trade_direction.value
+    context["tdi"] = _tdi_to_flashcard_context(tdi_result)
+    context["patterns"] = _patterns_to_flashcard_context(patterns)
+    context["convergence"] = {
+        "themes": _currency_theme_tags(analysis.symbol, direction),
+        "theme_score": advisory.convergence_score if advisory else 0.0,
+    }
+    if advisory:
+        context["advisory"] = {
+            "confidence_score": advisory.final_score,
+            "grade": advisory.grade,
+            "action": advisory.action,
+            "reasons": advisory.reasons,
+            "blockers": advisory.blockers,
+            "peer_symbols": advisory.peer_symbols,
+        }
+    return context
 
 
 class HelixOrchestratorV2:
@@ -137,7 +219,7 @@ class HelixOrchestratorV2:
         self.mtf: Optional[MTFAnalyzer] = None
         self.flashcards = FlashcardSystem()
         self.vision_backtests = VisionBacktestStore() if _HAS_VISION_STORE else None
-        self.notifier = WhatsAppNotifier()
+        self.notifier = self._create_notifier()
         self._running = False
         self._symbols: List[str] = list(settings.trading.symbols)
         self._last_market_scan: float = 0
@@ -147,8 +229,21 @@ class HelixOrchestratorV2:
         self._notified_failures: Set[str] = set()
         # Track last MTF analysis per symbol for comparison logging
         self._last_analysis: Dict[str, MTFAnalysis] = {}
+        self._last_advisory_inputs: Dict[str, AdvisorySetup] = {}
         # Persistent re-entry guard (SQLite-backed, survives restarts)
         self.guard = ReentryGuard()
+
+    @staticmethod
+    def _create_notifier():
+        """Pick notification backend from NOTIFICATION_BACKEND env var."""
+        import os
+        backend = os.getenv("NOTIFICATION_BACKEND", "whatsapp").lower()
+        if backend == "telegram":
+            notifier = TelegramNotifier()
+            if notifier.enabled:
+                return notifier
+            logger.warning("Telegram not configured, falling back to WhatsApp")
+        return WhatsAppNotifier()
 
     def _setup_signals(self) -> None:
         def _stop(signum, frame):
@@ -254,6 +349,29 @@ class HelixOrchestratorV2:
                 asian_low=analysis.fifteen_min.asian_range_low,
             )
 
+            advisory_setup = advisory_setup_from_mtf(
+                analysis,
+                tdi_result=tdi_result,
+                patterns=patterns,
+            )
+            advisory = score_advisory_setup(
+                advisory_setup,
+                self._last_advisory_inputs.values(),
+            )
+            self._last_advisory_inputs[symbol] = advisory_setup
+            logger.info(
+                "ADVISORY %s %s score=%.1f grade=%s action=%s convergence=%.1f peers=%s",
+                symbol,
+                analysis.trade_direction.value,
+                advisory.final_score,
+                advisory.grade,
+                advisory.action,
+                advisory.convergence_score,
+                ",".join(advisory.peer_symbols) or "-",
+            )
+            if advisory.blockers:
+                logger.info("ADVISORY %s blockers: %s", symbol, "; ".join(advisory.blockers))
+
             # Generate annotated chart with everything
             _, annotated_path = self.annotator.generate_from_mtf(
                 df_m15, symbol, "M15", analysis,
@@ -294,7 +412,7 @@ class HelixOrchestratorV2:
                     symbol=symbol,
                     timeframe="M15",
                     chart_path=str(annotated_path),
-                    mtf_context=_mtf_to_flashcard_context(analysis),
+                    mtf_context=_enrich_flashcard_context(analysis, tdi_result, patterns, advisory),
                     reason=f"Vision declined: {consensus.divergence_notes}",
                     tags=["missed", "no_consensus", analysis.weekly.week_phase.value],
                 )
@@ -343,7 +461,7 @@ class HelixOrchestratorV2:
                     symbol=symbol,
                     timeframe="M15",
                     chart_path=str(annotated_path),
-                    mtf_context=_mtf_to_flashcard_context(analysis),
+                    mtf_context=_enrich_flashcard_context(analysis, tdi_result, patterns, advisory),
                     reason="Gatekeeper blocked",
                     tags=["missed", "blocked", analysis.weekly.week_phase.value],
                 )
@@ -365,7 +483,7 @@ class HelixOrchestratorV2:
                 )
 
                 # Save entry flashcard with full MTF context
-                fc_context = _mtf_to_flashcard_context(analysis)
+                fc_context = _enrich_flashcard_context(analysis, tdi_result, patterns, advisory)
                 fc_context["profile"]["lot_size"] = order.lot_size
                 self.flashcards.save_entry_flashcard(
                     symbol=symbol,
@@ -461,6 +579,11 @@ class HelixOrchestratorV2:
 
         for action in actions:
             self.notifier._send(f"HELIX V3 TRADE MGMT\n{'='*25}\n{action}")
+            # Record entry cooldown for ANY trade exit (prevents same-setup churn)
+            for sym in self._symbols:
+                if sym in action:
+                    self.guard.record_exit(sym)
+                    break
             # Track losses for persistent re-entry guard
             action_lower = action.lower()
             if "sl" in action_lower or "stop" in action_lower or "loss" in action_lower or "stale" in action_lower:

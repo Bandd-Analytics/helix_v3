@@ -3,6 +3,7 @@
 Survives orchestrator restarts. All state written to disk immediately.
 
 Rules:
+  - After ANY exit on a symbol → ENTRY_COOLDOWN (2 hours, prevents same-setup churn)
   - 1 loss on symbol+direction → COOLDOWN (blocked until session transition)
   - 2+ losses on symbol+direction same day → BANNED for the day
   - New trading day → all bans/cooldowns reset
@@ -18,7 +19,7 @@ from __future__ import annotations
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import List, Optional, Set
+from typing import Optional, Set
 
 import MetaTrader5 as mt5
 
@@ -67,8 +68,9 @@ def _trading_day() -> str:
 class ReentryGuard:
     """Persistent re-entry guard with SQLite backing."""
 
-    def __init__(self, db_path: Optional[Path] = None) -> None:
+    def __init__(self, db_path: Optional[Path] = None, ban_scope: Optional[str] = None) -> None:
         self._db_path = db_path or DB_PATH
+        self._ban_scope = _normalize_ban_scope(ban_scope or settings.risk.reentry_guard_ban_scope)
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(str(self._db_path))
         self._conn.row_factory = sqlite3.Row
@@ -80,8 +82,9 @@ class ReentryGuard:
         self._today = _trading_day()
         self._rebuild_state()
         logger.info(
-            "ReentryGuard initialized: %d losses, %d bans, %d cooldowns for %s",
-            len(self._loss_counts), len(self._banned), len(self._cooldowns), self._today,
+            "ReentryGuard initialized: %d losses, %d bans, %d cooldowns for %s scope=%s",
+            len(self._loss_counts), len(self._banned), len(self._cooldowns),
+            self._today, self._ban_scope,
         )
 
     def _rebuild_state(self) -> None:
@@ -108,13 +111,19 @@ class ReentryGuard:
         for b in bans:
             if b["ban_type"] == "DAY_BAN":
                 self._banned.add(f"{b['symbol']}_{b['direction']}")
-                self._banned.add(b["symbol"])
+                if self._ban_scope == "symbol":
+                    self._banned.add(b["symbol"])
 
         # Cooldowns (1 loss, not yet banned)
         self._cooldowns: Set[str] = set()
         for key, cnt in self._loss_counts.items():
             if cnt == 1 and key not in self._banned:
                 self._cooldowns.add(key)
+
+        # Entry cooldowns: block re-entry on same symbol for 2 hours after ANY exit
+        # Keyed by symbol -> cooldown_until (UTC datetime)
+        if not hasattr(self, "_entry_cooldowns"):
+            self._entry_cooldowns: dict[str, datetime] = {}
 
     def check(self, symbol: str, direction: str) -> Optional[str]:
         """Check if entry is allowed. Returns None if OK, reason string if blocked."""
@@ -125,12 +134,23 @@ class ReentryGuard:
 
         key = f"{symbol}_{direction}"
 
-        if key in self._banned or symbol in self._banned:
+        if key in self._banned:
             cnt = self._loss_counts.get(key, 0)
             return f"BANNED: {symbol} {direction} — {cnt} losses today, no more entries"
 
+        if symbol in self._banned:
+            return f"BANNED: {symbol} - symbol-wide day ban active"
+
         if key in self._cooldowns:
             return f"COOLDOWN: {symbol} {direction} — 1 loss, waiting for session change"
+
+        # Entry cooldown: no re-entry on same symbol for 2 hours after ANY exit
+        cooldown_until = self._entry_cooldowns.get(symbol)
+        if cooldown_until is not None:
+            now = datetime.now(timezone.utc)
+            if now < cooldown_until:
+                remaining = int((cooldown_until - now).total_seconds() / 60)
+                return f"ENTRY_COOLDOWN: {symbol} — {remaining}min remaining (prevents same-setup churn)"
 
         # Check if there's already an open position on this pair
         positions = mt5.positions_get(symbol=symbol)
@@ -140,6 +160,16 @@ class ReentryGuard:
             return f"EXPOSURE: {symbol} already has {len(helix_positions)} open position(s), {total_lots:.2f} lots"
 
         return None
+
+    def record_exit(self, symbol: str, cooldown_hours: float = 2.0) -> None:
+        """Record a trade exit and set entry cooldown. Call after ANY trade closes."""
+        now = datetime.now(timezone.utc)
+        self._entry_cooldowns[symbol] = now + timedelta(hours=cooldown_hours)
+        logger.info(
+            "GUARD: %s entry cooldown set for %.1f hours (until %s)",
+            symbol, cooldown_hours,
+            self._entry_cooldowns[symbol].strftime("%H:%M UTC"),
+        )
 
     def record_loss(self, symbol: str, direction: str,
                     ticket: int = 0, loss_pips: float = 0, loss_usd: float = 0) -> None:
@@ -166,7 +196,8 @@ class ReentryGuard:
         if cnt >= 2:
             # Ban for the day
             self._banned.add(key)
-            self._banned.add(symbol)
+            if self._ban_scope == "symbol":
+                self._banned.add(symbol)
             self._cooldowns.discard(key)
             self._conn.execute(
                 "INSERT INTO bans (symbol, direction, ban_type, reason, created_at, trading_day) "
@@ -195,6 +226,7 @@ class ReentryGuard:
             self._rebuild_state()
         return {
             "trading_day": self._today,
+            "ban_scope": self._ban_scope,
             "loss_counts": dict(self._loss_counts),
             "banned": list(self._banned),
             "cooldowns": list(self._cooldowns),
@@ -212,3 +244,10 @@ def check_pair_exposure(symbol: str, max_positions_per_pair: int = 1) -> Optiona
         total_lots = sum(p.volume for p in helix)
         return f"{symbol}: {len(helix)} position(s) open ({total_lots:.2f} lots). Max {max_positions_per_pair}."
     return None
+
+
+def _normalize_ban_scope(value: str) -> str:
+    scope = str(value or "direction").strip().lower()
+    if scope in {"symbol", "symbol-wide", "pair"}:
+        return "symbol"
+    return "direction"
