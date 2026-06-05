@@ -1,11 +1,13 @@
 """MMMConsensusValidator - Multi-mode vision verification engine.
 
-Supports three validation modes:
-  - "anthropic": Single-model via Anthropic API (Claude Opus). Runs two
-    independent queries with different temperature/prompts for self-consensus.
-  - "dual-api": Original dual-model (Claude + GPT-5.5) via API keys.
-  - "local": Reads verdicts from a local JSON file written by Claude Code
-    during interactive sessions (no API keys required).
+Supports four validation modes (cheapest to most robust):
+  - "local": Single Anthropic API call if key available, otherwise reads
+    verdict files from disk. Cheapest real analysis mode. Stale file
+    verdicts (>30 min) are rejected to prevent old signals rubber-stamping.
+  - "anthropic": Self-consensus via two independent Claude queries with
+    different prompts (pattern + structural).
+  - "openai": Single OpenAI structured-vision verdict.
+  - "dual-api": Claude + GPT in parallel (requires both API keys).
 
 Mode is auto-detected from available API keys, or can be forced via
 CONSENSUS_MODE in .env.
@@ -286,7 +288,8 @@ class MMMConsensusValidator:
         return verdict_path
 
     def _read_local_verdict(
-        self, symbol: str, timeframe: str, label: str
+        self, symbol: str, timeframe: str, label: str,
+        max_age_minutes: int = 30,
     ) -> VisionVerdict:
         verdict_path = LOCAL_VERDICTS_DIR / f"{symbol}_{timeframe}.json"
         if not verdict_path.exists():
@@ -300,6 +303,25 @@ class MMMConsensusValidator:
                 rrt_detected=False,
                 pin_bar_detected=False,
                 raw_json={"error": "no_local_verdict"},
+            )
+
+        # Reject stale verdict files — prevents old signals from rubber-stamping trades
+        import os, time as _time
+        age_min = (_time.time() - os.path.getmtime(verdict_path)) / 60
+        if age_min > max_age_minutes:
+            logger.warning(
+                "Stale local verdict rejected: %s (%.0f min old, limit=%d)",
+                verdict_path.name, age_min, max_age_minutes,
+            )
+            return VisionVerdict(
+                model_name=label,
+                direction=Direction.NEUTRAL,
+                confidence=0.0,
+                cycle_level=None,
+                m_w_detected=False,
+                rrt_detected=False,
+                pin_bar_detected=False,
+                raw_json={"error": "stale_verdict", "age_minutes": round(age_min)},
             )
 
         raw = verdict_path.read_text()
@@ -438,7 +460,7 @@ class MMMConsensusValidator:
         elif self._mode == "openai":
             return await self._evaluate_openai_only(image_b64)
         elif self._mode == "local":
-            return self._evaluate_local(symbol, timeframe)
+            return await self._evaluate_local(image_b64, symbol, timeframe)
         else:
             raise ValueError(f"Unknown consensus mode: {self._mode}")
 
@@ -489,31 +511,55 @@ class MMMConsensusValidator:
             )
         return self._gather_and_arbitrate(results, ["claude-opus-primary", "claude-opus-structural"])
 
-    def _evaluate_local(self, symbol: str, timeframe: str) -> ConsensusResult:
-        """Read pre-written verdicts from disk (Claude Code interactive mode)."""
+    async def _evaluate_local(
+        self, image_b64: str, symbol: str, timeframe: str
+    ) -> ConsensusResult:
+        """Local mode: single Anthropic API call if key available, else file fallback.
+
+        This is the cheapest real analysis mode — one API call vs two in
+        'anthropic' mode. Falls back to reading verdict files from disk only
+        when no API key is configured.
+        """
+        # If we have an Anthropic key AND an image, do real single-call analysis
+        if self._api_cfg.anthropic_key and image_b64:
+            logger.info("Local mode: analyzing chart via single Anthropic API call")
+            try:
+                async with httpx.AsyncClient() as client:
+                    verdict = await self._query_anthropic(
+                        image_b64,
+                        client,
+                        VISION_SYSTEM_PROMPT,
+                        "local-single-claude",
+                    )
+                if verdict.confidence > 0:
+                    return self._arbitrate([verdict])
+
+                logger.warning(
+                    "Local API call returned zero confidence for %s — falling back to file",
+                    symbol,
+                )
+            except Exception as e:
+                logger.error("Local API call failed for %s: %s — falling back to file", symbol, e)
+
+        # Fallback: read pre-written verdicts from disk
         v1 = self._read_local_verdict(symbol, timeframe, "claude-code-primary")
-        v2 = self._read_local_verdict(symbol, timeframe, "claude-code-secondary")
+        if v1.confidence > 0:
+            return self._arbitrate([v1])
 
-        # If only one verdict file exists, duplicate it as single-opinion
-        if v1.confidence > 0 and v2.confidence == 0:
-            v2 = VisionVerdict(
-                model_name="claude-code-secondary",
-                direction=v1.direction,
-                confidence=v1.confidence,
-                cycle_level=v1.cycle_level,
-                m_w_detected=v1.m_w_detected,
-                rrt_detected=v1.rrt_detected,
-                pin_bar_detected=v1.pin_bar_detected,
-                setup_class=v1.setup_class,
-                entry_quality=v1.entry_quality,
-                risk_flags=list(v1.risk_flags),
-                expected_path=v1.expected_path,
-                invalidation=v1.invalidation,
-                reasoning=v1.reasoning,
-                raw_json=v1.raw_json,
+        # No API, no file — return declined consensus
+        logger.warning("No local verdict available for %s_%s (no API key, no verdict file)", symbol, timeframe)
+        return self._arbitrate([
+            VisionVerdict(
+                model_name="local-unavailable",
+                direction=Direction.NEUTRAL,
+                confidence=0.0,
+                cycle_level=None,
+                m_w_detected=False,
+                rrt_detected=False,
+                pin_bar_detected=False,
+                raw_json={"error": "no_api_key_and_no_verdict_file"},
             )
-
-        return self._arbitrate([v1, v2])
+        ])
 
     def _gather_and_arbitrate(
         self, results: list, model_names: List[str]
