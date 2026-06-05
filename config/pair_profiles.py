@@ -46,6 +46,7 @@ class PairProfile:
 
     # SL placement (behind first swing high after push, per MMM)
     sl_buffer_pips: float = 3.0          # Buffer behind the structural level
+    min_sl_pips: float = 20.0            # Floor for SL — prevents lot inflation from tight stops
 
     # MMM stop hunt range (used for entry zone detection)
     stop_hunt_min_pips: float = 25.0     # Min expected stop hunt from Asian range
@@ -85,6 +86,7 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         trail_activation_pips=15.0,        # BE after 15 pips (conservative EUR)
         trail_distance_pips=12.0,          # Tight trail — EUR doesn't whipsaw much
         sl_buffer_pips=3.0,
+        min_sl_pips=15.0,                  # EUR is tight — but never less than 15
         stop_hunt_min_pips=20.0,           # EUR hunts are tighter
         stop_hunt_max_pips=40.0,
         expected_level_move_pips=70.0,     # Slightly less than GBP
@@ -103,6 +105,7 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         trail_activation_pips=20.0,        # GBP needs more room
         trail_distance_pips=15.0,
         sl_buffer_pips=3.0,
+        min_sl_pips=20.0,
         stop_hunt_min_pips=25.0,           # Standard MMM range
         stop_hunt_max_pips=50.0,
         expected_level_move_pips=80.0,     # GBP moves bigger
@@ -121,6 +124,7 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         trail_activation_pips=12.0,        # AUD is slower
         trail_distance_pips=10.0,
         sl_buffer_pips=3.0,
+        min_sl_pips=12.0,                  # AUD is slow — tighter floor OK
         stop_hunt_min_pips=15.0,           # AUD hunts are smaller
         stop_hunt_max_pips=35.0,
         expected_level_move_pips=55.0,     # Smaller ADR
@@ -144,6 +148,7 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         trail_activation_pips=30.0,        # Wide ATR needs room
         trail_distance_pips=22.0,
         sl_buffer_pips=5.0,               # Wider — spiky pair
+        min_sl_pips=25.0,                  # Spiky — needs room
         stop_hunt_min_pips=30.0,
         stop_hunt_max_pips=60.0,           # Wider stop hunts on crosses
         expected_level_move_pips=100.0,    # Big moves
@@ -163,6 +168,7 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         trail_activation_pips=25.0,        # GJ can run 150+ pips
         trail_distance_pips=18.0,
         sl_buffer_pips=5.0,               # Wider for JPY volatility
+        min_sl_pips=25.0,                  # GJ is aggressive — never less than 25
         stop_hunt_min_pips=30.0,           # GJ stop hunts are aggressive
         stop_hunt_max_pips=60.0,           # Per MMM book: more volatile = wider
         expected_level_move_pips=100.0,    # GJ does 100+ pip level moves
@@ -182,6 +188,7 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         trail_activation_pips=35.0,        # Very wide ATR
         trail_distance_pips=25.0,
         sl_buffer_pips=5.0,
+        min_sl_pips=25.0,
         stop_hunt_min_pips=30.0,
         stop_hunt_max_pips=65.0,           # Widest stop hunts
         expected_level_move_pips=110.0,
@@ -203,6 +210,7 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         trail_activation_pips=20.0,
         trail_distance_pips=15.0,
         sl_buffer_pips=4.0,
+        min_sl_pips=20.0,
         stop_hunt_min_pips=25.0,
         stop_hunt_max_pips=50.0,
         expected_level_move_pips=85.0,
@@ -221,6 +229,7 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         trail_activation_pips=10.0,        # Very low vol — small moves matter
         trail_distance_pips=8.0,
         sl_buffer_pips=3.0,
+        min_sl_pips=10.0,                  # Ultra-low vol — tightest floor
         stop_hunt_min_pips=15.0,           # Tight ranges, small hunts
         stop_hunt_max_pips=30.0,
         expected_level_move_pips=45.0,     # Smallest ADR of all pairs
@@ -242,6 +251,7 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         trail_activation_pips=22.0,
         trail_distance_pips=16.0,
         sl_buffer_pips=4.0,
+        min_sl_pips=20.0,
         stop_hunt_min_pips=25.0,
         stop_hunt_max_pips=50.0,
         expected_level_move_pips=85.0,
@@ -260,6 +270,7 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         trail_activation_pips=15.0,
         trail_distance_pips=12.0,
         sl_buffer_pips=3.0,
+        min_sl_pips=15.0,
         stop_hunt_min_pips=20.0,
         stop_hunt_max_pips=40.0,
         expected_level_move_pips=60.0,
@@ -281,6 +292,7 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         trail_activation_pips=20.0,
         trail_distance_pips=15.0,
         sl_buffer_pips=4.0,
+        min_sl_pips=20.0,
         stop_hunt_min_pips=25.0,
         stop_hunt_max_pips=50.0,
         expected_level_move_pips=80.0,
@@ -300,6 +312,7 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         trail_activation_pips=18.0,
         trail_distance_pips=14.0,
         sl_buffer_pips=4.0,
+        min_sl_pips=18.0,
         stop_hunt_min_pips=20.0,
         stop_hunt_max_pips=45.0,
         expected_level_move_pips=75.0,
@@ -325,6 +338,7 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         t1_rr=1.0,
         partial_close_ratio=0.50,
         sl_buffer_pips=30.0,              # 30 pips = $0.30
+        min_sl_pips=150.0,                 # Gold min SL = $1.50 move
         stop_hunt_min_pips=200.0,         # Gold stop hunts in "pips" are huge
         stop_hunt_max_pips=500.0,
         expected_level_move_pips=800.0,    # Gold level moves = $8.00
@@ -363,7 +377,7 @@ def print_pair_profiles() -> str:
         "=" * 95,
         "",
         f"  {'Symbol':8} {'Tier':6} {'Risk%':>6} {'MaxLot':>6} {'Spread':>6} "
-        f"{'Stale':>5} {'MaxDur':>6} {'Trail':>10} {'SLBuf':>5} {'HuntRange':>10} {'LvlMove':>7}",
+        f"{'MinSL':>5} {'Trail':>10} {'SLBuf':>5} {'HuntRange':>10} {'LvlMove':>7}",
         "-" * 95,
     ]
 
@@ -371,8 +385,7 @@ def print_pair_profiles() -> str:
         lines.append(
             f"  {p.symbol:8} {p.risk_tier:6} {p.max_risk_pct*100:>5.1f}% "
             f"{p.max_lot_size:>6.1f} {p.max_spread_pips:>5.1f}p "
-            f"{p.stale_minutes:>3}m  "
-            f"{p.max_duration_minutes:>4}m "
+            f"{p.min_sl_pips:>4.0f}p "
             f"{p.trail_activation_pips:>4.0f}/{p.trail_distance_pips:.0f}p "
             f"{p.sl_buffer_pips:>4.0f}p "
             f"{p.stop_hunt_min_pips:.0f}-{p.stop_hunt_max_pips:.0f}p "

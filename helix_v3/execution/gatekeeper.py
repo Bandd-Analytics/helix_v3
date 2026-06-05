@@ -131,37 +131,71 @@ class MT5ExecutionGatekeeper:
     ) -> float:
         """Lot = (Equity * PairRisk%) / (SL_pips * PipValue_per_lot)
 
-        Uses pair-specific risk percentage from pair profiles.
+        Safety layers:
+        1. SL floor — never size off fewer pips than pair minimum
+        2. Account-proportional max lot — caps based on equity, not static
+        3. Post-calc risk verification — rejects if actual $ risk exceeds limit
         """
         profile = get_pair_profile(symbol)
         equity = self._get_account_equity()
         risk_pct = profile.max_risk_pct
         risk_amount = equity * risk_pct
 
+        # --- Safety 1: SL floor prevents lot inflation from tight stops ---
+        effective_sl = sl_pips
+        if sl_pips < profile.min_sl_pips:
+            logger.warning(
+                "SL floor applied %s: %.1f pips < min %.1f — using floor for lot calc",
+                symbol, sl_pips, profile.min_sl_pips,
+            )
+            effective_sl = profile.min_sl_pips
+
         info = self._get_symbol_info(symbol)
         pip_size = self._get_pip_value(symbol)
         tick_value = info.trade_tick_value
         tick_size = info.trade_tick_size
 
-        if tick_size == 0 or sl_pips == 0:
+        if tick_size == 0 or effective_sl == 0:
             logger.error("Invalid tick_size or sl_pips for lot calculation")
             return info.volume_min
 
         pip_value_per_lot = (pip_size / tick_size) * tick_value
-        raw_lot = risk_amount / (sl_pips * pip_value_per_lot)
+        raw_lot = risk_amount / (effective_sl * pip_value_per_lot)
 
-        # Clamp to broker limits, pair max lot, and round to volume step
+        # --- Safety 2: Account-proportional max lot ---
+        # Never allow a lot size where a 2x SL move would exceed 3% of equity
+        max_loss_pct = 0.03  # Hard cap: 3% of equity absolute max
+        if pip_value_per_lot > 0:
+            account_max_lot = (equity * max_loss_pct) / (effective_sl * pip_value_per_lot)
+        else:
+            account_max_lot = info.volume_min
+
+        # Clamp to broker limits, pair max lot, account max lot
         vol_min = info.volume_min
-        vol_max = min(info.volume_max, profile.max_lot_size)
+        vol_max = min(info.volume_max, profile.max_lot_size, account_max_lot)
         vol_step = info.volume_step
 
         lot = max(vol_min, min(raw_lot, vol_max))
         lot = round(lot / vol_step) * vol_step
         lot = round(lot, 2)
 
+        # --- Safety 3: Post-calc risk verification ---
+        actual_risk = lot * effective_sl * pip_value_per_lot
+        actual_risk_pct = actual_risk / equity if equity > 0 else 1.0
+        if actual_risk_pct > max_loss_pct:
+            lot = vol_min
+            actual_risk = lot * effective_sl * pip_value_per_lot
+            actual_risk_pct = actual_risk / equity if equity > 0 else 1.0
+            logger.warning(
+                "Risk verification clamped %s to min lot %.2f (risk was %.1f%%)",
+                symbol, lot, actual_risk_pct * 100,
+            )
+
         logger.info(
-            "Lot sizing %s [%s]: equity=%.2f risk=%.1f%% ($%.2f) sl=%.1f pips -> %.2f lots",
-            symbol, profile.risk_tier, equity, risk_pct * 100, risk_amount, sl_pips, lot,
+            "Lot sizing %s [%s]: equity=$%.2f risk=%.1f%% ($%.2f) "
+            "sl=%.1f pips (effective=%.1f) -> %.2f lots ($%.2f at risk, %.1f%%)",
+            symbol, profile.risk_tier, equity, risk_pct * 100, risk_amount,
+            sl_pips, effective_sl, lot, actual_risk, actual_risk_pct * 100,
         )
         return lot
 
