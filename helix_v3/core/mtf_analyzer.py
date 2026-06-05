@@ -34,7 +34,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 import numpy as np
 import pandas as pd
@@ -130,6 +130,7 @@ class FifteenMinEntry:
     entry_signal: bool
     entry_direction: Direction
     entry_confidence: float
+    m_w_pattern: str = ""                   # "W_BOTTOM" / "M_TOP" / ""
     notes: str = ""
 
 
@@ -197,9 +198,6 @@ class MTFAnalyzer:
         df_h4 = self._engine.fetch_rates(symbol, "H4", count=120)
 
         closes = df_d1["Close"]
-        highs = df_d1["High"]
-        lows = df_d1["Low"]
-
         # EMA stack on D1
         ema_stack = {}
         for p in [5, 13, 50, 200]:
@@ -258,7 +256,6 @@ class MTFAnalyzer:
 
     def _analyze_4h(self, symbol: str) -> FourHourContext:
         df = self._engine.fetch_rates(symbol, "H4", count=120)
-        closes = df["Close"]
 
         ema_vec = self._compute_ema_vector(df)
 
@@ -456,6 +453,11 @@ class MTFAnalyzer:
 
         # RRT detection
         rrt = self._detect_rrt(df.iloc[-4:])
+        m_w_pattern = ""
+        if m_w_direction == Direction.BUY:
+            m_w_pattern = "W_BOTTOM"
+        elif m_w_direction == Direction.SELL:
+            m_w_pattern = "M_TOP"
 
         # DIRECTION LOGIC — M/W pattern overrides stop hunt side
         # Per MMM: the M/W formation tells you the TRUE direction.
@@ -540,6 +542,7 @@ class MTFAnalyzer:
             entry_signal=entry_signal,
             entry_direction=entry_dir,
             entry_confidence=min(1.0, conf),
+            m_w_pattern=m_w_pattern,
             notes=f"AR={ar_pips:.0f}p valid={accum_valid} hunt={hunt_detected} pushes={push_count} M/W={m_w}",
         )
 
@@ -779,7 +782,7 @@ class MTFAnalyzer:
             "",
             f"  15-MIN:  Asian range: {a.fifteen_min.asian_range_pips:.0f} pips (valid={a.fifteen_min.accumulation_valid})",
             f"           Stop hunt: {a.fifteen_min.stop_hunt_detected} dir={a.fifteen_min.stop_hunt_direction.value} {a.fifteen_min.stop_hunt_pips:.1f}p",
-            f"           Pushes: {a.fifteen_min.push_count} | M/W: {a.fifteen_min.m_w_forming} | RRT: {a.fifteen_min.rrt_detected}",
+            f"           Pushes: {a.fifteen_min.push_count} | M/W: {a.fifteen_min.m_w_pattern or a.fifteen_min.m_w_forming} | RRT: {a.fifteen_min.rrt_detected}",
             "",
             f"  VERDICT: {'TRADE VALID' if a.trade_valid else 'NO TRADE'}",
             f"           Direction: {a.trade_direction.value} | Confidence: {a.trade_confidence:.0%}",

@@ -32,11 +32,15 @@ Important auth boundary: Codex ChatGPT login is not the same as `OPENAI_API_KEY`
 - `config/pair_profiles.py`: per-pair risk parameters.
 - `helix_v3/core/quant_engine.py`: MT5 rates, EMA vectors, accumulation, stop hunt.
 - `helix_v3/core/mtf_analyzer.py`: Weekly/H4/H1/M15 top-down analysis.
+- `helix_v3/core/advisory_confidence.py`: convergence-weighted MMM advisory scoring for live scans and replay reports.
 - `helix_v3/consensus/validator.py`: local, Anthropic, OpenAI, and dual-provider vision verdicts.
 - `helix_v3/ai/model_roles.py`: provider/model role routing.
 - `helix_v3/backtest/vision_store.py`: prediction and outcome storage.
 - `helix_v3/backtest/scanner_replay.py`: offline scanner baseline and model replay.
-- `helix_v3/journal/flashcards.py`: market-structure flashcards.
+- `helix_v3/backtest/mmm_event_replay.py`: MMM event-based replay, setup signatures, pair-normalized reports, and convergence mining.
+- `helix_v3/backtest/historical_flashcard_miner.py`: backdated MMM setup miner that creates historical flashcards and event labels.
+- `helix_v3/backtest/validation_library.py`: promoted profitable setup signatures for validating new entries.
+- `helix_v3/journal/flashcards.py`: market-structure flashcards with M/W type, TDI, pattern, and convergence metadata.
 - `helix_v3/execution/gatekeeper.py`: live order construction and trade management.
 
 ## Databases
@@ -82,7 +86,8 @@ Seed scanner baseline predictions:
 .venv\Scripts\python.exe -m helix_v3.backtest.scanner_replay baseline --min-readiness 50 --timeframe M15 --limit 100 --policy stop_hunt_then_bias
 ```
 
-Evaluate pending predictions against MT5 history:
+Evaluate pending predictions against MT5 history. This is a diagnostic only; do not treat fixed
+`30/90/240` horizons as the primary MMM benchmark:
 
 ```powershell
 .venv\Scripts\python.exe -m helix_v3.backtest.scanner_replay evaluate --limit 100 --horizons 30,90,240
@@ -107,13 +112,60 @@ Run paid-account CLI replay without API keys:
 .venv\Scripts\python.exe -m helix_v3.backtest.account_cli_replay --provider claude --min-readiness 50 --timeframe M15 --limit 5
 ```
 
+Replay flashcards through MMM trade-management events:
+
+```powershell
+.venv\Scripts\python.exe -m helix_v3.backtest.mmm_event_replay enrich-flashcards --min-confluence 30 --limit 500
+.venv\Scripts\python.exe -m helix_v3.backtest.mmm_event_replay flashcards --min-confluence 50 --limit 100
+```
+
+Report pair-normalized MMM replay performance:
+
+```powershell
+.venv\Scripts\python.exe -m helix_v3.backtest.mmm_event_replay pair-report --min-total 1
+.venv\Scripts\python.exe -m helix_v3.backtest.mmm_event_replay setup-report --min-total 2
+.venv\Scripts\python.exe -m helix_v3.backtest.mmm_event_replay convergence-report --min-symbols 2 --limit 500
+.venv\Scripts\python.exe -m helix_v3.backtest.mmm_event_replay calibration-report --min-total 5
+.venv\Scripts\python.exe -m helix_v3.backtest.mmm_event_replay gate-ablation-report --min-total 5
+.venv\Scripts\python.exe -m helix_v3.backtest.mmm_event_replay advisory-report --min-total 3
+.venv\Scripts\python.exe -m helix_v3.backtest.mmm_event_replay calibration-propose --min-total 5
+```
+
+MMM event replay is the preferred backtest frame for flashcard learning. It uses pair profiles,
+structural SL from the Asian range, T1 at 1R, breakeven after T1, 90-minute stale exit only when
+not in profit, pair-specific trailing, and max-duration exits. Setup signatures should include
+explicit `M_TOP`/`W_BOTTOM`, TDI state, pattern trade type, pair-normalized range/hunt buckets,
+and cross-pair convergence theme score.
+
+The V2 orchestrator computes an advisory confidence score after TDI/pattern scanning and stores it
+on flashcards. This is advisory-only unless a future change explicitly enforces
+`PairProfile` advisory gate fields such as `min_confluence_score`, `require_tdi_confirmation`,
+or `advisory_min_score`.
+
+`REENTRY_GUARD_BAN_SCOPE=direction` matches `CLAUDE.md`: two losses ban only the same
+symbol+direction for the day. Set it to `symbol` only when intentionally choosing stricter
+whole-symbol bans.
+
+Mine backdated historical flashcards and build the validation library:
+
+```powershell
+.venv\Scripts\python.exe -m helix_v3.backtest.historical_flashcard_miner mine --days 180 --symbols EURUSD,GBPUSD,GBPJPY,USDJPY,EURJPY,GBPCHF,AUDUSD --min-confluence 50 --step-bars 4 --limit-per-symbol 100
+.venv\Scripts\python.exe -m helix_v3.backtest.validation_library promote --min-total 5 --min-favorable-rate 55
+.venv\Scripts\python.exe -m helix_v3.backtest.historical_flashcard_miner library-report --limit 50
+.venv\Scripts\python.exe -m helix_v3.backtest.historical_flashcard_miner validate-current --symbols EURUSD,GBPUSD,GBPJPY,USDJPY,EURJPY,GBPCHF,AUDUSD
+```
+
+Historical mining uses MT5 only for candle history. It slices each timeframe at the historical
+snapshot, runs the same Weekly/H4/H1/M15 analyzer, saves `HISTORICAL` flashcards with real
+backdated timestamps, records MMM event outcomes, and promotes repeated profitable signatures.
+
 ## Verification Expectations
 
 For backtest/vision changes, run at least:
 
 ```powershell
-.venv\Scripts\python.exe -m pytest tests\test_vision_backtest_store.py tests\test_scanner_replay.py
-.venv\Scripts\python.exe -m ruff check helix_v3\backtest tests\test_scanner_replay.py tests\test_vision_backtest_store.py
+.venv\Scripts\python.exe -m pytest tests\test_vision_backtest_store.py tests\test_scanner_replay.py tests\test_mmm_event_replay.py tests\test_flashcards.py tests\test_advisory_confidence.py tests\test_reentry_guard.py tests\test_validation_library.py tests\test_historical_flashcard_miner.py
+.venv\Scripts\python.exe -m ruff check helix_v3\backtest\mmm_event_replay.py helix_v3\backtest\historical_flashcard_miner.py helix_v3\backtest\validation_library.py helix_v3\core\advisory_confidence.py tests\test_scanner_replay.py tests\test_vision_backtest_store.py tests\test_mmm_event_replay.py tests\test_flashcards.py tests\test_advisory_confidence.py tests\test_reentry_guard.py tests\test_validation_library.py tests\test_historical_flashcard_miner.py
 ```
 
 For validator/model-role changes, also run:

@@ -58,6 +58,19 @@ class PairProfile:
     # Asian range max for valid accumulation
     asian_range_max_pips: float = 50.0
 
+    # Entry calibration advisory fields. These are used by replay/advisory reports
+    # and are not live execution gates unless explicitly enforced by orchestration.
+    min_confluence_score: int = 50
+    require_m_w: bool = False
+    require_push3: bool = False
+    require_rrt: bool = False
+    require_tdi_confirmation: bool = False
+    block_tdi_conflict: bool = True
+    max_asian_range_ratio: float = 1.0
+    max_hunt_range_ratio: float = 1.0
+    min_convergence_score: float = 0.0
+    advisory_min_score: float = 70.0
+
     # Session exit
     close_before_session: str = "ASIAN_EARLY"
 

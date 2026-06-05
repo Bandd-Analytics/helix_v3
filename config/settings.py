@@ -48,6 +48,7 @@ class RiskConfig:
     trailing_stop_activation_pips: float = float(os.getenv("TRAIL_ACTIVATION_PIPS", "20.0"))
     trailing_stop_distance_pips: float = float(os.getenv("TRAIL_DISTANCE_PIPS", "15.0"))
     close_before_session: str = os.getenv("CLOSE_BEFORE_SESSION", "ASIAN_EARLY")
+    reentry_guard_ban_scope: str = os.getenv("REENTRY_GUARD_BAN_SCOPE", "direction").lower()
 
 
 @dataclass(frozen=True)

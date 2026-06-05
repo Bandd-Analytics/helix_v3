@@ -22,16 +22,14 @@ import base64
 from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import mplfinance as mpf
-import numpy as np
 import pandas as pd
 
-from config.pair_profiles import PairProfile, get_pair_profile
 from config.settings import settings
 from helix_v3.utils.logger import get_logger
 
@@ -90,7 +88,6 @@ class AnnotatedChartGenerator:
         Returns:
             Tuple of (base64_image, file_path).
         """
-        pp = get_pair_profile(symbol)
         bar_count = min(self._cfg.bar_count, len(df))
         subset = df.iloc[-bar_count:].copy()
 
@@ -138,9 +135,9 @@ class AnnotatedChartGenerator:
 
         res = self._cfg.resolution
         dpi = self._cfg.dpi
-        fig_w = res / dpi
-        # Cap figure height to prevent rendering explosion
-        fig_height = min(fig_w * 1.4, 14.0) if has_tdi else fig_w
+        # Landscape: 16:9 aspect ratio for mobile readability
+        fig_w = res / dpi * 1.6
+        fig_height = min(fig_w * 0.65, 12.0) if has_tdi else fig_w * 0.55
         panel_ratios = (4, 1.5) if has_tdi else (1,)
 
         fig, axes = mpf.plot(
@@ -224,7 +221,7 @@ class AnnotatedChartGenerator:
                     ar_label = f"ASIAN RANGE ({ar_pips:.0f}p)"
                     ax.text(
                         ar_s + 1, ar_h_val + y_range * 0.01,
-                        ar_label, color="#4FC3F7", fontsize=7, fontweight="bold",
+                        ar_label, color="#4FC3F7", fontsize=9, fontweight="bold",
                         zorder=10,
                     )
         else:
@@ -314,37 +311,52 @@ class AnnotatedChartGenerator:
                     )
                     ax.add_patch(shade_rect)
 
-        # 2. Stop Hunt Zone (pink/red per MMM flashcard style)
+        # 2. Stop Hunt Zone (prominent red/pink per MMM flashcard style)
         hunt_h = annotations.get("stop_hunt_high")
         hunt_l = annotations.get("stop_hunt_low")
+        hunt_pips = annotations.get("stop_hunt_pips", 0)
+        hunt_active = annotations.get("stop_hunt_active", False)
+
         if hunt_h and asian_h:
             rect = mpatches.Rectangle(
-                (0, asian_h), x_len * 0.6, hunt_h - asian_h,
-                linewidth=0, facecolor="#E91E63", alpha=0.08, zorder=1,
+                (0, asian_h), x_len * 0.7, hunt_h - asian_h,
+                linewidth=1.5, edgecolor="#E91E63", facecolor="#E91E63", alpha=0.15, zorder=1,
             )
             ax.add_patch(rect)
-            hunt_pips = annotations.get("stop_hunt_pips", 0)
-            hunt_label = f"STOP HUNT ({hunt_pips:.0f}p)" if hunt_pips else "STOP HUNT"
+            hunt_label = f"STOP HUNT {hunt_pips:.0f}p" if hunt_pips else "STOP HUNT"
+            if hunt_active:
+                hunt_label = ">>> " + hunt_label + " LIVE <<<"
             ax.text(
-                x_len * 0.02, hunt_h + y_range * 0.005,
-                hunt_label, color="#E91E63", fontsize=6, zorder=10,
+                x_len * 0.02, hunt_h + y_range * 0.008,
+                hunt_label, color="#E91E63", fontsize=9, fontweight="bold", zorder=10,
             )
+            # Horizontal line at hunt extreme
+            ax.axhline(y=hunt_h, color="#E91E63", linewidth=1.0, linestyle="--", alpha=0.5, zorder=2)
+
         if hunt_l and asian_l:
             rect = mpatches.Rectangle(
-                (0, hunt_l), x_len * 0.6, asian_l - hunt_l,
-                linewidth=0, facecolor="#E91E63", alpha=0.08, zorder=1,
+                (0, hunt_l), x_len * 0.7, asian_l - hunt_l,
+                linewidth=1.5, edgecolor="#E91E63", facecolor="#E91E63", alpha=0.15, zorder=1,
             )
             ax.add_patch(rect)
+            hunt_label_low = f"STOP HUNT {hunt_pips:.0f}p" if hunt_pips else "STOP HUNT"
+            if hunt_active:
+                hunt_label_low = ">>> " + hunt_label_low + " LIVE <<<"
+            ax.text(
+                x_len * 0.02, hunt_l - y_range * 0.025,
+                hunt_label_low, color="#E91E63", fontsize=9, fontweight="bold", zorder=10,
+            )
+            ax.axhline(y=hunt_l, color="#E91E63", linewidth=1.0, linestyle="--", alpha=0.5, zorder=2)
 
         # 3. HOD / LOD horizontal lines
         hod = annotations.get("hod")
         lod = annotations.get("lod")
         if hod:
-            ax.axhline(y=hod, color="#FF9800", linewidth=0.7, linestyle="--", alpha=0.6, zorder=2)
-            ax.text(x_len * 0.85, hod + y_range * 0.005, "HOD", color="#FF9800", fontsize=6, zorder=10)
+            ax.axhline(y=hod, color="#FF9800", linewidth=1.0, linestyle="--", alpha=0.7, zorder=2)
+            ax.text(x_len * 0.85, hod + y_range * 0.005, "HOD", color="#FF9800", fontsize=8, fontweight="bold", zorder=10)
         if lod:
-            ax.axhline(y=lod, color="#2196F3", linewidth=0.7, linestyle="--", alpha=0.6, zorder=2)
-            ax.text(x_len * 0.85, lod - y_range * 0.015, "LOD", color="#2196F3", fontsize=6, zorder=10)
+            ax.axhline(y=lod, color="#2196F3", linewidth=1.0, linestyle="--", alpha=0.7, zorder=2)
+            ax.text(x_len * 0.85, lod - y_range * 0.018, "LOD", color="#2196F3", fontsize=8, fontweight="bold", zorder=10)
 
         # 4. Entry zone + SL + TP markers
         entry = annotations.get("entry_price")
@@ -435,34 +447,42 @@ class AnnotatedChartGenerator:
             ax.axhline(y=adr_low, color="#E040FB", linewidth=0.5, linestyle="-.", alpha=0.3, zorder=1)
             ax.text(x_len * 0.88, adr_low - y_range * 0.015, "ADR L", color="#E040FB", fontsize=5, alpha=0.6, zorder=10)
 
-        # 10. Pattern markers (RRT, pin bars, spikes, etc.)
+        # 10. Pattern markers (RRT, pin bars, spikes, etc.) — with text labels
         detected_patterns = annotations.get("patterns", [])
         pattern_markers = {
-            "RRT": ("s", "#FFD600", 7),           # Square — yellow
-            "PIN_BAR_BULL": ("^", "#00E676", 7),   # Up triangle — green
-            "PIN_BAR_BEAR": ("v", "#FF5252", 7),   # Down triangle — red
-            "SPIKE_CANDLE": ("x", "#FF9100", 8),   # X — orange
-            "HAMMER": ("^", "#76FF03", 6),
-            "INVERTED_HAMMER": ("v", "#FF1744", 6),
-            "EVENING_STAR": ("*", "#FF5252", 8),
-            "MORNING_STAR": ("*", "#00E676", 8),
-            "M_TOP": ("v", "#FF6D00", 9),
-            "W_BOTTOM": ("^", "#00B0FF", 9),
-            "HALF_BATMAN": ("D", "#E040FB", 7),
-            "HIGH_TEST": ("_", "#FF6D00", 10),
-            "LOW_TEST": ("_", "#448AFF", 10),
+            "RRT": ("s", "#FFD600", 10, "RRT"),
+            "PIN_BAR_BULL": ("^", "#00E676", 10, "PIN"),
+            "PIN_BAR_BEAR": ("v", "#FF5252", 10, "PIN"),
+            "SPIKE_CANDLE": ("x", "#FF9100", 11, "SPIKE"),
+            "HAMMER": ("^", "#76FF03", 9, "HAM"),
+            "INVERTED_HAMMER": ("v", "#FF1744", 9, "INV.H"),
+            "EVENING_STAR": ("*", "#FF5252", 11, "EVE*"),
+            "MORNING_STAR": ("*", "#00E676", 11, "MRN*"),
+            "M_TOP": ("v", "#FF6D00", 12, "M-TOP"),
+            "W_BOTTOM": ("^", "#00B0FF", 12, "W-BTM"),
+            "HALF_BATMAN": ("D", "#E040FB", 10, "BATMAN"),
+            "HIGH_TEST": ("_", "#FF6D00", 12, "HI-TEST"),
+            "LOW_TEST": ("_", "#448AFF", 12, "LO-TEST"),
         }
+        _labeled_positions = set()  # Avoid overlapping labels
         for pat in detected_patterns:
             pat_name = pat.pattern.value if hasattr(pat, "pattern") else str(pat.get("pattern", ""))
             pat_idx = pat.bar_index if hasattr(pat, "bar_index") else pat.get("bar_index", 0)
             pat_price = pat.price if hasattr(pat, "price") else pat.get("price", 0)
-            # Adjust index relative to subset
             rel_idx = pat_idx - (len(df) - len(subset))
             if 0 <= rel_idx < x_len and pat_name in pattern_markers:
-                marker, color, size = pattern_markers[pat_name]
+                marker, color, size, label = pattern_markers[pat_name]
                 ax.plot(rel_idx, pat_price, marker=marker, color=color,
                         markersize=size, markerfacecolor="none" if marker in ("o", "s") else color,
-                        markeredgewidth=1.2, zorder=9, alpha=0.8)
+                        markeredgewidth=1.5, zorder=9, alpha=0.9)
+                # Add text label above/below marker (avoid duplicates nearby)
+                bucket = (rel_idx // 3, pat_name)
+                if bucket not in _labeled_positions:
+                    is_bearish = pat_name in ("PIN_BAR_BEAR", "INVERTED_HAMMER", "EVENING_STAR", "M_TOP", "HIGH_TEST")
+                    label_y = pat_price + y_range * (- 0.03 if is_bearish else 0.02)
+                    ax.text(rel_idx, label_y, label, color=color, fontsize=7,
+                            fontweight="bold", ha="center", alpha=0.9, zorder=11)
+                    _labeled_positions.add(bucket)
 
         # 11. Session box overlay (Asian range as colored region)
         session_boxes = annotations.get("session_boxes", [])
@@ -508,9 +528,11 @@ class AnnotatedChartGenerator:
         for (x_idx, y_pos, level_num) in level_counts:
             rx = x_idx - (len(df) - len(subset))
             if 0 <= rx < x_len:
-                ax.text(rx, y_pos, str(level_num),
-                        color="#FFD600", fontsize=14, fontweight="bold",
-                        ha="center", va="center", alpha=0.7, zorder=12)
+                ax.text(rx, y_pos, f"L{level_num}",
+                        color="#FFD600", fontsize=18, fontweight="bold",
+                        ha="center", va="center", alpha=0.85, zorder=12,
+                        bbox=dict(boxstyle="round,pad=0.15", facecolor="#1a1a2e",
+                                  alpha=0.6, edgecolor="#FFD600"))
 
         # 15. Entry/exit signal arrows (red down, green up per MMM flashcards)
         signal_arrows = annotations.get("signal_arrows", [])
@@ -542,23 +564,23 @@ class AnnotatedChartGenerator:
                 stat_text = "\n".join(stat_lines)
                 ax.text(
                     0.98, 0.65, stat_text,
-                    transform=ax.transAxes, fontsize=5, color="#CCCCCC",
+                    transform=ax.transAxes, fontsize=7, color="#EEEEEE",
                     verticalalignment="top", horizontalalignment="right",
                     fontfamily="monospace",
-                    bbox=dict(boxstyle="round,pad=0.3", facecolor="#1a1a2e",
-                              alpha=0.75, edgecolor="#333333"),
+                    bbox=dict(boxstyle="round,pad=0.4", facecolor="#1a1a2e",
+                              alpha=0.85, edgecolor="#555555", linewidth=1.0),
                     zorder=20,
                 )
 
-        # 17. Trade type label
+        # 17. Trade type label (THE 33, etc.) — prominent
         trade_type = annotations.get("trade_type", "")
         if trade_type and trade_type != "NONE":
             ax.text(
                 0.98, 0.98, trade_type.replace("_", " "),
-                transform=ax.transAxes, fontsize=7, color="#FFD600",
+                transform=ax.transAxes, fontsize=12, color="#FFD600",
                 horizontalalignment="right", verticalalignment="top",
-                fontweight="bold", alpha=0.8,
-                bbox=dict(boxstyle="round,pad=0.2", facecolor="#1a1a2e", alpha=0.7, edgecolor="#FFD600"),
+                fontweight="bold", alpha=0.95,
+                bbox=dict(boxstyle="round,pad=0.3", facecolor="#1a1a2e", alpha=0.85, edgecolor="#FFD600", linewidth=1.5),
                 zorder=20,
             )
 
@@ -611,9 +633,9 @@ class AnnotatedChartGenerator:
         info_text = "\n".join(info_lines)
         ax.text(
             0.02, 0.98, info_text,
-            transform=ax.transAxes, fontsize=6, color="#CCCCCC",
+            transform=ax.transAxes, fontsize=8, color="#EEEEEE",
             verticalalignment="top", fontfamily="monospace",
-            bbox=dict(boxstyle="round,pad=0.3", facecolor="#1a1a2e", alpha=0.85, edgecolor="#333333"),
+            bbox=dict(boxstyle="round,pad=0.4", facecolor="#1a1a2e", alpha=0.9, edgecolor="#555555", linewidth=1.0),
             zorder=20,
         )
 
@@ -640,7 +662,7 @@ class AnnotatedChartGenerator:
         buf.seek(0)
         b64 = base64.b64encode(buf.read()).decode("utf-8")
 
-        ts_file = datetime.now(EAT).strftime("%Y%m%d_%H%M%S")
+        ts_file = datetime.now(EAT).strftime("%Y%m%d_%H%M%S_%f")
         filename = f"{symbol}_{timeframe}_annotated_{ts_file}.png"
         file_path = self._output_dir / filename
         buf.seek(0)
@@ -666,8 +688,6 @@ class AnnotatedChartGenerator:
 
         Optionally includes TDI subplot, pattern markers, pivots, and ADR.
         """
-        pp = get_pair_profile(symbol)
-
         a = mtf_analysis
         m15 = a.fifteen_min
         h1 = a.one_hour
@@ -720,11 +740,13 @@ class AnnotatedChartGenerator:
         # Stop hunt zone
         if m15.stop_hunt_detected:
             annotations["stop_hunt_pips"] = m15.stop_hunt_pips
+            annotations["stop_hunt_direction"] = m15.stop_hunt_direction.value
+            annotations["stop_hunt_active"] = True  # Mark as live/confirmed
             if m15.stop_hunt_direction.value == "SELL":
-                annotations["stop_hunt_high"] = asian_h + m15.stop_hunt_pips * pp.sl_buffer_pips
+                annotations["stop_hunt_high"] = asian_h + m15.stop_hunt_pips * pip_val
             else:
-                annotations["stop_hunt_low"] = asian_l - m15.stop_hunt_pips * pp.sl_buffer_pips
-            annotations["notes"].append(f"Stop hunt: {m15.stop_hunt_direction.value} {m15.stop_hunt_pips:.1f}p")
+                annotations["stop_hunt_low"] = asian_l - m15.stop_hunt_pips * pip_val
+            annotations["notes"].append(f"STOP HUNT: {m15.stop_hunt_direction.value} {m15.stop_hunt_pips:.1f}p ({m15.push_count} pushes)")
 
         if m15.m_w_forming:
             annotations["notes"].append("M/W formation detected")

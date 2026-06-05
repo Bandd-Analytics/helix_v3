@@ -76,6 +76,7 @@ CREATE TABLE IF NOT EXISTS flashcards (
     stop_hunt_pips      REAL,
     push_count          INTEGER,
     m_w_forming         INTEGER,
+    m_w_pattern         TEXT,
     rrt_detected        INTEGER,
     entry_direction     TEXT,
     entry_confidence    REAL,
@@ -88,6 +89,30 @@ CREATE TABLE IF NOT EXISTS flashcards (
     ema_200_angle       REAL,
     ema_800_angle       REAL,
     fast_slow_div       REAL,
+
+    -- TDI / pattern confirmation
+    tdi_signals         TEXT,
+    tdi_shark_fin       INTEGER,
+    tdi_shark_direction TEXT,
+    tdi_vb_squeeze      INTEGER,
+    tdi_divergence      TEXT,
+    tdi_crossed_signal  TEXT,
+    tdi_rsi             REAL,
+    tdi_signal          REAL,
+    tdi_base            REAL,
+    pattern_trade_type  TEXT,
+    pattern_count       INTEGER,
+    pattern_rrt_count   INTEGER,
+    pattern_spike_count INTEGER,
+    pattern_pin_bar_count INTEGER,
+    pattern_half_batman INTEGER,
+    convergence_themes  TEXT,
+    convergence_theme_score REAL,
+    advisory_confidence_score REAL,
+    advisory_grade      TEXT,
+    advisory_action     TEXT,
+    advisory_reasons    TEXT,
+    advisory_blockers   TEXT,
 
     -- Outcome (filled after trade closes)
     outcome             TEXT,
@@ -116,6 +141,32 @@ CREATE INDEX IF NOT EXISTS idx_fc_h4_level ON flashcards(h4_level);
 CREATE INDEX IF NOT EXISTS idx_fc_confluence ON flashcards(confluence_score);
 """
 
+FLASHCARD_COLUMN_MIGRATIONS = {
+    "m_w_pattern": "TEXT",
+    "tdi_signals": "TEXT",
+    "tdi_shark_fin": "INTEGER",
+    "tdi_shark_direction": "TEXT",
+    "tdi_vb_squeeze": "INTEGER",
+    "tdi_divergence": "TEXT",
+    "tdi_crossed_signal": "TEXT",
+    "tdi_rsi": "REAL",
+    "tdi_signal": "REAL",
+    "tdi_base": "REAL",
+    "pattern_trade_type": "TEXT",
+    "pattern_count": "INTEGER",
+    "pattern_rrt_count": "INTEGER",
+    "pattern_spike_count": "INTEGER",
+    "pattern_pin_bar_count": "INTEGER",
+    "pattern_half_batman": "INTEGER",
+    "convergence_themes": "TEXT",
+    "convergence_theme_score": "REAL",
+    "advisory_confidence_score": "REAL",
+    "advisory_grade": "TEXT",
+    "advisory_action": "TEXT",
+    "advisory_reasons": "TEXT",
+    "advisory_blockers": "TEXT",
+}
+
 
 class FlashcardSystem:
     """Persistent market structure learning database.
@@ -139,6 +190,7 @@ class FlashcardSystem:
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.executescript(SCHEMA)
+        self._ensure_columns()
         self._conn.commit()
         logger.info("Flashcard system initialized: %s", self._db_path)
 
@@ -148,6 +200,15 @@ class FlashcardSystem:
     # ------------------------------------------------------------------
     # Save Flashcard
     # ------------------------------------------------------------------
+
+    def _ensure_columns(self) -> None:
+        existing = {
+            row["name"]
+            for row in self._conn.execute("PRAGMA table_info(flashcards)").fetchall()
+        }
+        for column, column_type in FLASHCARD_COLUMN_MIGRATIONS.items():
+            if column not in existing:
+                self._conn.execute(f"ALTER TABLE flashcards ADD COLUMN {column} {column_type}")
 
     def save_entry_flashcard(
         self,
@@ -208,6 +269,27 @@ class FlashcardSystem:
             notes=f"MISSED: {reason}",
         )
 
+    def save_historical_flashcard(
+        self,
+        symbol: str,
+        timeframe: str,
+        chart_path: str,
+        mtf_context: Dict[str, Any],
+        snapshot_at: datetime,
+        tags: Optional[List[str]] = None,
+        notes: str = "",
+    ) -> int:
+        return self._save(
+            snapshot_type="HISTORICAL",
+            symbol=symbol,
+            timeframe=timeframe,
+            chart_path=chart_path,
+            mtf_context=mtf_context,
+            snapshot_at=snapshot_at,
+            tags=tags,
+            notes=notes,
+        )
+
     def _save(
         self,
         snapshot_type: str,
@@ -218,52 +300,91 @@ class FlashcardSystem:
         ticket: Optional[int] = None,
         tags: Optional[List[str]] = None,
         notes: str = "",
+        snapshot_at: Optional[datetime] = None,
     ) -> int:
         w = mtf_context.get("weekly", {})
         h4 = mtf_context.get("four_hour", {})
         h1 = mtf_context.get("one_hour", {})
         m15 = mtf_context.get("fifteen_min", {})
         ema = mtf_context.get("ema", {})
+        tdi = mtf_context.get("tdi", {})
+        patterns = mtf_context.get("patterns", {})
+        convergence = mtf_context.get("convergence", {})
+        advisory = mtf_context.get("advisory", {})
         profile = mtf_context.get("profile", {})
 
+        row = {
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "ticket": ticket,
+            "snapshot_type": snapshot_type,
+            "snapshot_at": _to_utc(snapshot_at or datetime.now(timezone.utc)).isoformat(),
+            "chart_path": chart_path,
+            "weekly_cycle": w.get("cycle_position"),
+            "weekly_phase": w.get("week_phase"),
+            "weekly_trend": w.get("trend_direction"),
+            "days_from_peak": w.get("days_since_peak"),
+            "h4_cycle": h4.get("cycle_position"),
+            "h4_level": h4.get("level_count"),
+            "h4_trend": h4.get("trend_direction"),
+            "h4_choppy": h4.get("is_choppy"),
+            "h1_session": h1.get("session_phase"),
+            "h1_trend": h1.get("trend_direction"),
+            "h1_intraday_level": h1.get("intraday_level"),
+            "h1_hod_locked": h1.get("hod_locked"),
+            "h1_lod_locked": h1.get("lod_locked"),
+            "h1_50_200_cross": h1.get("ema_50_200_cross"),
+            "asian_range_pips": m15.get("asian_range_pips"),
+            "accumulation_valid": m15.get("accumulation_valid"),
+            "stop_hunt_detected": m15.get("stop_hunt_detected"),
+            "stop_hunt_direction": m15.get("stop_hunt_direction"),
+            "stop_hunt_pips": m15.get("stop_hunt_pips"),
+            "push_count": m15.get("push_count"),
+            "m_w_forming": m15.get("m_w_forming"),
+            "m_w_pattern": m15.get("m_w_pattern"),
+            "rrt_detected": m15.get("rrt_detected"),
+            "entry_direction": m15.get("entry_direction"),
+            "entry_confidence": m15.get("entry_confidence"),
+            "confluence_score": mtf_context.get("confluence_score"),
+            "ema_5_angle": ema.get("ema_5_angle"),
+            "ema_13_angle": ema.get("ema_13_angle"),
+            "ema_50_angle": ema.get("ema_50_angle"),
+            "ema_200_angle": ema.get("ema_200_angle"),
+            "ema_800_angle": ema.get("ema_800_angle"),
+            "fast_slow_div": ema.get("fast_slow_div"),
+            "tdi_signals": json.dumps(tdi.get("signals") or []),
+            "tdi_shark_fin": tdi.get("shark_fin_active"),
+            "tdi_shark_direction": tdi.get("shark_fin_direction"),
+            "tdi_vb_squeeze": tdi.get("vb_squeeze"),
+            "tdi_divergence": tdi.get("divergence"),
+            "tdi_crossed_signal": tdi.get("crossed_signal"),
+            "tdi_rsi": tdi.get("rsi"),
+            "tdi_signal": tdi.get("signal"),
+            "tdi_base": tdi.get("base"),
+            "pattern_trade_type": patterns.get("trade_type"),
+            "pattern_count": patterns.get("pattern_count"),
+            "pattern_rrt_count": patterns.get("rrt_count"),
+            "pattern_spike_count": patterns.get("spike_count"),
+            "pattern_pin_bar_count": patterns.get("pin_bar_count"),
+            "pattern_half_batman": patterns.get("half_batman"),
+            "convergence_themes": json.dumps(convergence.get("themes") or []),
+            "convergence_theme_score": convergence.get("theme_score"),
+            "advisory_confidence_score": advisory.get("confidence_score"),
+            "advisory_grade": advisory.get("grade"),
+            "advisory_action": advisory.get("action"),
+            "advisory_reasons": json.dumps(advisory.get("reasons") or []),
+            "advisory_blockers": json.dumps(advisory.get("blockers") or []),
+            "tags": json.dumps(tags) if tags else None,
+            "notes": notes,
+            "risk_tier": profile.get("risk_tier"),
+            "risk_pct": profile.get("max_risk_pct"),
+            "lot_size": profile.get("lot_size"),
+        }
+        cols = ", ".join(row.keys())
+        placeholders = ", ".join("?" for _ in row)
         cursor = self._conn.execute(
-            """INSERT INTO flashcards (
-                symbol, timeframe, ticket, snapshot_type, snapshot_at, chart_path,
-                weekly_cycle, weekly_phase, weekly_trend, days_from_peak,
-                h4_cycle, h4_level, h4_trend, h4_choppy,
-                h1_session, h1_trend, h1_intraday_level, h1_hod_locked, h1_lod_locked, h1_50_200_cross,
-                asian_range_pips, accumulation_valid, stop_hunt_detected, stop_hunt_direction,
-                stop_hunt_pips, push_count, m_w_forming, rrt_detected,
-                entry_direction, entry_confidence, confluence_score,
-                ema_5_angle, ema_13_angle, ema_50_angle, ema_200_angle, ema_800_angle, fast_slow_div,
-                tags, notes, risk_tier, risk_pct, lot_size
-            ) VALUES (
-                ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?,
-                ?, ?, ?, ?,
-                ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?,
-                ?, ?, ?, ?,
-                ?, ?, ?,
-                ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?
-            )""",
-            (
-                symbol, timeframe, ticket, snapshot_type,
-                datetime.now(timezone.utc).isoformat(), chart_path,
-                w.get("cycle_position"), w.get("week_phase"), w.get("trend_direction"), w.get("days_since_peak"),
-                h4.get("cycle_position"), h4.get("level_count"), h4.get("trend_direction"), h4.get("is_choppy"),
-                h1.get("session_phase"), h1.get("trend_direction"), h1.get("intraday_level"),
-                h1.get("hod_locked"), h1.get("lod_locked"), h1.get("ema_50_200_cross"),
-                m15.get("asian_range_pips"), m15.get("accumulation_valid"), m15.get("stop_hunt_detected"),
-                m15.get("stop_hunt_direction"), m15.get("stop_hunt_pips"), m15.get("push_count"),
-                m15.get("m_w_forming"), m15.get("rrt_detected"),
-                m15.get("entry_direction"), m15.get("entry_confidence"), mtf_context.get("confluence_score"),
-                ema.get("ema_5_angle"), ema.get("ema_13_angle"), ema.get("ema_50_angle"),
-                ema.get("ema_200_angle"), ema.get("ema_800_angle"), ema.get("fast_slow_div"),
-                json.dumps(tags) if tags else None, notes,
-                profile.get("risk_tier"), profile.get("max_risk_pct"), profile.get("lot_size"),
-            ),
+            f"INSERT INTO flashcards ({cols}) VALUES ({placeholders})",
+            tuple(row.values()),
         )
         self._conn.commit()
         fc_id = cursor.lastrowid
@@ -293,6 +414,34 @@ class FlashcardSystem:
         )
         self._conn.commit()
         logger.info("Flashcard outcome: ticket=%d %s %+.1f pips", ticket, outcome, pips_gained)
+
+    def record_outcome_by_id(
+        self,
+        flashcard_id: int,
+        outcome: str,
+        pips_gained: float,
+        duration_minutes: float,
+        exit_reason: str,
+        t1_hit: bool = False,
+        net_profit: float = 0.0,
+    ) -> None:
+        self._conn.execute(
+            """UPDATE flashcards SET
+                outcome = ?, pips_gained = ?, net_profit = ?,
+                duration_minutes = ?, exit_reason = ?, t1_hit = ?
+            WHERE id = ?""",
+            (
+                outcome,
+                pips_gained,
+                net_profit,
+                duration_minutes,
+                exit_reason,
+                int(t1_hit),
+                flashcard_id,
+            ),
+        )
+        self._conn.commit()
+        logger.info("Flashcard #%d outcome: %s %+.1f pips", flashcard_id, outcome, pips_gained)
 
     # ------------------------------------------------------------------
     # Pattern Queries
@@ -413,8 +562,11 @@ class FlashcardSystem:
         levels = self.get_best_cycle_level()
         if levels:
             lines.append("\n  --- Best Cycle Level ---")
-            for l in levels:
-                lines.append(f"  L{l['h4_level']}: {l['total']}T WR={l['win_rate']}% avg={l['avg_pips']:+.1f}p")
+            for level in levels:
+                lines.append(
+                    f"  L{level['h4_level']}: {level['total']}T "
+                    f"WR={level['win_rate']}% avg={level['avg_pips']:+.1f}p"
+                )
 
         # Best session
         sessions = self.get_best_session()
@@ -433,3 +585,9 @@ class FlashcardSystem:
         lines.append("")
         lines.append("=" * 65)
         return "\n".join(lines)
+
+
+def _to_utc(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
