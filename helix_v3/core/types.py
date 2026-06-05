@@ -76,6 +76,12 @@ class VisionVerdict:
     m_w_detected: bool
     rrt_detected: bool
     pin_bar_detected: bool
+    setup_class: str = "UNKNOWN"
+    entry_quality: int = 0
+    risk_flags: list[str] = field(default_factory=list)
+    expected_path: str = ""
+    invalidation: str = ""
+    reasoning: str = ""
     raw_json: dict = field(default_factory=dict)
 
 

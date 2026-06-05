@@ -47,7 +47,11 @@ Enterprise-grade Market Maker Method (MMM) algorithmic execution system trading 
 |------|---------|
 | `helix_v3/core/types.py` | Shared dataclasses: Direction, CycleLevel, QuantSignal, ConsensusResult, ExecutionOrder |
 | `helix_v3/core/quant_engine.py` | MT5 data fetch, EMA vectors, Asian accumulation, stop-hunt detection |
-| `helix_v3/core/mtf_analyzer.py` | Multi-timeframe analysis: Weekly->4H->1H->15M with confluence scoring |
+| `helix_v3/core/mtf_analyzer.py` | Multi-timeframe analysis: Weekly->4H->1H->15M with confluence scoring. M/W pattern drives direction. |
+| `helix_v3/core/tdi.py` | TDI (V2-verified RSI=21), pivots (R3/S3/M1-M4 + day-type), ADR (Wilder ATR), NewHUD dashboard, crossover arrows, daily HiLo |
+| `helix_v3/core/patterns.py` | Context-aware candlestick patterns: spike, hammer, doji, RRT, evening/morning star, high/low test, M/W, half batman. Trade type classification. |
+| `helix_v3/core/sessions.py` | MMM session classification (Asia/London/NYC per Book p.8), per-day Asian range, session boundaries, weekly open range |
+| `helix_v3/core/reentry_guard.py` | SQLite-backed re-entry guard: loss tracking, cooldowns, day bans, exposure check. Survives restarts. |
 
 ### Visualization
 | File | Purpose |
@@ -91,7 +95,23 @@ Enterprise-grade Market Maker Method (MMM) algorithmic execution system trading 
 ### Orchestrator
 | File | Purpose |
 |------|---------|
-| `helix_v3/orchestrator.py` | Main pipeline loop: 60s trade scan, 15-min market scan, report scheduler, trade management |
+| `helix_v3/orchestrator.py` | V1 pipeline (flat quant engine per TF — legacy, kept as fallback) |
+| `helix_v3/orchestrator_v2.py` | **V2 PRIMARY** — MTF-first analysis, TDI/patterns/pivots, annotated flashcard charts, persistent re-entry guard, WhatsApp with chart images |
+
+### Tests & Tools
+| File | Purpose |
+|------|---------|
+| `tests/full_market_scan.py` | Full 13-pair scan with all indicators, generates charts + WhatsApp notifications |
+| `tests/fresh_scan.py` | Quick scan with narrative output for manual review |
+| `tests/compare_orchestrators.py` | V1 vs V2 side-by-side evaluation |
+| `tests/live_test.py` | Integration test (dry-run, no trades) |
+
+### Updates
+| File | Purpose |
+|------|---------|
+| `updates/CHANGELOG.md` | Version history with all changes and evaluation results |
+| `updates/eval_*.txt` | Evaluation logs from comparison tests |
+| `updates/scan_*.txt` | Market scan result logs |
 
 ## MMM Trading Rules (from Steve Mauro methodology)
 
@@ -101,12 +121,15 @@ Enterprise-grade Market Maker Method (MMM) algorithmic execution system trading 
 3. **1-Hour (H1)**: Session phase. HOD/LOD locked? EMA 50/200 cross?
 4. **15-Min (M15)**: Asian range < 50 pips? Stop hunt 25-50p with 3 pushes? M/W? RRT?
 
-### Entry Requirements
-- Asian range < pair-specific max (40-65 pips depending on pair)
-- Stop hunt detected (25-50 pips beyond range, pair-adjusted)
-- 3 pushes in the stop hunt zone
-- M/W formation OR Railroad Tracks at reversal
-- All 4 timeframes aligned (confluence score >= 50/100)
+### Entry Requirements (V2 — corrected June 5)
+- Asian range < pair-specific max (accumulation valid)
+- M/W formation detected: **W-bottom = BUY, M-top = SELL** (PRIMARY direction signal)
+- Stop hunt confirmed (even 1-5 pip breach if M/W confirms — "soft hunt")
+- M/W pattern OVERRIDES stop hunt breach side (the breach is the fake move, M/W is the real signal)
+- Confluence score >= 50/100 from MTF alignment
+- TDI confirmation (Shark Fin, Blood in the Water, VB Squeeze)
+- Re-entry guard: no re-entry same pair/direction after loss (persistent SQLite)
+- Exposure check: no new entry if pair already has open position
 
 ### Trade Management
 - **Universal**: 90 min max if NOT in profit -> close (stale exit)
@@ -131,7 +154,9 @@ Enterprise-grade Market Maker Method (MMM) algorithmic execution system trading 
 ## Databases
 - `logs/trade_journal.db` — Trade history (75 fields per trade)
 - `logs/market_scanner.db` — 15-min market condition snapshots
-- `logs/flashcards.db` — Market structure pattern learning
+- `logs/flashcards.db` — Market structure pattern learning (entry/scan/missed with full MTF context)
+- `logs/reentry_guard.db` — Persistent re-entry guard: loss events, day bans, cooldowns (survives restarts)
+- `logs/vision_backtests.db` — Vision model predictions for offline calibration
 
 ## Report Schedule (all times EAT)
 - **Session reports**: Auto-sent when session transitions (Asian->London->NY)
@@ -148,9 +173,11 @@ Set via `CONSENSUS_MODE` in `.env`.
 
 ## Running
 ```bash
-.venv/Scripts/python.exe -m helix_v3.orchestrator   # Full autonomous system
-.venv/Scripts/python.exe tests/live_test.py           # Integration test
-.venv/Scripts/python.exe tests/execute_gbpjpy.py      # Single pair execution
+.venv/Scripts/python.exe -m helix_v3.orchestrator_v2  # V2 autonomous system (PRIMARY)
+.venv/Scripts/python.exe tests/fresh_scan.py           # Quick market scan with narrative
+.venv/Scripts/python.exe tests/full_market_scan.py     # Full scan + WhatsApp notifications
+.venv/Scripts/python.exe tests/compare_orchestrators.py # V1 vs V2 comparison
+.venv/Scripts/python.exe -m helix_v3.orchestrator      # V1 legacy (flat quant, no MTF)
 ```
 
 ## Key Dependencies

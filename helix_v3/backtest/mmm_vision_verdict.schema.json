@@ -1,0 +1,75 @@
+{
+  "type": "object",
+  "properties": {
+    "direction": {
+      "type": "string",
+      "enum": ["BUY", "SELL", "NEUTRAL"]
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "cycle_level": {
+      "type": "integer",
+      "enum": [0, 1, 2, 3]
+    },
+    "m_w_detected": {
+      "type": "boolean"
+    },
+    "rrt_detected": {
+      "type": "boolean"
+    },
+    "pin_bar_detected": {
+      "type": "boolean"
+    },
+    "setup_class": {
+      "type": "string",
+      "enum": [
+        "THE_33",
+        "NYC_REVERSAL",
+        "SECOND_LEG_MW",
+        "STRAIGHTAWAY",
+        "EMA_200_BOUNCE",
+        "LONDON_REVERSAL",
+        "NO_TRADE",
+        "UNKNOWN"
+      ]
+    },
+    "entry_quality": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "risk_flags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "expected_path": {
+      "type": "string"
+    },
+    "invalidation": {
+      "type": "string"
+    },
+    "reasoning": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "direction",
+    "confidence",
+    "cycle_level",
+    "m_w_detected",
+    "rrt_detected",
+    "pin_bar_detected",
+    "setup_class",
+    "entry_quality",
+    "risk_flags",
+    "expected_path",
+    "invalidation",
+    "reasoning"
+  ],
+  "additionalProperties": false
+}

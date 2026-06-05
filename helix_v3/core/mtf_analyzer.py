@@ -391,48 +391,117 @@ class MTFAnalyzer:
         ar_pips = (ar_high - ar_low) / pip_size
         accum_valid = ar_pips <= pp.asian_range_max_pips
 
-        # Stop hunt detection (price beyond Asian range by 25-50 pips)
-        current = float(df.iloc[-1]["Close"])
-        breach_above = (current - ar_high) / pip_size
-        breach_below = (ar_low - current) / pip_size
+        # Stop hunt detection — scan ALL post-Asian bars for ANY breach,
+        # not just current price. The stop hunt happens then price reverses,
+        # so by scan time the current price may already be back inside range.
+        #
+        # Per MMM: a W-bottom retest of Asian low IS the stop hunt even if
+        # the breach is only a few pips. The M/W formation confirms it.
+        # We use two thresholds:
+        #   - "hard" hunt: breach >= stop_hunt_min_pips (classic 25-50p)
+        #   - "soft" hunt: any breach of Asian boundary + M/W or RRT confirmation
+
+        post_asian = df[~asian_mask | (~today_mask)]
 
         hunt_detected = False
         hunt_dir = Direction.NEUTRAL
         hunt_pips = 0.0
 
-        if pp.stop_hunt_min_pips <= breach_above <= pp.stop_hunt_max_pips:
+        # Scan all post-Asian bars for maximum breach
+        max_breach_above = 0.0
+        max_breach_below = 0.0
+        if not post_asian.empty:
+            max_high = float(post_asian["High"].max())
+            min_low = float(post_asian["Low"].min())
+            max_breach_above = (max_high - ar_high) / pip_size
+            max_breach_below = (ar_low - min_low) / pip_size
+
+        # Hard stop hunt: classic 25-50 pip breach
+        if pp.stop_hunt_min_pips <= max_breach_above <= pp.stop_hunt_max_pips:
             hunt_detected = True
-            hunt_dir = Direction.SELL  # Hunt above = real trend is down
-            hunt_pips = breach_above
-        elif pp.stop_hunt_min_pips <= breach_below <= pp.stop_hunt_max_pips:
+            hunt_dir = Direction.SELL
+            hunt_pips = max_breach_above
+        elif pp.stop_hunt_min_pips <= max_breach_below <= pp.stop_hunt_max_pips:
             hunt_detected = True
-            hunt_dir = Direction.BUY  # Hunt below = real trend is up
-            hunt_pips = breach_below
+            hunt_dir = Direction.BUY
+            hunt_pips = max_breach_below
+
+        # M/W detection — this determines the DIRECTION per MMM
+        # W-bottom = BUY (double bottom, MM hunted lows, true trend is up)
+        # M-top = SELL (double top, MM hunted highs, true trend is down)
+        last_20 = df.iloc[-20:]
+        m_w = False
+        m_w_direction = Direction.NEUTRAL
+        m_w_highs = last_20["High"].values
+        m_w_lows = last_20["Low"].values
+
+        # Check W-bottom first (two troughs with peak between)
+        for i in range(2, len(m_w_lows) - 2):
+            if m_w_lows[i] > m_w_lows[i - 2] and m_w_lows[i] > m_w_lows[i + 2]:
+                trough_diff = abs(m_w_lows[i - 2] - m_w_lows[i + 2]) / pip_size
+                if trough_diff < 20:
+                    m_w = True
+                    m_w_direction = Direction.BUY
+                    break
+
+        # Check M-top (two peaks with valley between)
+        if not m_w:
+            for i in range(2, len(m_w_highs) - 2):
+                if m_w_highs[i] < m_w_highs[i - 2] and m_w_highs[i] < m_w_highs[i + 2]:
+                    peak_diff = abs(m_w_highs[i - 2] - m_w_highs[i + 2]) / pip_size
+                    if peak_diff < 20:
+                        m_w = True
+                        m_w_direction = Direction.SELL
+                        break
+
+        # RRT detection
+        rrt = self._detect_rrt(df.iloc[-4:])
+
+        # DIRECTION LOGIC — M/W pattern overrides stop hunt side
+        # Per MMM: the M/W formation tells you the TRUE direction.
+        # The stop hunt just confirms liquidity was grabbed.
+        current = float(df.iloc[-1]["Close"])
+
+        if m_w and m_w_direction != Direction.NEUTRAL:
+            # M/W pattern determines direction — this is the primary signal
+            if not hunt_detected:
+                hunt_detected = True
+                hunt_pips = max(max_breach_above, max_breach_below)
+            hunt_dir = m_w_direction
+        elif hunt_detected and m_w:
+            # Hunt was detected by breach, but M/W should override direction
+            hunt_dir = m_w_direction
+        elif not hunt_detected and (m_w or rrt):
+            # Soft hunt: any breach + pattern confirmation
+            if max_breach_above >= 1.0 or max_breach_below >= 1.0:
+                hunt_detected = True
+                hunt_pips = max(max_breach_above, max_breach_below)
+                # Use M/W direction if available, otherwise infer from price position
+                if m_w_direction != Direction.NEUTRAL:
+                    hunt_dir = m_w_direction
+                elif current > ar_high:
+                    hunt_dir = Direction.BUY
+                elif current < ar_low:
+                    hunt_dir = Direction.SELL
 
         # Count pushes in stop hunt zone (3 pushes expected)
         push_count = 0
         if hunt_detected:
-            post_asian = df[~asian_mask | (~today_mask)]
             if hunt_dir == Direction.SELL:
-                # Count upward pushes above Asian high
                 above = post_asian[post_asian["High"] > ar_high]
                 if not above.empty:
-                    highs = above["High"].values
-                    push_count = self._count_pushes(highs, direction="up")
+                    push_count = self._count_pushes(above["High"].values, direction="up")
             else:
                 below = post_asian[post_asian["Low"] < ar_low]
                 if not below.empty:
-                    lows = below["Low"].values
-                    push_count = self._count_pushes(lows, direction="down")
+                    push_count = self._count_pushes(below["Low"].values, direction="down")
+                # Also count pushes TO the Asian low (W retests)
+                if push_count == 0:
+                    near_low = post_asian[post_asian["Low"] < ar_low + 5 * pip_size]
+                    if not near_low.empty:
+                        push_count = self._count_pushes(near_low["Low"].values, direction="down")
 
-        # M/W detection (simplified: look for double top/bottom in last 6 bars)
-        last_12 = df.iloc[-12:]
-        m_w = self._detect_m_w(last_12, pip_size)
-
-        # RRT detection (consecutive opposing candles of similar size)
-        rrt = self._detect_rrt(df.iloc[-4:])
-
-        # Entry signal: requires accumulation + stop hunt + M/W or RRT
+        # Entry signal: accumulation + (hunt OR soft hunt with M/W) + pattern confirmation
         entry_signal = accum_valid and hunt_detected and (m_w or rrt or push_count >= 3)
         entry_dir = hunt_dir if entry_signal else Direction.NEUTRAL
 
@@ -441,13 +510,21 @@ class MTFAnalyzer:
         if accum_valid:
             conf += 0.20
         if hunt_detected:
-            conf += 0.25
+            conf += 0.20
+            if hunt_pips >= pp.stop_hunt_min_pips:
+                conf += 0.10  # bonus for deep hunt
         if push_count >= 3:
             conf += 0.15
+        elif push_count >= 2:
+            conf += 0.10
         if m_w:
             conf += 0.25
         if rrt:
             conf += 0.15
+        # Bonus: price already reversed past Asian range (strong confirmation)
+        if hunt_detected and ((hunt_dir == Direction.BUY and current > ar_high) or
+                               (hunt_dir == Direction.SELL and current < ar_low)):
+            conf += 0.10
 
         return FifteenMinEntry(
             asian_range_high=ar_high,

@@ -1,0 +1,290 @@
+
+==========================================================================================
+  HELIX V3: ORCHESTRATOR V1 vs V2 COMPARISON | 2026-06-04 14:29 EAT
+==========================================================================================
+  Account: 52846409 | Balance: 781.73 | Equity: 781.73
+
+==========================================================================================
+  V1 ANALYSIS (Flat Quant Engine — per symbol per timeframe)
+==========================================================================================
+
+  Symbol     TF    Filter   Accum   Hunt    HuntDir  HuntPips  Trend      AsianRng  
+------------------------------------------------------------------------------------------
+  EURUSD     M15   no       n       Y       SELL     28.2      BUY        11.0      
+  EURUSD     H1    no       n       Y       SELL     28.2      NEUTRAL    11.0      
+  GBPUSD     M15   no       n       Y       SELL     26.9      BUY        14.7      
+  GBPUSD     H1    no       n       Y       SELL     26.9      NEUTRAL    14.7      
+  AUDUSD     M15   no       n       n       N/A      0.0       NEUTRAL    14.9      
+  AUDUSD     H1    no       n       n       N/A      0.0       NEUTRAL    14.9      
+  GBPAUD     M15   no       n       n       N/A      0.0       BUY        34.4      
+  GBPAUD     H1    no       n       n       N/A      0.0       BUY        34.4      
+  GBPJPY     M15   no       n       n       N/A      0.0       BUY        18.8      
+  GBPJPY     H1    no       n       n       N/A      0.0       NEUTRAL    18.8      
+  GBPNZD     M15   no       n       n       N/A      0.0       NEUTRAL    33.3      
+  GBPNZD     H1    no       n       n       N/A      0.0       BUY        33.3      
+  EURJPY     M15   no       n       n       N/A      0.0       BUY        13.3      
+  EURJPY     H1    no       n       n       N/A      0.0       BUY        13.3      
+  EURCHF     M15   no       n       n       N/A      0.0       NEUTRAL    8.7       
+  EURCHF     H1    no       n       n       N/A      0.0       NEUTRAL    8.7       
+  GBPCHF     M15   no       n       Y       BUY      16.7      NEUTRAL    11.6      
+  GBPCHF     H1    no       n       Y       BUY      16.7      NEUTRAL    11.6      
+  USDCHF     M15   no       n       n       N/A      0.0       NEUTRAL    12.6      
+  USDCHF     H1    no       n       n       N/A      0.0       NEUTRAL    12.6      
+  USDJPY     M15   no       n       n       N/A      0.0       NEUTRAL    11.7      
+  USDJPY     H1    no       n       n       N/A      0.0       NEUTRAL    11.7      
+  AUDJPY     M15   no       n       n       N/A      0.0       NEUTRAL    24.0      
+  AUDJPY     H1    no       n       n       N/A      0.0       NEUTRAL    24.0      
+  XAUUSD     M15   no       n       n       N/A      0.0       NEUTRAL    3425.0    
+  XAUUSD     H1    no       n       n       N/A      0.0       NEUTRAL    3425.0    
+
+  V1 Summary: 0/26 passed pre-filter | Time: 0.14s
+
+==========================================================================================
+  V2 ANALYSIS (MTF Top-Down — per symbol, all TFs in one pass)
+==========================================================================================
+
+  Symbol     Weekly             H4             H1 Session       M15 Hunt     Push   Confl  Valid  Dir     
+------------------------------------------------------------------------------------------
+  EURUSD     LATE_WEEK SELL     L0 NEUTRAL  TRUE_TREND       -            0      35     no     NEUTRAL 
+               WARN: No 15M entry signal
+  GBPUSD     LATE_WEEK BUY      L3 SELL     TRUE_TREND       -            0      40     no     NEUTRAL 
+               WARN: No 15M entry signal
+               WARN: H4 trend SELL conflicts
+               WARN: Asian range too wide: 55 pips
+  AUDUSD     LATE_WEEK SELL     L3 SELL     TRUE_TREND       -            0      40     no     NEUTRAL 
+               WARN: No 15M entry signal
+               WARN: H4 trend SELL conflicts
+               WARN: Asian range too wide: 59 pips
+  GBPAUD     LATE_WEEK BUY      L3 BUY      TRUE_TREND       -            0      30     no     NEUTRAL 
+               WARN: No 15M entry signal
+               WARN: H4 trend BUY conflicts
+               WARN: Asian range too wide: 93 pips
+  GBPJPY     LATE_WEEK SELL     L0 NEUTRAL  TRUE_TREND       -            0      35     no     NEUTRAL 
+               WARN: No 15M entry signal
+               WARN: Asian range too wide: 76 pips
+  GBPNZD     LATE_WEEK BUY      L3 BUY      TRUE_TREND       -            0      30     no     NEUTRAL 
+               WARN: No 15M entry signal
+               WARN: H4 trend BUY conflicts
+               WARN: Asian range too wide: 187 pips
+  EURJPY     LATE_WEEK SELL     L1 BUY      TRUE_TREND       -            0      20     no     NEUTRAL 
+               WARN: No 15M entry signal
+               WARN: H4 trend BUY conflicts
+  EURCHF     LATE_WEEK SELL     L3 BUY      TRUE_TREND       -            0      40     no     NEUTRAL 
+               WARN: No 15M entry signal
+               WARN: H4 trend BUY conflicts
+               WARN: Asian range too wide: 31 pips
+  GBPCHF     LATE_WEEK SELL     L0 NEUTRAL  TRUE_TREND       -            0      35     no     NEUTRAL 
+               WARN: No 15M entry signal
+  USDCHF     LATE_WEEK SELL     L0 NEUTRAL  TRUE_TREND       -            0      30     no     NEUTRAL 
+               WARN: No 15M entry signal
+               WARN: Asian range too wide: 43 pips
+  USDJPY     LATE_WEEK SELL     L0 NEUTRAL  TRUE_TREND       -            0      45     no     NEUTRAL 
+               WARN: No 15M entry signal
+  AUDJPY     LATE_WEEK SELL     L0 NEUTRAL  TRUE_TREND       -            0      40     no     NEUTRAL 
+               WARN: No 15M entry signal
+               WARN: Asian range too wide: 97 pips
+  XAUUSD     LATE_WEEK SELL     L0 NEUTRAL  TRUE_TREND       -            0      30     no     NEUTRAL 
+               WARN: No 15M entry signal
+               WARN: Asian range too wide: 5384 pips
+
+  V2 Summary: 0/13 trade valid | 0/13 confluence >= 50 | Time: 0.69s
+
+==========================================================================================
+  V2 DETAILED MTF REPORTS (Top 5 by confluence)
+==========================================================================================
+
+============================================================
+  MTF ANALYSIS: USDJPY | 2026-06-04 11:29 UTC
+============================================================
+
+  WEEKLY:  LEVEL_1 | LATE_WEEK | Trend: SELL
+           Peak H=160.08700 L=158.70200 | 1d from peak
+           Mid-week reversal: no
+
+  4-HOUR:  UNKNOWN (L0) | Trend: NEUTRAL
+           Choppy: False | Peak detected: False
+
+  1-HOUR:  Session: TRUE_TREND | Trend: NEUTRAL
+           HOD=160.07900 locked=True | LOD=159.60200 locked=True
+           50/200 cross: none | Intraday L3
+
+  15-MIN:  Asian range: 18 pips (valid=True)
+           Stop hunt: False dir=NEUTRAL 0.0p
+           Pushes: 0 | M/W: True | RRT: True
+
+  VERDICT: NO TRADE
+           Direction: NEUTRAL | Confidence: 60%
+           Confluence: 45/100
+           Rejections: No 15M entry signal
+           Profile: medium tier, 0.8% risk
+============================================================
+
+============================================================
+  MTF ANALYSIS: GBPUSD | 2026-06-04 11:29 UTC
+============================================================
+
+  WEEKLY:  LEVEL_3 | LATE_WEEK | Trend: BUY
+           Peak H=1.35091 L=1.33675 | 7d from peak
+           Mid-week reversal: no
+
+  4-HOUR:  LEVEL_3 (L3) | Trend: SELL
+           Choppy: False | Peak detected: True
+
+  1-HOUR:  Session: TRUE_TREND | Trend: NEUTRAL
+           HOD=1.34617 locked=False | LOD=1.34108 locked=True
+           50/200 cross: none | Intraday L3
+
+  15-MIN:  Asian range: 55 pips (valid=False)
+           Stop hunt: False dir=NEUTRAL 0.0p
+           Pushes: 0 | M/W: True | RRT: False
+
+  VERDICT: NO TRADE
+           Direction: NEUTRAL | Confidence: 25%
+           Confluence: 40/100
+           Rejections: No 15M entry signal; H4 trend SELL conflicts; Asian range too wide: 55 pips
+           Profile: low tier, 1.0% risk
+============================================================
+
+============================================================
+  MTF ANALYSIS: AUDUSD | 2026-06-04 11:29 UTC
+============================================================
+
+  WEEKLY:  LEVEL_3 | LATE_WEEK | Trend: SELL
+           Peak H=0.72006 L=0.70978 | 6d from peak
+           Mid-week reversal: no
+
+  4-HOUR:  LEVEL_3 (L3) | Trend: SELL
+           Choppy: False | Peak detected: False
+
+  1-HOUR:  Session: TRUE_TREND | Trend: NEUTRAL
+           HOD=0.71451 locked=False | LOD=0.71224 locked=False
+           50/200 cross: none | Intraday L3
+
+  15-MIN:  Asian range: 59 pips (valid=False)
+           Stop hunt: False dir=NEUTRAL 0.0p
+           Pushes: 0 | M/W: True | RRT: True
+
+  VERDICT: NO TRADE
+           Direction: NEUTRAL | Confidence: 40%
+           Confluence: 40/100
+           Rejections: No 15M entry signal; H4 trend SELL conflicts; Asian range too wide: 59 pips
+           Profile: low tier, 1.0% risk
+============================================================
+
+============================================================
+  MTF ANALYSIS: EURCHF | 2026-06-04 11:29 UTC
+============================================================
+
+  WEEKLY:  LEVEL_1 | LATE_WEEK | Trend: SELL
+           Peak H=0.91921 L=0.90831 | 1d from peak
+           Mid-week reversal: no
+
+  4-HOUR:  LEVEL_3 (L3) | Trend: BUY
+           Choppy: False | Peak detected: True
+
+  1-HOUR:  Session: TRUE_TREND | Trend: NEUTRAL
+           HOD=0.91905 locked=False | LOD=0.91594 locked=False
+           50/200 cross: none | Intraday L3
+
+  15-MIN:  Asian range: 31 pips (valid=False)
+           Stop hunt: False dir=NEUTRAL 0.0p
+           Pushes: 0 | M/W: True | RRT: True
+
+  VERDICT: NO TRADE
+           Direction: NEUTRAL | Confidence: 40%
+           Confluence: 40/100
+           Rejections: No 15M entry signal; H4 trend BUY conflicts; Asian range too wide: 31 pips
+           Profile: low tier, 1.0% risk
+============================================================
+
+============================================================
+  MTF ANALYSIS: AUDJPY | 2026-06-04 11:29 UTC
+============================================================
+
+  WEEKLY:  LEVEL_1 | LATE_WEEK | Trend: SELL
+           Peak H=114.91400 L=113.26500 | 2d from peak
+           Mid-week reversal: no
+
+  4-HOUR:  UNKNOWN (L0) | Trend: NEUTRAL
+           Choppy: False | Peak detected: False
+
+  1-HOUR:  Session: TRUE_TREND | Trend: NEUTRAL
+           HOD=114.18200 locked=False | LOD=113.83100 locked=True
+           50/200 cross: none | Intraday L3
+
+  15-MIN:  Asian range: 97 pips (valid=False)
+           Stop hunt: False dir=NEUTRAL 0.0p
+           Pushes: 0 | M/W: True | RRT: True
+
+  VERDICT: NO TRADE
+           Direction: NEUTRAL | Confidence: 40%
+           Confluence: 40/100
+           Rejections: No 15M entry signal; Asian range too wide: 97 pips
+           Profile: medium tier, 0.8% risk
+============================================================
+
+==========================================================================================
+  HEAD-TO-HEAD COMPARISON
+==========================================================================================
+
+  Metric                                   V1                        V2                       
+------------------------------------------------------------------------------------------
+  Analysis approach                        Flat per TF               Top-down MTF             
+  Scan time                                0.14s                     0.69s                    
+  Symbols analyzed                         13                        13                       
+  TF combinations                          13x2=26                   13x1=13 (all TFs in 1)   
+  Passed entry gate                        0 pre_filter_passed       0 trade_valid            
+  High confidence setups                   N/A (boolean only)        0 confluence>=50         
+  Weekly context                           No                        Yes (phase+trend+peak)   
+  H4 cycle level                           No                        Yes (L1/L2/L3)           
+  Session awareness                        No                        Yes (phase detection)    
+  HOD/LOD tracking                         No                        Yes (with lock detect)   
+  Push count (3 pushes)                    No                        Yes                      
+  M/W formation                            Via vision only           Quant + vision           
+  Annotated charts                         No                        Yes (Asian/hunt/HOD)     
+  WhatsApp with chart                      Text only                 Chart image attached     
+  Flashcard learning                       Not connected             Active (entry/scan/miss) 
+  Confluence scoring                       No                        Yes (0-100 composite)    
+
+==========================================================================================
+  KEY INSIGHTS
+==========================================================================================
+
+  V2 detects context V1 cannot see:
+    USDJPY (confluence=45): HOD+LOD locked
+    GBPUSD (confluence=40): H4 at L3 (SELL); LOD locked
+    AUDUSD (confluence=40): H4 at L3 (SELL)
+    EURCHF (confluence=40): H4 at L3 (BUY)
+    AUDJPY (confluence=40): LOD locked
+    EURUSD (confluence=35): LOD locked
+    GBPJPY (confluence=35): LOD locked
+    GBPAUD (confluence=30): H4 at L3 (BUY); LOD locked
+    GBPNZD (confluence=30): H4 at L3 (BUY); LOD locked
+    USDCHF (confluence=30): HOD locked
+    XAUUSD (confluence=30): LOD locked
+    EURJPY (confluence=20): LOD locked
+
+==========================================================================================
+  ANNOTATED CHART TEST (V2 only)
+==========================================================================================
+  Generated annotated chart: charts\annotated\USDJPY_M15_annotated_20260604_142943.png
+  (This chart would be attached to WhatsApp in V2)
+
+==========================================================================================
+  EVALUATION VERDICT
+==========================================================================================
+  1. V2 provides full Weekly->4H->1H->15M context per symbol (V1 has none)
+  2. V2 tracks weekly cycle position, mid-week reversal expectation, days from peak
+  3. V2 counts H4 cycle levels (L1/L2/L3) — critical for MMM entry timing
+  4. V2 detects session phase and HOD/LOD locks — tells you where in the day you are
+  5. V2 counts pushes in stop hunt zone (3 pushes = MMM entry signal)
+  6. V2 scores confluence 0-100 instead of binary pass/fail — gradual readiness
+  7. V2 generates annotated charts with Asian range, hunt zone, entry markers
+  8. V2 sends chart images with WhatsApp (not text-only)
+  9. V2 saves flashcards for pattern learning (entry/scan/missed)
+
+  Trade-offs:
+  - V2 scan time (0.69s) vs V1 (0.14s) — V2 fetches more data (D1, H4, H1, M15)
+
+  RECOMMENDATION: V2 should replace V1 as the primary orchestrator.
+  V1 can remain as a lightweight fast-scan fallback.

@@ -1,0 +1,15 @@
+HELIX V3 FULL SCAN | 2026-06-04 17:00 EAT
+
+EURUSD: confluence=40 dir=NEUTRAL valid=False type=THE_33 tdi_rsi=61.7 adr=56p
+USDJPY: confluence=35 dir=NEUTRAL valid=False type=THE_33 tdi_rsi=37.3 adr=72p
+AUDJPY: confluence=35 dir=NEUTRAL valid=False type=THE_33 tdi_rsi=60.2 adr=84p
+AUDUSD: confluence=30 dir=NEUTRAL valid=False type=THE_33 tdi_rsi=64.1 adr=57p
+GBPAUD: confluence=30 dir=NEUTRAL valid=False type=THE_33 tdi_rsi=48.2 adr=102p
+GBPJPY: confluence=30 dir=NEUTRAL valid=False type=THE_33 tdi_rsi=65.4 adr=113p
+EURCHF: confluence=30 dir=NEUTRAL valid=False type=THE_33 tdi_rsi=29.7 adr=41p
+GBPCHF: confluence=30 dir=NEUTRAL valid=False type=THE_33 tdi_rsi=28.7 adr=53p
+GBPNZD: confluence=25 dir=NEUTRAL valid=False type=THE_33 tdi_rsi=49.1 adr=165p
+USDCHF: confluence=25 dir=NEUTRAL valid=False type=THE_33 tdi_rsi=22.6 adr=55p
+XAUUSD: confluence=25 dir=NEUTRAL valid=False type=THE_33 tdi_rsi=57.6 adr=1023p
+GBPUSD: confluence=20 dir=NEUTRAL valid=False type=THE_33 tdi_rsi=58.8 adr=76p
+EURJPY: confluence=15 dir=NEUTRAL valid=False type=THE_33 tdi_rsi=68.0 adr=87p

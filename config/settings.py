@@ -24,8 +24,11 @@ class MT5Config:
 class APIConfig:
     anthropic_key: str = os.getenv("ANTHROPIC_API_KEY", "")
     openai_key: str = os.getenv("OPENAI_API_KEY", "")
-    anthropic_model: str = "claude-opus-4-20250901"
-    openai_model: str = "gpt-5.5"
+    anthropic_model: str = os.getenv("ANTHROPIC_MODEL", "claude-opus-4-8")
+    anthropic_fast_model: str = os.getenv("ANTHROPIC_FAST_MODEL", "claude-sonnet-4-6")
+    openai_model: str = os.getenv("OPENAI_MODEL", "gpt-5.5")
+    openai_embedding_model: str = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
+    model_routing_policy: str = os.getenv("MODEL_ROUTING_POLICY", "dual_provider")
     consensus_confidence_threshold: float = 0.88
 
 

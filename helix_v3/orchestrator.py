@@ -62,7 +62,9 @@ class HelixOrchestrator:
         self._symbols: List[str] = list(settings.trading.symbols)
         self._last_market_scan: float = 0
         self._last_session: str = ""
-        self._reports_sent_today: Set[str] = set()  # Track which reports sent
+        self._reports_sent_today: Set[str] = set()
+        self._notified_setups: Set[str] = set()  # Prevent repeat setup alerts
+        self._notified_failures: Set[str] = set()  # Prevent repeat block/exec-fail alerts
 
     def _setup_signals(self) -> None:
         def _stop(signum, frame):
@@ -108,25 +110,36 @@ class HelixOrchestrator:
                 )
                 return
 
-            # Notify: valid setup detected
-            cycle_lvl = 0
-            if consensus.verdicts:
-                cl = consensus.verdicts[0].cycle_level
-                cycle_lvl = cl.value if cl else 0
+            # Notify: valid setup detected (once per symbol/direction/session)
+            setup_key = f"{symbol}_{consensus.direction.value}_{timeframe}"
+            if setup_key not in self._notified_setups:
+                cycle_lvl = 0
+                if consensus.verdicts:
+                    cl = consensus.verdicts[0].cycle_level
+                    cycle_lvl = cl.value if cl else 0
 
-            self.notifier.notify_trade_setup(
-                symbol=symbol,
-                timeframe=timeframe,
-                direction=consensus.direction.value,
-                confidence=consensus.avg_confidence,
-                cycle_level=cycle_lvl,
-                readiness=100,
-            )
+                self.notifier.notify_trade_setup(
+                    symbol=symbol,
+                    timeframe=timeframe,
+                    direction=consensus.direction.value,
+                    confidence=consensus.avg_confidence,
+                    cycle_level=cycle_lvl,
+                    readiness=100,
+                )
+                self._notified_setups.add(setup_key)
 
             # Step 4: Build and execute order
             order = self.gatekeeper.build_order(symbol, quant_signal, consensus)
             if order is None:
                 logger.info("Order construction blocked for %s", symbol)
+                block_key = f"block_{setup_key}"
+                if block_key not in self._notified_failures:
+                    self.notifier._send(
+                        f"HELIX V3 ORDER BLOCKED\n{'='*25}\n"
+                        f"{symbol} {timeframe} {consensus.direction.value}\n"
+                        f"Reason: gatekeeper rejected (pair gate / risk / margin)"
+                    )
+                    self._notified_failures.add(block_key)
                 return
 
             ticket = self.gatekeeper.execute_order(
@@ -156,6 +169,15 @@ class HelixOrchestrator:
                 )
             else:
                 logger.warning("Order execution failed for %s", symbol)
+                exec_key = f"exec_{setup_key}"
+                if exec_key not in self._notified_failures:
+                    self.notifier._send(
+                        f"HELIX V3 EXEC FAILED\n{'='*25}\n"
+                        f"{symbol} {order.direction.value} {order.lot_size} lots\n"
+                        f"Entry: {order.entry_price}  SL: {order.stop_loss}\n"
+                        f"MT5 returned no ticket — check terminal log"
+                    )
+                    self._notified_failures.add(exec_key)
 
         except ConnectionError as e:
             logger.error("Connection error for %s: %s", symbol, e)
@@ -208,6 +230,8 @@ class HelixOrchestrator:
             if current_session != self._last_session and self._last_session:
                 logger.info("Session transition: %s -> %s", self._last_session, current_session)
                 self._send_session_report(self._last_session)
+                self._notified_setups.clear()  # Reset setup alerts for new session
+                self._notified_failures.clear()  # Reset failure alerts for new session
             self._last_session = current_session
 
             # Check for EOD / weekly / monthly reports

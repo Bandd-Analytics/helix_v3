@@ -27,9 +27,12 @@ from helix_v3.core.types import (
     Direction,
     VisionVerdict,
 )
+from helix_v3.ai.model_roles import get_role
 from helix_v3.utils.logger import get_logger
 
 logger = get_logger("consensus_validator")
+
+PROMPT_VERSION = "mmm_vision_v2"
 
 VISION_SYSTEM_PROMPT = """You are an expert Market Maker Method (MMM) chart analyst.
 Analyze this candlestick chart with EMA overlays (5-Red, 13-Yellow, 50-Aqua, 200-Magenta, 800-White).
@@ -40,6 +43,7 @@ Identify and report:
 3. Pin bars or volume spikes interacting with the 50 or 200 EMA lines
 4. Market Maker Cycle Level: count directional pushes relative to the 800 EMA anchor (Level 1, 2, or 3)
 5. Overall directional bias based on EMA stack order and price structure
+6. Setup class, entry quality, risk flags, expected path, and invalidation level/condition
 
 You MUST respond with valid JSON only, no other text."""
 
@@ -61,16 +65,36 @@ VISION_JSON_SCHEMA: Dict[str, Any] = {
     "properties": {
         "direction": {"type": "string", "enum": ["BUY", "SELL", "NEUTRAL"]},
         "confidence": {"type": "number", "minimum": 0.0, "maximum": 1.0},
-        "cycle_level": {"type": "integer", "enum": [1, 2, 3]},
+        "cycle_level": {"type": "integer", "enum": [0, 1, 2, 3]},
         "m_w_detected": {"type": "boolean"},
         "rrt_detected": {"type": "boolean"},
         "pin_bar_detected": {"type": "boolean"},
+        "setup_class": {
+            "type": "string",
+            "enum": [
+                "THE_33",
+                "NYC_REVERSAL",
+                "SECOND_LEG_MW",
+                "STRAIGHTAWAY",
+                "EMA_200_BOUNCE",
+                "LONDON_REVERSAL",
+                "NO_TRADE",
+                "UNKNOWN",
+            ],
+        },
+        "entry_quality": {"type": "integer", "minimum": 0, "maximum": 100},
+        "risk_flags": {"type": "array", "items": {"type": "string"}},
+        "expected_path": {"type": "string"},
+        "invalidation": {"type": "string"},
         "reasoning": {"type": "string"},
     },
     "required": [
         "direction", "confidence", "cycle_level",
-        "m_w_detected", "rrt_detected", "pin_bar_detected", "reasoning",
+        "m_w_detected", "rrt_detected", "pin_bar_detected",
+        "setup_class", "entry_quality", "risk_flags",
+        "expected_path", "invalidation", "reasoning",
     ],
+    "additionalProperties": False,
 }
 
 LOCAL_VERDICTS_DIR = Path(settings.chart.output_dir).parent / "verdicts"
@@ -102,7 +126,7 @@ class MMMConsensusValidator:
     def _auto_detect_mode(self) -> str:
         import os
         forced = os.getenv("CONSENSUS_MODE", "").lower()
-        if forced in ("anthropic", "dual-api", "local"):
+        if forced in ("anthropic", "dual-api", "openai", "local"):
             return forced
 
         has_anthropic = bool(self._api_cfg.anthropic_key)
@@ -178,33 +202,42 @@ class MMMConsensusValidator:
     async def _query_openai(
         self, image_b64: str, client: httpx.AsyncClient
     ) -> VisionVerdict:
+        role = get_role("structured_arbitrator")
         payload = {
-            "model": self._api_cfg.openai_model,
-            "response_format": {"type": "json_object"},
-            "max_tokens": 1024,
-            "messages": [
+            "model": role.model,
+            "max_output_tokens": 1024,
+            "input": [
                 {"role": "system", "content": VISION_SYSTEM_PROMPT},
                 {
                     "role": "user",
                     "content": [
                         {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/png;base64,{image_b64}",
-                                "detail": "high",
-                            },
+                            "type": "input_text",
+                            "text": (
+                                "Analyze this MMM chart and return the strict "
+                                "backtest-ready JSON verdict."
+                            ),
                         },
                         {
-                            "type": "text",
-                            "text": "Analyze this MMM chart and return your structured JSON verdict.",
+                            "type": "input_image",
+                            "image_url": f"data:image/png;base64,{image_b64}",
+                            "detail": "high",
                         },
                     ],
                 },
             ],
+            "text": {
+                "format": {
+                    "type": "json_schema",
+                    "name": "mmm_vision_verdict",
+                    "schema": VISION_JSON_SCHEMA,
+                    "strict": True,
+                }
+            },
         }
 
         response = await client.post(
-            "https://api.openai.com/v1/chat/completions",
+            "https://api.openai.com/v1/responses",
             headers={
                 "Authorization": f"Bearer {self._api_cfg.openai_key}",
                 "Content-Type": "application/json",
@@ -215,8 +248,21 @@ class MMMConsensusValidator:
         response.raise_for_status()
         data = response.json()
 
-        text_content = data["choices"][0]["message"]["content"]
-        return self._parse_verdict("gpt-5.5", text_content)
+        text_content = self._extract_openai_text(data)
+        return self._parse_verdict(f"openai:{role.role_id}:{role.model}", text_content)
+
+    @staticmethod
+    def _extract_openai_text(data: Dict[str, Any]) -> str:
+        if isinstance(data.get("output_text"), str):
+            return data["output_text"]
+
+        pieces: List[str] = []
+        for item in data.get("output", []):
+            for content in item.get("content", []):
+                text = content.get("text")
+                if isinstance(text, str):
+                    pieces.append(text)
+        return "".join(pieces)
 
     # ------------------------------------------------------------------
     # Local Mode (Claude Code writes verdicts to disk)
@@ -293,16 +339,44 @@ class MMMConsensusValidator:
         if cycle_raw in (1, 2, 3):
             cycle_level = CycleLevel(cycle_raw)
 
+        risk_flags_raw = parsed.get("risk_flags", [])
+        if isinstance(risk_flags_raw, list):
+            risk_flags = [str(flag) for flag in risk_flags_raw]
+        elif risk_flags_raw:
+            risk_flags = [str(risk_flags_raw)]
+        else:
+            risk_flags = []
+
         return VisionVerdict(
             model_name=model_name,
             direction=direction,
-            confidence=float(parsed.get("confidence", 0.0)),
+            confidence=self._safe_float(parsed.get("confidence", 0.0)),
             cycle_level=cycle_level,
             m_w_detected=bool(parsed.get("m_w_detected", False)),
             rrt_detected=bool(parsed.get("rrt_detected", False)),
             pin_bar_detected=bool(parsed.get("pin_bar_detected", False)),
+            setup_class=str(parsed.get("setup_class", "UNKNOWN")),
+            entry_quality=self._safe_int(parsed.get("entry_quality", 0)),
+            risk_flags=risk_flags,
+            expected_path=str(parsed.get("expected_path", "")),
+            invalidation=str(parsed.get("invalidation", "")),
+            reasoning=str(parsed.get("reasoning", "")),
             raw_json=parsed,
         )
+
+    @staticmethod
+    def _safe_float(value: Any) -> float:
+        try:
+            return float(value or 0.0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    @staticmethod
+    def _safe_int(value: Any) -> int:
+        try:
+            return int(float(value or 0))
+        except (TypeError, ValueError):
+            return 0
 
     # ------------------------------------------------------------------
     # Consensus Arbitration
@@ -361,6 +435,8 @@ class MMMConsensusValidator:
             return await self._evaluate_dual_api(image_b64)
         elif self._mode == "anthropic":
             return await self._evaluate_anthropic_only(image_b64)
+        elif self._mode == "openai":
+            return await self._evaluate_openai_only(image_b64)
         elif self._mode == "local":
             return self._evaluate_local(symbol, timeframe)
         else:
@@ -368,13 +444,36 @@ class MMMConsensusValidator:
 
     async def _evaluate_dual_api(self, image_b64: str) -> ConsensusResult:
         """Original dual-model: Claude Opus + GPT-5.5 in parallel."""
+        anthropic_role = get_role("vision_pattern_primary")
+        openai_role = get_role("structured_arbitrator")
         async with httpx.AsyncClient() as client:
             results = await asyncio.gather(
-                self._query_anthropic(image_b64, client, VISION_SYSTEM_PROMPT, "claude-opus"),
+                self._query_anthropic(
+                    image_b64,
+                    client,
+                    VISION_SYSTEM_PROMPT,
+                    f"anthropic:{anthropic_role.role_id}:{anthropic_role.model}",
+                ),
                 self._query_openai(image_b64, client),
                 return_exceptions=True,
             )
-        return self._gather_and_arbitrate(results, ["claude-opus", "gpt-5.5"])
+        return self._gather_and_arbitrate(
+            results,
+            [
+                f"anthropic:{anthropic_role.role_id}:{anthropic_role.model}",
+                f"openai:{openai_role.role_id}:{openai_role.model}",
+            ],
+        )
+
+    async def _evaluate_openai_only(self, image_b64: str) -> ConsensusResult:
+        """Single OpenAI structured-vision verdict for offline evaluation."""
+        role = get_role("structured_arbitrator")
+        async with httpx.AsyncClient() as client:
+            result = await self._query_openai(image_b64, client)
+        return self._gather_and_arbitrate(
+            [result],
+            [f"openai:{role.role_id}:{role.model}"],
+        )
 
     async def _evaluate_anthropic_only(self, image_b64: str) -> ConsensusResult:
         """Single-model self-consensus: two Claude queries with different prompts."""
@@ -405,6 +504,12 @@ class MMMConsensusValidator:
                 m_w_detected=v1.m_w_detected,
                 rrt_detected=v1.rrt_detected,
                 pin_bar_detected=v1.pin_bar_detected,
+                setup_class=v1.setup_class,
+                entry_quality=v1.entry_quality,
+                risk_flags=list(v1.risk_flags),
+                expected_path=v1.expected_path,
+                invalidation=v1.invalidation,
+                reasoning=v1.reasoning,
                 raw_json=v1.raw_json,
             )
 
