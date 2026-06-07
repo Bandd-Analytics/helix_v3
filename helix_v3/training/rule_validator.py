@@ -781,6 +781,287 @@ class RuleValidator:
         return result
 
     # ==================================================================
+    # Rule: Pivot Day-Map M3/M1 Targeting (MMM-TRAIN-005)
+    # ==================================================================
+
+    def validate_pivot_day_map(
+        self, symbol: str, days: int = 90,
+    ) -> ValidationResult:
+        """Test: Does prior-day candle color predict HOD zone via M3/M1 pivots?
+
+        Per Steve Mauro (MMM-TRAIN-005):
+        - Red prior candle → M1/M3 day (HOD between S2/S1 or PP/R1)
+        - Green prior candle → M2/M4 day (HOD between S1/PP or R1/R2)
+
+        Also tests: does targeting the pivot-projected zone improve TP accuracy
+        versus a blind SL-multiple TP?
+        """
+        pip = self._pip_size(symbol)
+        df_d1 = self._fetch_data(symbol, "D1", days + 20)
+
+        from helix_v3.core.tdi import compute_pivots
+
+        result = ValidationResult(
+            rule_name="pivot_day_map",
+            symbol=symbol,
+            test_date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            parameters={"days": days},
+        )
+
+        events = []
+        m1m3_correct = 0
+        m2m4_correct = 0
+        m1m3_total = 0
+        m2m4_total = 0
+        pivot_tp_hits = 0
+        blind_tp_hits = 0
+        total_tested = 0
+
+        for i in range(2, len(df_d1)):
+            prev = df_d1.iloc[i - 1]
+            curr = df_d1.iloc[i]
+
+            prev_h = float(prev["High"])
+            prev_l = float(prev["Low"])
+            prev_c = float(prev["Close"])
+            prev_o = float(prev["Open"])
+            prev_bullish = prev_c > prev_o
+
+            curr_h = float(curr["High"])
+            curr_l = float(curr["Low"])
+
+            pivots = compute_pivots(prev_h, prev_l, prev_c, prev_bullish)
+            pp = pivots["PP"]
+            m1 = pivots["M1"]  # (S2+S1)/2
+            m2 = pivots["M2"]  # (S1+PP)/2
+            m3 = pivots["M3"]  # (PP+R1)/2
+            m4 = pivots["M4"]  # (R1+R2)/2
+            day_type = pivots["day_type"]
+
+            # Where did today's HOD actually land?
+            hod = curr_h
+
+            if day_type == "M1_M3":
+                m1m3_total += 1
+                # HOD should be in M1 zone (S2-S1) or M3 zone (PP-R1)
+                in_m1_zone = pivots["S2"] <= hod <= pivots["S1"]
+                in_m3_zone = pp <= hod <= pivots["R1"]
+                if in_m1_zone or in_m3_zone:
+                    m1m3_correct += 1
+                    outcome = "CORRECT"
+                else:
+                    outcome = "WRONG"
+            else:  # M2_M4
+                m2m4_total += 1
+                # HOD should be in M2 zone (S1-PP) or M4 zone (R1-R2)
+                in_m2_zone = pivots["S1"] <= hod <= pp
+                in_m4_zone = pivots["R1"] <= hod <= pivots["R2"]
+                if in_m2_zone or in_m4_zone:
+                    m2m4_correct += 1
+                    outcome = "CORRECT"
+                else:
+                    outcome = "WRONG"
+
+            # Test pivot-targeted TP vs blind TP
+            # For a sell day (red prior): target is M1 from M3
+            # For a buy day (green prior): target is M4 from M2
+            total_tested += 1
+            if not prev_bullish:
+                # Sell day: did price travel from M3 zone down to M1?
+                if curr_h >= m3 and curr_l <= m1:
+                    pivot_tp_hits += 1
+                # Blind TP: did price move > 1.5x ADR?
+                day_range = (curr_h - curr_l) / pip
+                if day_range > 50:  # rough proxy for "TP hit"
+                    blind_tp_hits += 1
+            else:
+                # Buy day: did price travel from M2 zone up to M4?
+                if curr_l <= m2 and curr_h >= m4:
+                    pivot_tp_hits += 1
+                day_range = (curr_h - curr_l) / pip
+                if day_range > 50:
+                    blind_tp_hits += 1
+
+            event = RuleEvent(
+                rule_name="pivot_day_map",
+                symbol=symbol,
+                event_time=curr.name.to_pydatetime(),
+                direction=day_type,
+                outcome=outcome,
+                pips_result=(hod - pp) / pip,
+                details={
+                    "day_type": day_type,
+                    "hod": hod,
+                    "pp": pp,
+                    "m1": m1, "m2": m2, "m3": m3, "m4": m4,
+                    "prev_bullish": prev_bullish,
+                },
+            )
+            events.append(event)
+
+        result.occurrences = len(events)
+        result.hits = sum(1 for e in events if e.outcome == "CORRECT")
+        result.misses = result.occurrences - result.hits
+        result.hit_rate = result.hits / result.occurrences if result.occurrences > 0 else 0
+
+        m1m3_rate = m1m3_correct / m1m3_total if m1m3_total > 0 else 0
+        m2m4_rate = m2m4_correct / m2m4_total if m2m4_total > 0 else 0
+        pivot_tp_rate = pivot_tp_hits / total_tested if total_tested > 0 else 0
+        blind_tp_rate = blind_tp_hits / total_tested if total_tested > 0 else 0
+
+        result.notes = (
+            f"Day-type prediction: {result.hit_rate:.1%} overall | "
+            f"M1/M3 days: {m1m3_rate:.1%} ({m1m3_correct}/{m1m3_total}) | "
+            f"M2/M4 days: {m2m4_rate:.1%} ({m2m4_correct}/{m2m4_total}) | "
+            f"Pivot TP hit: {pivot_tp_rate:.1%} vs blind: {blind_tp_rate:.1%}"
+        )
+        result.parameters["m1m3_rate"] = m1m3_rate
+        result.parameters["m2m4_rate"] = m2m4_rate
+        result.parameters["pivot_tp_rate"] = pivot_tp_rate
+        result.parameters["blind_tp_rate"] = blind_tp_rate
+
+        result.events = events
+        self._save_result(result)
+        return result
+
+    # ==================================================================
+    # Rule: Friday Exit Logic (MMM-TRAIN-007)
+    # ==================================================================
+
+    def validate_friday_exit(
+        self, symbol: str, days: int = 180,
+    ) -> ValidationResult:
+        """Test: Does exiting positions on Friday US session reduce drawdowns?
+
+        Per Steve Mauro (MMM-TRAIN-007):
+        - Friday US session = exit context after level completion
+        - Price consolidates toward end of week
+
+        Compares: holding through Friday vs exiting at Friday 17:00 UTC.
+        """
+        pip = self._pip_size(symbol)
+        df_d1 = self._fetch_data(symbol, "D1", days + 10)
+        df_m15 = self._fetch_data(symbol, "M15", days * 96 + 200)
+
+        result = ValidationResult(
+            rule_name="friday_exit",
+            symbol=symbol,
+            test_date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            parameters={"days": days},
+        )
+
+        events = []
+        friday_exit_pnl = []
+        hold_through_pnl = []
+
+        # Find each Friday in the data
+        for i in range(1, len(df_d1)):
+            bar = df_d1.iloc[i]
+            if bar.name.weekday() != 4:  # Not Friday
+                continue
+
+            # Get Monday's open for this week
+            # Look back to find Monday (weekday 0)
+            mon_idx = None
+            for j in range(i, max(i - 7, 0), -1):
+                if df_d1.iloc[j].name.weekday() == 0:
+                    mon_idx = j
+                    break
+            if mon_idx is None:
+                continue
+
+            monday_open = float(df_d1.iloc[mon_idx]["Open"])
+            friday_bar = df_d1.iloc[i]
+            friday_close = float(friday_bar["Close"])
+
+            # Scenario 1: Exit at Friday 17:00 UTC (US session wind-down)
+            fri_date = friday_bar.name.date()
+            fri_m15 = df_m15[df_m15.index.date == fri_date]
+            fri_1700 = fri_m15[fri_m15.index.hour >= 17]
+            if not fri_1700.empty:
+                exit_at_1700 = float(fri_1700.iloc[0]["Close"])
+            else:
+                exit_at_1700 = friday_close
+
+            # Scenario 2: Hold through to Monday open
+            if i + 1 < len(df_d1):
+                next_bar = df_d1.iloc[i + 1]
+                monday_next_open = float(next_bar["Open"])
+            else:
+                monday_next_open = friday_close
+
+            # Weekly move from Monday open
+            week_move = (friday_close - monday_open) / pip
+            fri_exit_move = (exit_at_1700 - monday_open) / pip
+            hold_move = (monday_next_open - monday_open) / pip
+
+            # Did Friday exit preserve more profit?
+            # If the week was up, Friday exit should capture most of the move
+            # without weekend gap risk
+            if abs(week_move) > 10:  # Only count meaningful weeks
+                fri_captured = fri_exit_move / week_move if week_move != 0 else 0
+                hold_captured = hold_move / week_move if week_move != 0 else 0
+
+                friday_better = abs(fri_exit_move) >= abs(hold_move)
+                friday_exit_pnl.append(fri_exit_move)
+                hold_through_pnl.append(hold_move)
+
+                # Check Friday afternoon reversal (price gives back gains)
+                fri_high = float(friday_bar["High"])
+                fri_low = float(friday_bar["Low"])
+                fri_open = float(friday_bar["Open"])
+                friday_reversal = False
+                if week_move > 0:
+                    # Bullish week — did Friday give back gains?
+                    friday_reversal = friday_close < fri_open and (fri_high - friday_close) / pip > 15
+                else:
+                    # Bearish week — did Friday bounce?
+                    friday_reversal = friday_close > fri_open and (friday_close - fri_low) / pip > 15
+
+                event = RuleEvent(
+                    rule_name="friday_exit",
+                    symbol=symbol,
+                    event_time=friday_bar.name.to_pydatetime(),
+                    direction="BULLISH_WEEK" if week_move > 0 else "BEARISH_WEEK",
+                    outcome="FRIDAY_BETTER" if friday_better else "HOLD_BETTER",
+                    pips_result=fri_exit_move - hold_move,
+                    details={
+                        "week_move": week_move,
+                        "fri_exit_move": fri_exit_move,
+                        "hold_move": hold_move,
+                        "friday_reversal": friday_reversal,
+                        "gap_cost": (monday_next_open - friday_close) / pip,
+                    },
+                )
+                events.append(event)
+
+        result.occurrences = len(events)
+        result.hits = sum(1 for e in events if e.outcome == "FRIDAY_BETTER")
+        result.misses = result.occurrences - result.hits
+        result.hit_rate = result.hits / result.occurrences if result.occurrences > 0 else 0
+
+        avg_fri = float(np.mean([abs(p) for p in friday_exit_pnl])) if friday_exit_pnl else 0
+        avg_hold = float(np.mean([abs(p) for p in hold_through_pnl])) if hold_through_pnl else 0
+        reversals = sum(1 for e in events if e.details.get("friday_reversal"))
+        gap_costs = [abs(e.details.get("gap_cost", 0)) for e in events]
+        avg_gap = float(np.mean(gap_costs)) if gap_costs else 0
+
+        result.notes = (
+            f"Friday exit better: {result.hit_rate:.1%} ({result.hits}/{result.occurrences}) | "
+            f"Avg |move| fri exit: {avg_fri:.0f}p vs hold: {avg_hold:.0f}p | "
+            f"Friday reversals: {reversals}/{result.occurrences} | "
+            f"Avg weekend gap: {avg_gap:.1f}p"
+        )
+        result.parameters["avg_friday_exit_pips"] = avg_fri
+        result.parameters["avg_hold_through_pips"] = avg_hold
+        result.parameters["friday_reversal_count"] = reversals
+        result.parameters["avg_gap_pips"] = avg_gap
+
+        result.events = events
+        self._save_result(result)
+        return result
+
+    # ==================================================================
     # Storage
     # ==================================================================
 
@@ -826,6 +1107,8 @@ class RuleValidator:
         "tdi_shark_fin",
         "session_moves",
         "adr_bounds",
+        "pivot_day_map",
+        "friday_exit",
     ]
 
     def run_all(
@@ -842,6 +1125,8 @@ class RuleValidator:
             "tdi_shark_fin": self.validate_tdi_shark_fin,
             "session_moves": self.validate_session_moves,
             "adr_bounds": self.validate_adr_bounds,
+            "pivot_day_map": self.validate_pivot_day_map,
+            "friday_exit": self.validate_friday_exit,
         }
 
         for name, method in rule_methods.items():
