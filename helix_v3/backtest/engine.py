@@ -26,8 +26,25 @@ from helix_v3.core.mtf_analyzer import MTFAnalyzer, MTFAnalysis
 from helix_v3.core.quant_engine import MMMQuantitativeEngine
 from helix_v3.core.tdi import compute_tdi, compute_pivots, compute_adr, compute_daily_hilo
 from helix_v3.core.patterns import scan_patterns
+from helix_v3.core.advisory_confidence import (
+    AdvisorySetup,
+    advisory_setup_from_mtf,
+    score_advisory_setup,
+)
 from helix_v3.core.types import Direction, QuantSignal, SessionBounds
 from helix_v3.utils.logger import get_logger
+
+try:
+    from helix_v3.backtest.mmm_event_replay import (
+        MMMReplayStore,
+        ReplaySetup,
+        build_setup_signature,
+        outcome_from_closed_trade,
+        replay_setup_from_mtf,
+    )
+    _HAS_REPLAY = True
+except ImportError:
+    _HAS_REPLAY = False
 
 logger = get_logger("backtest_engine")
 
@@ -96,6 +113,8 @@ class SimulatedTrade:
     t1_closed: bool = False
     remaining_lots: float = 0.0
     current_sl: float = 0.0
+    advisory_grade: str = ""
+    advisory_score: float = 0.0
 
     def __post_init__(self):
         self.remaining_lots = self.lot_size
@@ -358,6 +377,12 @@ class BacktestRunner:
         self._day_bans: Dict[str, str] = {}  # "SYMBOL_DIR" -> ban_date
         # Entry cooldown: block re-entry on same symbol for 2 hours after ANY exit
         self._entry_cooldowns: Dict[str, datetime] = {}  # "SYMBOL" -> cooldown_until
+        # Advisory peer tracking for convergence scoring
+        self._current_advisory_setups: Dict[str, AdvisorySetup] = {}  # symbol -> latest setup
+        # Replay store for recording trade outcomes
+        self._replay_store = MMMReplayStore() if _HAS_REPLAY else None
+        # Track ReplaySetup per trade for outcome recording (keyed by "SYMBOL_entry_time")
+        self._trade_setups: Dict[str, object] = {}  # "SYMBOL_timestamp" -> ReplaySetup
 
     def run(self) -> None:
         """Execute the backtest."""
@@ -482,6 +507,34 @@ class BacktestRunner:
         if self._is_banned(dir_key, bar_time):
             return
 
+        # Advisory confidence scoring — grade the setup
+        df_m15_tdi = self.data_store.get_rates(symbol, "M15", bar_time, 200)
+        tdi_result = compute_tdi(df_m15_tdi) if not df_m15_tdi.empty else None
+        pip_size = self.data_store.get_pip_size(symbol)
+        pat_scan = scan_patterns(
+            df_m15_tdi.iloc[-50:], pip_size,
+            asian_high=analysis.fifteen_min.asian_range_high,
+            asian_low=analysis.fifteen_min.asian_range_low,
+        ) if not df_m15_tdi.empty else None
+
+        advisory_setup = advisory_setup_from_mtf(
+            analysis, tdi_result=tdi_result, patterns=pat_scan,
+        )
+        self._current_advisory_setups[symbol] = advisory_setup
+        advisory = score_advisory_setup(
+            advisory_setup, self._current_advisory_setups.values(),
+        )
+
+        # Block D and AVOID grades
+        if advisory.grade in ("D", "AVOID"):
+            if self.verbose:
+                logger.debug(
+                    "[%s] %s %s blocked: grade=%s score=%.0f blockers=%s",
+                    bar_time.strftime("%m-%d %H:%M"), direction.value, symbol,
+                    advisory.grade, advisory.final_score, advisory.blockers[:3],
+                )
+            return
+
         # Get entry price from M15 bar
         df_m15 = self.data_store.get_rates(symbol, "M15", bar_time, 1)
         if df_m15.empty:
@@ -532,22 +585,58 @@ class BacktestRunner:
             pip_value_per_lot=pip_value_per_lot,
         )
 
-        if trade and self.verbose:
-            logger.info(
-                "[%s] ENTRY: %s %s %.2fL @ %.5f SL=%.5f conf=%d",
-                bar_time.strftime("%m-%d %H:%M"),
-                direction.value, symbol, trade.lot_size,
-                entry_price, sl_price, analysis.confluence_score,
-            )
+        if trade:
+            trade.advisory_grade = advisory.grade
+            trade.advisory_score = advisory.final_score
+            # Store replay setup for outcome recording when trade closes
+            if _HAS_REPLAY:
+                rs = replay_setup_from_mtf(
+                    analysis, snapshot_at=bar_time,
+                    tdi_result=tdi_result, patterns=pat_scan,
+                    source="backtest", source_id=len(self.simulator.closed_trades),
+                )
+                trade_key = f"{symbol}_{bar_time.isoformat()}"
+                self._trade_setups[trade_key] = rs
+            if self.verbose:
+                logger.info(
+                    "[%s] ENTRY: %s %s %.2fL @ %.5f SL=%.5f conf=%d grade=%s(%.0f)",
+                    bar_time.strftime("%m-%d %H:%M"),
+                    direction.value, symbol, trade.lot_size,
+                    entry_price, sl_price, analysis.confluence_score,
+                    advisory.grade, advisory.final_score,
+                )
 
     def _record_exit(self, action: str, bar_time: datetime) -> None:
-        """Set entry cooldown after ANY trade exit (prevents same-setup churn)."""
+        """Set entry cooldown and record outcome to replay store."""
+        # T1 HIT means the trade is still open (partial close), skip
+        if "T1 HIT" in action:
+            return
         parts = action.split(":")
         if len(parts) < 2:
             return
         symbol = parts[1].strip().split()[0]
         # 2 hour entry cooldown on the symbol after any exit
         self._entry_cooldowns[symbol] = bar_time + timedelta(hours=2)
+
+        # Record outcome to replay store — find the most recently closed trade for this symbol
+        if self._replay_store and _HAS_REPLAY:
+            for trade in reversed(self.simulator.closed_trades):
+                if trade.symbol == symbol:
+                    entry_ts = trade.entry_time
+                    if hasattr(entry_ts, 'isoformat'):
+                        trade_key = f"{symbol}_{entry_ts.isoformat()}"
+                    else:
+                        trade_key = f"{symbol}_{str(entry_ts)}"
+                    rs = self._trade_setups.pop(trade_key, None)
+                    if rs is not None:
+                        try:
+                            sig = build_setup_signature(rs)
+                            sig_id = self._replay_store.record_signature(sig)
+                            outcome = outcome_from_closed_trade(trade, rs)
+                            self._replay_store.record_outcome(outcome, sig_id)
+                        except Exception as e:
+                            logger.warning("Replay record failed for %s: %s", symbol, e)
+                    break
 
     def _record_loss(self, action: str, bar_time: datetime) -> None:
         """Update re-entry guard after a losing trade."""
@@ -651,6 +740,26 @@ def main(argv: Optional[list] = None) -> None:
     # Print report
     from helix_v3.backtest.report import print_backtest_report
     print_backtest_report(runner.simulator, start, end)
+
+    # Auto-promote proven patterns to validation library
+    if _HAS_REPLAY:
+        try:
+            from helix_v3.backtest.validation_library import ValidationLibrary
+            lib = ValidationLibrary()
+            promoted = lib.promote_from_replay(
+                min_total=5, min_favorable_rate=55.0, min_symbols=1,
+            )
+            records = lib.top_records(limit=5)
+            print(f"\n  VALIDATION LIBRARY: promoted {promoted} patterns")
+            if records:
+                print(f"  Top proven patterns:")
+                for r in records:
+                    print(f"    {r.setup_family:<20} {r.symbol or 'CROSS':<8} "
+                          f"win={r.favorable_rate:.1f}% n={r.total} "
+                          f"target={r.realistic_target_pips or 0:.1f}p")
+            lib.close()
+        except Exception as e:
+            logger.warning("Validation library promotion failed: %s", e)
 
 
 if __name__ == "__main__":

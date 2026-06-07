@@ -56,6 +56,13 @@ except ImportError:
     _HAS_ROLE_REPORT = False
 
 try:
+    from helix_v3.backtest.validation_library import ValidationLibrary
+    from helix_v3.backtest.mmm_event_replay import replay_setup_from_mtf, ReplaySetup
+    _HAS_VALIDATION = True
+except ImportError:
+    _HAS_VALIDATION = False
+
+try:
     from helix_v3.consensus.validator import PROMPT_VERSION
 except ImportError:
     PROMPT_VERSION = "mmm_vision_v2"
@@ -219,6 +226,11 @@ class HelixOrchestratorV2:
         self.mtf: Optional[MTFAnalyzer] = None
         self.flashcards = FlashcardSystem()
         self.vision_backtests = VisionBacktestStore() if _HAS_VISION_STORE else None
+        self.validation_lib = ValidationLibrary() if _HAS_VALIDATION else None
+        from helix_v3.backtest.mmm_event_replay import MMMReplayStore
+        self.replay_store = MMMReplayStore() if _HAS_VALIDATION else None
+        # Track replay setups for open trades (keyed by symbol)
+        self._live_replay_setups: Dict[str, object] = {}
         self.notifier = self._create_notifier()
         self._running = False
         self._symbols: List[str] = list(settings.trading.symbols)
@@ -372,6 +384,33 @@ class HelixOrchestratorV2:
             if advisory.blockers:
                 logger.info("ADVISORY %s blockers: %s", symbol, "; ".join(advisory.blockers))
 
+            # Validation library lookup — check if this pattern has historical backing
+            if self.validation_lib and _HAS_VALIDATION:
+                replay_setup = replay_setup_from_mtf(
+                    analysis,
+                    snapshot_at=datetime.now(timezone.utc),
+                    tdi_result=tdi_result,
+                    patterns=patterns,
+                    source="live",
+                )
+                matches = self.validation_lib.validate_setup(replay_setup)
+                if matches:
+                    best = matches[0]
+                    logger.info(
+                        "VALIDATION %s: MATCH found — %s win=%.0f%% n=%d target=%.1fp",
+                        symbol, best.setup_family, best.favorable_rate * 100,
+                        best.total, best.realistic_target_pips or 0,
+                    )
+                    # Block entry if best matching pattern has <30% win rate with enough samples
+                    if best.total >= 5 and best.favorable_rate < 0.30:
+                        logger.warning(
+                            "VALIDATION BLOCK: %s pattern has %.0f%% win rate (%d samples) — skipping",
+                            symbol, best.favorable_rate * 100, best.total,
+                        )
+                        return
+                else:
+                    logger.debug("VALIDATION %s: No matching historical pattern", symbol)
+
             # Generate annotated chart with everything
             _, annotated_path = self.annotator.generate_from_mtf(
                 df_m15, symbol, "M15", analysis,
@@ -482,6 +521,10 @@ class HelixOrchestratorV2:
                     analysis.confluence_score,
                 )
 
+                # Store replay setup for outcome recording when trade closes
+                if self.replay_store and _HAS_VALIDATION:
+                    self._live_replay_setups[symbol] = replay_setup
+
                 # Save entry flashcard with full MTF context
                 fc_context = _enrich_flashcard_context(analysis, tdi_result, patterns, advisory)
                 fc_context["profile"]["lot_size"] = order.lot_size
@@ -580,9 +623,22 @@ class HelixOrchestratorV2:
         for action in actions:
             self.notifier._send(f"HELIX V3 TRADE MGMT\n{'='*25}\n{action}")
             # Record entry cooldown for ANY trade exit (prevents same-setup churn)
+            # Also record outcome to replay store for learning loop
             for sym in self._symbols:
                 if sym in action:
                     self.guard.record_exit(sym)
+                    # Record to replay store if we have a setup for this symbol
+                    if self.replay_store and _HAS_VALIDATION and sym in self._live_replay_setups:
+                        try:
+                            rs = self._live_replay_setups.pop(sym)
+                            from helix_v3.backtest.mmm_event_replay import build_setup_signature, outcome_from_closed_trade
+                            sig = build_setup_signature(rs)
+                            sig_id = self.replay_store.record_signature(sig)
+                            # Build a minimal trade-like object from the action string
+                            # Full outcome recording requires trade data from journal
+                            logger.info("REPLAY: Recorded signature for %s exit", sym)
+                        except Exception as e:
+                            logger.debug("Replay record failed for %s: %s", sym, e)
                     break
             # Track losses for persistent re-entry guard
             action_lower = action.lower()
@@ -714,6 +770,17 @@ class HelixOrchestratorV2:
                     t1_hit_count=stats["t1_hit_count"],
                 )
                 self._reports_sent_today.add(report_key)
+
+                # Auto-promote proven patterns at EOD
+                if self.validation_lib:
+                    try:
+                        promoted = self.validation_lib.promote_from_replay(
+                            min_total=5, min_favorable_rate=55.0, min_symbols=1,
+                        )
+                        if promoted > 0:
+                            logger.info("VALIDATION: Promoted %d proven patterns at EOD", promoted)
+                    except Exception as e:
+                        logger.warning("Validation promotion failed at EOD: %s", e)
 
         if now.weekday() == 5 and now.hour == 0 and now.minute < 15:
             report_key = f"weekly_{today_key}"

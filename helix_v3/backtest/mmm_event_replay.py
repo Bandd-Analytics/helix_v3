@@ -1879,6 +1879,193 @@ class MMMEventReplay:
         return "\n".join(lines)
 
 
+def _enum_val(obj: Any) -> str:
+    """Extract string value from an enum or return the string itself."""
+    val = getattr(obj, "value", obj)
+    return str(val) if val else ""
+
+
+def _to_direction(obj: Any) -> Direction:
+    """Convert an enum, string, or None to Direction."""
+    if obj is None:
+        return Direction.NEUTRAL
+    if isinstance(obj, Direction):
+        return obj
+    val = getattr(obj, "value", obj)
+    try:
+        return Direction(str(val).upper())
+    except (ValueError, AttributeError):
+        return Direction.NEUTRAL
+
+
+def replay_setup_from_mtf(
+    analysis: Any,
+    *,
+    snapshot_at: datetime,
+    tdi_result: Any = None,
+    patterns: Any = None,
+    source: str = "live",
+    source_id: int = 0,
+) -> ReplaySetup:
+    """Build a ReplaySetup from a live MTF analysis + optional TDI/patterns."""
+    m15 = getattr(analysis, "fifteen_min", None)
+    h4 = getattr(analysis, "four_hour", None)
+    h1 = getattr(analysis, "one_hour", None)
+    weekly = getattr(analysis, "weekly", None)
+
+    tdi_sigs = []
+    tdi_rsi = tdi_signal = tdi_base = None
+    tdi_shark = False
+    tdi_shark_dir = ""
+    tdi_vb = False
+    tdi_div = ""
+    tdi_cross = ""
+    if tdi_result is not None:
+        tdi_sigs = [s.value for s in getattr(tdi_result, "signals", []) if getattr(s, "value", "NONE") != "NONE"]
+        tdi_rsi = getattr(tdi_result, "rsi", None)
+        tdi_signal = getattr(tdi_result, "signal", None)
+        tdi_base = getattr(tdi_result, "base", None)
+        tdi_shark = bool(getattr(tdi_result, "shark_fin_active", False))
+        tdi_shark_dir = str(getattr(tdi_result, "shark_fin_direction", "") or "")
+        tdi_vb = bool(getattr(tdi_result, "vb_squeeze", False))
+        for s in tdi_sigs:
+            if "DIVERGENCE" in s:
+                tdi_div = s
+            if "CROSS" in s:
+                tdi_cross = s
+
+    pat_type = ""
+    pat_count = pat_rrt = pat_spike = pat_pin = 0
+    pat_batman = False
+    if patterns is not None:
+        pat_type = str(getattr(getattr(patterns, "trade_type", ""), "value", getattr(patterns, "trade_type", "")))
+        pat_list = getattr(patterns, "patterns", [])
+        pat_count = len(pat_list)
+        for p in pat_list:
+            pv = str(getattr(getattr(p, "pattern", ""), "value", getattr(p, "pattern", "")))
+            if "RRT" in pv or "RAILROAD" in pv:
+                pat_rrt += 1
+            if "SPIKE" in pv:
+                pat_spike += 1
+            if "PIN" in pv:
+                pat_pin += 1
+            if "BATMAN" in pv:
+                pat_batman = True
+
+    return ReplaySetup(
+        symbol=str(getattr(analysis, "symbol", "")),
+        timeframe="M15",
+        snapshot_at=snapshot_at,
+        direction=getattr(analysis, "trade_direction", Direction.NEUTRAL),
+        confluence_score=int(getattr(analysis, "confluence_score", 0) or 0),
+        weekly_phase=_enum_val(getattr(weekly, "week_phase", "")),
+        weekly_trend=_to_direction(getattr(weekly, "trend_direction", None)),
+        h4_level=int(getattr(h4, "level_count", 0) or 0),
+        h4_trend=_to_direction(getattr(h4, "trend_direction", None)),
+        h1_session=_enum_val(getattr(h1, "session_phase", "")),
+        h1_trend=_to_direction(getattr(h1, "trend_direction", None)),
+        asian_range_pips=getattr(m15, "asian_range_pips", None),
+        accumulation_valid=bool(getattr(m15, "accumulation_valid", False)),
+        stop_hunt_detected=bool(getattr(m15, "stop_hunt_detected", False)),
+        stop_hunt_direction=_to_direction(getattr(m15, "stop_hunt_direction", None)),
+        stop_hunt_pips=getattr(m15, "stop_hunt_pips", None),
+        push_count=int(getattr(m15, "push_count", 0) or 0),
+        m_w_forming=bool(getattr(m15, "m_w_forming", False)),
+        m_w_pattern=str(getattr(m15, "m_w_pattern", "") or ""),
+        rrt_detected=bool(getattr(m15, "rrt_detected", False)),
+        tdi_signals=tdi_sigs,
+        tdi_shark_fin=tdi_shark,
+        tdi_shark_direction=tdi_shark_dir,
+        tdi_vb_squeeze=tdi_vb,
+        tdi_divergence=tdi_div,
+        tdi_crossed_signal=tdi_cross,
+        tdi_rsi=tdi_rsi,
+        tdi_signal=tdi_signal,
+        tdi_base=tdi_base,
+        pattern_trade_type=pat_type,
+        pattern_count=pat_count,
+        pattern_rrt_count=pat_rrt,
+        pattern_spike_count=pat_spike,
+        pattern_pin_bar_count=pat_pin,
+        pattern_half_batman=pat_batman,
+        source=source,
+        source_id=source_id,
+    )
+
+
+def outcome_from_closed_trade(
+    trade: Any,
+    replay_setup: ReplaySetup,
+) -> MMMEventOutcome:
+    """Build an MMMEventOutcome from a closed SimulatedTrade or live trade data."""
+    sl_pips = getattr(trade, "sl_pips", None)
+    pip_size = getattr(trade, "pip_size", 0.0001)
+    entry = getattr(trade, "entry_price", 0.0)
+    sl = getattr(trade, "stop_loss", 0.0)
+    tp1 = getattr(trade, "take_profit_1", 0.0)
+    tp2 = getattr(trade, "take_profit_2", 0.0)
+
+    t1_pips = abs(tp1 - entry) / pip_size if pip_size > 0 and tp1 else None
+    t2_pips = abs(tp2 - entry) / pip_size if pip_size > 0 and tp2 else None
+
+    exit_price = getattr(trade, "exit_price", entry)
+    direction = getattr(trade, "direction", Direction.NEUTRAL)
+    if direction == Direction.BUY:
+        exit_pips = (exit_price - entry) / pip_size if pip_size > 0 else 0
+    elif direction == Direction.SELL:
+        exit_pips = (entry - exit_price) / pip_size if pip_size > 0 else 0
+    else:
+        exit_pips = 0
+
+    exit_reason = str(getattr(trade, "exit_reason", ""))
+    t1_closed = bool(getattr(trade, "t1_closed", False))
+
+    # Map exit reason to replay outcome labels
+    outcome_map = {
+        "SL_HIT": "SL_HIT",
+        "TP2_HIT": "TARGET_2",
+        "STALE": "STALE_EXIT",
+        "MAX_DURATION": "TIME_EXIT" if exit_pips > 0 else "TIME_EXIT_LOSS",
+        "BACKTEST_END": "OPEN_PROFIT" if exit_pips > 0 else "OPEN_LOSS",
+    }
+    outcome = outcome_map.get(exit_reason, exit_reason)
+    if exit_reason == "MAX_DURATION" and exit_pips > 0:
+        outcome = "TIME_EXIT_PROFIT"
+
+    duration_min = 0.0
+    entry_time = getattr(trade, "entry_time", None)
+    exit_time = getattr(trade, "exit_time", None)
+    if entry_time and exit_time:
+        duration_min = (exit_time - entry_time).total_seconds() / 60
+
+    return MMMEventOutcome(
+        source=replay_setup.source,
+        source_id=replay_setup.source_id,
+        symbol=replay_setup.symbol,
+        timeframe="M15",
+        snapshot_at=replay_setup.snapshot_at,
+        direction=direction,
+        entry_price=entry,
+        stop_loss_price=sl,
+        t1_price=tp1,
+        t2_price=tp2,
+        sl_pips=sl_pips,
+        t1_pips=t1_pips,
+        t2_pips=t2_pips,
+        exit_at=exit_time,
+        exit_price=exit_price,
+        exit_pips=exit_pips,
+        max_favorable_pips=getattr(trade, "max_favorable_pips", None),
+        max_adverse_pips=getattr(trade, "max_adverse_pips", None),
+        t1_hit=t1_closed,
+        minutes_to_t1=None,
+        outcome=outcome,
+        label=f"{outcome}_{int(duration_min)}M",
+        event_path=[exit_reason],
+        notes=f"grade={getattr(trade, 'advisory_grade', '')} score={getattr(trade, 'advisory_score', 0):.0f}",
+    )
+
+
 def setup_from_flashcard_row(row: sqlite3.Row | dict[str, Any]) -> ReplaySetup:
     data = dict(row)
     return ReplaySetup(

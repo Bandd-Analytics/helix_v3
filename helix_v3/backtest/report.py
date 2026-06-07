@@ -69,6 +69,15 @@ def per_pair_breakdown(trades: List[SimulatedTrade]) -> dict:
     return {sym: compute_metrics(pair_trades) for sym, pair_trades in sorted(by_pair.items())}
 
 
+def grade_breakdown(trades: List[SimulatedTrade]) -> dict:
+    """Group metrics by advisory grade."""
+    by_grade: dict = defaultdict(list)
+    for t in trades:
+        grade = t.advisory_grade or "UNGRADED"
+        by_grade[grade].append(t)
+    return {g: compute_metrics(gt) for g, gt in sorted(by_grade.items())}
+
+
 def exit_reason_breakdown(trades: List[SimulatedTrade]) -> dict:
     """Count trades by exit reason."""
     counts: dict = defaultdict(int)
@@ -132,6 +141,22 @@ def print_backtest_report(
     for reason, count in exits.items():
         pct = count / len(trades) * 100
         print(f"  {reason:<20} {count:>4} ({pct:>5.1f}%)")
+
+    # Advisory grade breakdown
+    grade_data = grade_breakdown(trades)
+    if grade_data:
+        print(f"\n  ADVISORY GRADE BREAKDOWN")
+        print(f"  {'--' * 36}")
+        print(f"  {'Grade':<10} {'Trades':>6} {'Win%':>6} {'AvgW':>7} {'AvgL':>7} "
+              f"{'PF':>6} {'Exp':>7} {'Net$':>8}")
+        print(f"  {'--' * 36}")
+        for g, m in grade_data.items():
+            print(
+                f"  {g:<10} {m['total_trades']:>6} {m['win_rate']:>5.1f}% "
+                f"{m['avg_win']:>+6.1f} {m['avg_loss']:>6.1f} "
+                f"{m['profit_factor']:>5.2f} {m['expectancy']:>+6.1f} "
+                f"${m['net_pnl']:>+7.2f}"
+            )
 
     # Per-pair breakdown
     pair_data = per_pair_breakdown(trades)
