@@ -586,7 +586,23 @@ def label_mmm_event_path(
                 continue
 
             close_pips = _directional_pips(direction, entry_price, close, pip_size)
-            if state == "FILLED" and minutes >= profile.stale_minutes and close_pips <= 0:
+            stale_exit_min = getattr(profile, "stale_exit_minutes", profile.stale_minutes)
+
+            # Phase 1: tighten SL at stale_minutes for extended-window pairs
+            if (state == "FILLED" and minutes >= profile.stale_minutes
+                    and close_pips <= 0 and stale_exit_min > profile.stale_minutes):
+                # Tighten SL to half — reduce risk during extended window
+                if sl_pips > 0:
+                    half_sl = sl_pips / 2.0
+                    if direction == Direction.BUY:
+                        active_sl = entry_price - half_sl * pip_size
+                    else:
+                        active_sl = entry_price + half_sl * pip_size
+                state = "STALE_TIGHTENED"
+                event_path.append("STALE_TIGHTEN")
+
+            # Phase 2: full exit at stale_exit_minutes
+            if state in ("FILLED", "STALE_TIGHTENED") and minutes >= stale_exit_min and close_pips <= 0:
                 return _final_outcome(
                     setup,
                     "STALE_EXIT",
@@ -605,7 +621,7 @@ def label_mmm_event_path(
                     False,
                     None,
                     event_path + ["STALE_EXIT"],
-                    "90 minute stale rule: trade was not in profit.",
+                    f"Stale exit at {stale_exit_min}min: trade was not in profit.",
                 )
 
         if state == "T1_HIT":

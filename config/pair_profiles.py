@@ -12,12 +12,16 @@ Calibrated from MMM Book (Steve Mauro) methodology:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict
+from typing import Dict, List
 
 
 @dataclass
 class PairProfile:
     symbol: str
+
+    # Active for execution. False = analysis-only (still scanned, not traded).
+    # CALIBRATED: disabled pairs showed negative or marginal edge in 14-day backtest.
+    tradeable: bool = True
 
     # Risk tier: "low" = standard, "medium" = reduced risk, "high" = minimal risk
     risk_tier: str = "low"
@@ -27,10 +31,13 @@ class PairProfile:
     # Spread
     max_spread_pips: float = 3.0         # Block entry above this
 
-    # --- UNIVERSAL RULE: 90 min stale if NOT in profit ---
-    # All pairs use 90 min. If not in profit after 90 min, exit.
-    # If IN profit, the trade stays open and trails.
-    stale_minutes: int = 90
+    # --- TIERED STALE EXIT (calibrated from 90-day validation) ---
+    # Phase 1 (stale_minutes): Tighten SL to half original distance if NOT in profit.
+    # Phase 2 (stale_exit_minutes): Full exit if STILL not in profit after extended window.
+    # Low-vol pairs: 90/90 (exit immediately at 90 min — no extension).
+    # Volatile crosses: 90/150 (tighten at 90, exit at 150 — data shows they need time).
+    stale_minutes: int = 90              # Phase 1: tighten SL (universal)
+    stale_exit_minutes: int = 90         # Phase 2: full exit (pair-specific)
     stale_max_pips: float = 0.0          # 0 = must be in profit, else stale
 
     # Max duration (hard cap even if in profit — session boundary)
@@ -94,6 +101,7 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         max_risk_pct=0.01,                # 1% risk — most predictable pair
         max_spread_pips=2.0,
         stale_minutes=90,
+        stale_exit_minutes=90,            # Low-vol: exit at 90 (validated 64.3%)
         stale_max_pips=0.0,               # Must be in profit by 90 min
         max_duration_minutes=240,          # 4h max
         trail_activation_pips=15.0,        # BE after 15 pips (conservative EUR)
@@ -101,7 +109,7 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         sl_buffer_pips=3.0,
         min_sl_pips=15.0,                  # EUR is tight — but never less than 15
         stop_hunt_min_pips=20.0,           # EUR hunts are tighter
-        stop_hunt_max_pips=40.0,
+        stop_hunt_max_pips=75.0,           # CALIBRATED: was 40, P90=75p
         expected_level_move_pips=70.0,     # Slightly less than GBP
         asian_range_max_pips=40.0,         # EUR has tighter Asian ranges
         notes="Most liquid. ~$10/pip. Tight spreads. Textbook MMM.",
@@ -113,6 +121,7 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         max_risk_pct=0.01,
         max_spread_pips=2.5,
         stale_minutes=90,
+        stale_exit_minutes=90,            # Low-vol: exit at 90 (validated 62.0%)
         stale_max_pips=0.0,
         max_duration_minutes=240,
         trail_activation_pips=20.0,        # GBP needs more room
@@ -120,7 +129,7 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         sl_buffer_pips=3.0,
         min_sl_pips=20.0,
         stop_hunt_min_pips=25.0,           # Standard MMM range
-        stop_hunt_max_pips=50.0,
+        stop_hunt_max_pips=105.0,          # CALIBRATED: was 50, P90=103p
         expected_level_move_pips=80.0,     # GBP moves bigger
         asian_range_max_pips=50.0,
         notes="Higher vol. ~$10/pip. Wider swings. Core MMM pair.",
@@ -132,6 +141,7 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         max_risk_pct=0.01,
         max_spread_pips=2.0,
         stale_minutes=90,
+        stale_exit_minutes=90,            # Low-vol: exit at 90 (validated 69.6%)
         stale_max_pips=0.0,
         max_duration_minutes=240,
         trail_activation_pips=12.0,        # AUD is slower
@@ -139,7 +149,7 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         sl_buffer_pips=3.0,
         min_sl_pips=12.0,                  # AUD is slow — tighter floor OK
         stop_hunt_min_pips=15.0,           # AUD hunts are smaller
-        stop_hunt_max_pips=35.0,
+        stop_hunt_max_pips=70.0,           # CALIBRATED: was 35, P90=68p
         expected_level_move_pips=55.0,     # Smaller ADR
         asian_range_max_pips=35.0,         # Tighter ranges
         notes="Slower, commodity-linked. ~$10/pip. Smaller stop hunts.",
@@ -155,7 +165,8 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         max_risk_pct=0.008,               # 0.8% — AUD pip value ~$7.3/pip
         max_lot_size=0.5,
         max_spread_pips=4.0,
-        stale_minutes=90,                  # UNIVERSAL: 90 min
+        stale_minutes=90,                  # Phase 1: tighten SL at 90 min
+        stale_exit_minutes=150,            # CALIBRATED: was 90, holding helps (37.9% exit-correct)
         stale_max_pips=0.0,               # Must be in profit
         max_duration_minutes=300,          # 5h — crosses can trend longer
         trail_activation_pips=30.0,        # Wide ATR needs room
@@ -163,10 +174,10 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         sl_buffer_pips=5.0,               # Wider — spiky pair
         min_sl_pips=25.0,                  # Spiky — needs room
         stop_hunt_min_pips=30.0,
-        stop_hunt_max_pips=60.0,           # Wider stop hunts on crosses
+        stop_hunt_max_pips=105.0,          # CALIBRATED: was 60, P90=103p
         expected_level_move_pips=100.0,    # Big moves
         asian_range_max_pips=60.0,
-        notes="Volatile cross. ~$7.3/pip. Spiky. Wider everything.",
+        notes="Volatile cross. ~$7.3/pip. Spiky. Extended stale window.",
     ),
 
     "GBPJPY": PairProfile(
@@ -175,7 +186,8 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         max_risk_pct=0.008,               # 0.8% — JPY pip value ~$6.6/pip
         max_lot_size=0.5,
         max_spread_pips=4.0,
-        stale_minutes=90,                  # UNIVERSAL: 90 min
+        stale_minutes=90,                  # Phase 1: tighten SL at 90 min
+        stale_exit_minutes=135,            # CALIBRATED: was 90, holding helps (45.8% exit-correct)
         stale_max_pips=0.0,               # Must be in profit
         max_duration_minutes=240,
         trail_activation_pips=25.0,        # GJ can run 150+ pips
@@ -183,19 +195,21 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         sl_buffer_pips=5.0,               # Wider for JPY volatility
         min_sl_pips=25.0,                  # GJ is aggressive — never less than 25
         stop_hunt_min_pips=30.0,           # GJ stop hunts are aggressive
-        stop_hunt_max_pips=60.0,           # Per MMM book: more volatile = wider
+        stop_hunt_max_pips=130.0,          # CALIBRATED: was 60, P90=131p
         expected_level_move_pips=100.0,    # GJ does 100+ pip level moves
         asian_range_max_pips=50.0,
-        notes="High vol JPY cross. ~$6.6/pip. Fast moves. MMM book says wider range.",
+        notes="High vol JPY cross. ~$6.6/pip. Fast moves. Extended stale window.",
     ),
 
     "GBPNZD": PairProfile(
         symbol="GBPNZD",
+        tradeable=False,                   # DISABLED: +$0.09 in 14-day backtest, 33% win rate
         risk_tier="medium",
         max_risk_pct=0.008,               # 0.8% — NZD pip value ~$5.8/pip
         max_lot_size=0.5,
         max_spread_pips=5.0,              # Widest spreads of the set
-        stale_minutes=90,                  # UNIVERSAL: 90 min
+        stale_minutes=90,                  # Phase 1: tighten SL at 90 min
+        stale_exit_minutes=150,            # CALIBRATED: was 90, holding helps (37.9% exit-correct)
         stale_max_pips=0.0,
         max_duration_minutes=300,
         trail_activation_pips=35.0,        # Very wide ATR
@@ -203,21 +217,23 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         sl_buffer_pips=5.0,
         min_sl_pips=25.0,
         stop_hunt_min_pips=30.0,
-        stop_hunt_max_pips=65.0,           # Widest stop hunts
+        stop_hunt_max_pips=115.0,          # CALIBRATED: was 65, P90=114p
         expected_level_move_pips=110.0,
         asian_range_max_pips=65.0,
-        notes="Widest spreads. ~$5.8/pip. Only trade London/NY. Big moves.",
+        notes="Widest spreads. ~$5.8/pip. Extended stale window. Big moves.",
     ),
 
     # --- EUR Crosses (MMM fractional disparity group) ---
 
     "EURJPY": PairProfile(
         symbol="EURJPY",
+        tradeable=False,                   # DISABLED: 0% win rate in 14-day backtest, -$2.20
         risk_tier="medium",
         max_risk_pct=0.008,
         max_lot_size=0.5,
         max_spread_pips=3.0,
         stale_minutes=90,
+        stale_exit_minutes=90,            # Borderline (57.8%) — keep 90 for safety
         stale_max_pips=0.0,
         max_duration_minutes=240,
         trail_activation_pips=20.0,
@@ -225,7 +241,7 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         sl_buffer_pips=4.0,
         min_sl_pips=20.0,
         stop_hunt_min_pips=25.0,
-        stop_hunt_max_pips=50.0,
+        stop_hunt_max_pips=110.0,          # CALIBRATED: was 50, P90=109p
         expected_level_move_pips=85.0,
         asian_range_max_pips=50.0,
         notes="EUR+JPY cross. ~$6.6/pip. Shows cycle disparity vs EURUSD.",
@@ -237,6 +253,7 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         max_risk_pct=0.01,
         max_spread_pips=2.5,
         stale_minutes=90,
+        stale_exit_minutes=90,            # Low-vol: exit at 90 (validated 86.5% — strongest)
         stale_max_pips=0.0,
         max_duration_minutes=240,
         trail_activation_pips=10.0,        # Very low vol — small moves matter
@@ -244,7 +261,7 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         sl_buffer_pips=3.0,
         min_sl_pips=10.0,                  # Ultra-low vol — tightest floor
         stop_hunt_min_pips=15.0,           # Tight ranges, small hunts
-        stop_hunt_max_pips=30.0,
+        stop_hunt_max_pips=40.0,           # CALIBRATED: was 30, P90=38p
         expected_level_move_pips=45.0,     # Smallest ADR of all pairs
         asian_range_max_pips=25.0,         # Often < 20 pip Asian ranges
         notes="Ultra-low vol. ~$11/pip. Tight ranges. Clean accumulation detection.",
@@ -259,6 +276,7 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         max_lot_size=0.5,
         max_spread_pips=4.0,
         stale_minutes=90,
+        stale_exit_minutes=90,            # Low-vol behavior (77.7% — validated)
         stale_max_pips=0.0,
         max_duration_minutes=240,
         trail_activation_pips=22.0,
@@ -266,7 +284,7 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         sl_buffer_pips=4.0,
         min_sl_pips=20.0,
         stop_hunt_min_pips=25.0,
-        stop_hunt_max_pips=50.0,
+        stop_hunt_max_pips=70.0,           # CALIBRATED: was 50, P90=67p
         expected_level_move_pips=85.0,
         asian_range_max_pips=50.0,
         notes="GBP vol + CHF safe-haven. ~$11/pip. Cleaner M/W than GBPNZD.",
@@ -278,6 +296,7 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         max_risk_pct=0.01,
         max_spread_pips=2.0,
         stale_minutes=90,
+        stale_exit_minutes=90,            # Low-vol: exit at 90 (validated 69.2%)
         stale_max_pips=0.0,
         max_duration_minutes=240,
         trail_activation_pips=15.0,
@@ -285,7 +304,7 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         sl_buffer_pips=3.0,
         min_sl_pips=15.0,
         stop_hunt_min_pips=20.0,
-        stop_hunt_max_pips=40.0,
+        stop_hunt_max_pips=55.0,           # CALIBRATED: was 40, P90=52p
         expected_level_move_pips=60.0,
         asian_range_max_pips=35.0,
         notes="Inverse EURUSD. ~$11/pip. Cross-validates EUR bias.",
@@ -295,11 +314,13 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
 
     "USDJPY": PairProfile(
         symbol="USDJPY",
+        tradeable=False,                   # DISABLED: weak M/W (47.4%), weak stale exit (53.3%)
         risk_tier="medium",
         max_risk_pct=0.008,
         max_lot_size=0.5,
         max_spread_pips=2.5,
         stale_minutes=90,
+        stale_exit_minutes=90,            # Borderline (53.3%) — keep 90 for safety
         stale_max_pips=0.0,
         max_duration_minutes=240,
         trail_activation_pips=20.0,
@@ -307,7 +328,7 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         sl_buffer_pips=4.0,
         min_sl_pips=20.0,
         stop_hunt_min_pips=25.0,
-        stop_hunt_max_pips=50.0,
+        stop_hunt_max_pips=100.0,          # CALIBRATED: was 50, P90=97p
         expected_level_move_pips=80.0,
         asian_range_max_pips=45.0,
         notes="Most liquid JPY pair. ~$6.6/pip. Complements all JPY crosses.",
@@ -315,11 +336,13 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
 
     "AUDJPY": PairProfile(
         symbol="AUDJPY",
+        tradeable=False,                   # DISABLED: +$0.76 in 14-day backtest, 25% win rate
         risk_tier="medium",
         max_risk_pct=0.008,
         max_lot_size=0.5,
         max_spread_pips=3.5,
         stale_minutes=90,
+        stale_exit_minutes=90,            # Borderline (60.7%) — keep 90 for safety
         stale_max_pips=0.0,
         max_duration_minutes=240,
         trail_activation_pips=18.0,
@@ -327,7 +350,7 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         sl_buffer_pips=4.0,
         min_sl_pips=18.0,
         stop_hunt_min_pips=20.0,
-        stop_hunt_max_pips=45.0,
+        stop_hunt_max_pips=90.0,           # CALIBRATED: was 45, P90=89p
         expected_level_move_pips=75.0,
         asian_range_max_pips=45.0,
         notes="Commodity+JPY. ~$6.6/pip. Shows fractional disparity when AUD hits L3.",
@@ -339,11 +362,13 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
 
     "XAUUSD": PairProfile(
         symbol="XAUUSD",
+        tradeable=False,                   # DISABLED: -$14 in 14-day backtest, parameters need fundamental rework
         risk_tier="high",
         max_risk_pct=0.005,               # 0.5% — gold is brutal
         max_lot_size=0.1,                  # Hard cap
         max_spread_pips=5.0,
-        stale_minutes=90,                  # UNIVERSAL: 90 min even for gold
+        stale_minutes=90,
+        stale_exit_minutes=90,            # Gold is violent — no extension
         stale_max_pips=0.0,               # Must be in profit
         max_duration_minutes=180,          # 3h max — gold reversals are violent
         trail_activation_pips=100.0,       # Gold "pips" = cents. 100 pips = $1.00 move
@@ -353,12 +378,17 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         sl_buffer_pips=30.0,              # 30 pips = $0.30
         min_sl_pips=150.0,                 # Gold min SL = $1.50 move
         stop_hunt_min_pips=200.0,         # Gold stop hunts in "pips" are huge
-        stop_hunt_max_pips=500.0,
+        stop_hunt_max_pips=15000.0,        # CALIBRATED: was 500, P90=15505p ($155 move)
         expected_level_move_pips=800.0,    # Gold level moves = $8.00
-        asian_range_max_pips=400.0,        # Gold Asian range in pips
+        asian_range_max_pips=8000.0,       # CALIBRATED: was 400, all days exceeded — $80 range
         notes="GOLD. 1 pip=$0.01. $1/pip/lot. Violent. Min risk. Short duration.",
     ),
 }
+
+
+def get_tradeable_symbols() -> List[str]:
+    """Return symbols with tradeable=True."""
+    return [sym for sym, p in PAIR_PROFILES.items() if p.tradeable]
 
 
 def get_pair_profile(symbol: str) -> PairProfile:
@@ -372,6 +402,7 @@ def get_pair_profile(symbol: str) -> PairProfile:
         max_risk_pct=0.008,
         max_spread_pips=4.0,
         stale_minutes=90,
+        stale_exit_minutes=90,
         stale_max_pips=0.0,
         max_duration_minutes=240,
         trail_activation_pips=20.0,
@@ -384,17 +415,18 @@ def get_pair_profile(symbol: str) -> PairProfile:
 def print_pair_profiles() -> str:
     lines = [
         "",
-        "=" * 95,
-        "  HELIX V3 PAIR RISK PROFILES (MMM Calibrated)",
-        "  Rule: 90 min max if NOT in profit. If in profit, trail SL.",
-        "=" * 95,
+        "=" * 105,
+        "  HELIX V3 PAIR RISK PROFILES (Calibrated from 90-day validation 2026-06-07)",
+        "  Stale: Phase1=tighten SL at 90min, Phase2=exit at pair-specific limit.",
+        "=" * 105,
         "",
         f"  {'Symbol':8} {'Tier':6} {'Risk%':>6} {'MaxLot':>6} {'Spread':>6} "
-        f"{'MinSL':>5} {'Trail':>10} {'SLBuf':>5} {'HuntRange':>10} {'LvlMove':>7}",
-        "-" * 95,
+        f"{'MinSL':>5} {'Trail':>10} {'SLBuf':>5} {'HuntRange':>12} {'LvlMove':>7} {'Stale':>8}",
+        "-" * 105,
     ]
 
     for sym, p in PAIR_PROFILES.items():
+        stale_str = f"{p.stale_minutes}/{p.stale_exit_minutes}"
         lines.append(
             f"  {p.symbol:8} {p.risk_tier:6} {p.max_risk_pct*100:>5.1f}% "
             f"{p.max_lot_size:>6.1f} {p.max_spread_pips:>5.1f}p "
@@ -403,10 +435,11 @@ def print_pair_profiles() -> str:
             f"{p.sl_buffer_pips:>4.0f}p "
             f"{p.stop_hunt_min_pips:.0f}-{p.stop_hunt_max_pips:.0f}p "
             f"{p.expected_level_move_pips:>5.0f}p"
+            f" {stale_str:>8}"
         )
 
     lines.append("")
-    lines.append("  Stale Rule: Exit at 90 min if pips <= 0 (universal). If pips > 0, trail SL.")
+    lines.append("  Stale: 90/90 = immediate exit at 90min. 90/150 = tighten SL at 90, exit at 150.")
     lines.append("  Risk Tiers: low=1%, medium=0.8%, high=0.5% per trade")
-    lines.append("=" * 95)
+    lines.append("=" * 105)
     return "\n".join(lines)

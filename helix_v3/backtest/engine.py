@@ -19,7 +19,7 @@ from typing import Dict, List, Optional
 import numpy as np
 import pandas as pd
 
-from config.pair_profiles import get_pair_profile, PAIR_PROFILES
+from config.pair_profiles import get_pair_profile, get_tradeable_symbols, PAIR_PROFILES
 from config.settings import settings
 from helix_v3.backtest.data_store import HistoricalDataStore
 from helix_v3.core.mtf_analyzer import MTFAnalyzer, MTFAnalysis
@@ -160,14 +160,22 @@ class TradeSimulator:
         lot = min(raw_lot, profile.max_lot_size, account_max_lot)
         lot = max(0.01, round(round(lot / 0.01) * 0.01, 2))
 
-        # TP levels
+        # TP levels — calibrated from validation data
+        # T1: 1:1 RR (unchanged — locks in profit)
+        # T2: min(expected_level_move, 3x SL) — targets realistic move, not blind multiple
         risk_dist = abs(entry_price - sl_price)
+        level_move_dist = profile.expected_level_move_pips * pip_size
+        # T2 distance = the smaller of level move or 3x SL (whichever is reachable)
+        tp2_dist = min(level_move_dist, risk_dist * 3.0)
+        # But never less than 1.5x SL (minimum RR worth holding for)
+        tp2_dist = max(tp2_dist, risk_dist * 1.5)
+
         if direction == Direction.BUY:
             tp1 = entry_price + risk_dist
-            tp2 = entry_price + risk_dist * 2.5
+            tp2 = entry_price + tp2_dist
         else:
             tp1 = entry_price - risk_dist
-            tp2 = entry_price - risk_dist * 2.5
+            tp2 = entry_price - tp2_dist
 
         trade = SimulatedTrade(
             symbol=symbol,
@@ -260,16 +268,35 @@ class TradeSimulator:
                 self.closed_trades.append(trade)
                 continue
 
-            # --- Stale trade (90 min not in profit) ---
-            if duration_min >= profile.stale_minutes and profit_pips <= 0:
+            # --- Tiered stale trade management ---
+            # Phase 1 (stale_minutes): Tighten SL to 50% for extended pairs
+            # Phase 2 (stale_exit_minutes): Full exit
+            stale_phase1 = profile.stale_minutes
+            stale_phase2 = getattr(profile, "stale_exit_minutes", stale_phase1)
+
+            if duration_min >= stale_phase2 and profit_pips <= 0:
                 trade.exit_price = close
                 trade.exit_time = bar_time
                 trade.exit_reason = "STALE"
                 trade.status = "CLOSED"
                 self._finalize_trade(trade)
-                actions.append(f"STALE EXIT: {trade.symbol} {trade.pnl_pips:+.1f}p")
+                actions.append(f"STALE EXIT: {trade.symbol} {trade.pnl_pips:+.1f}p at {duration_min:.0f}min")
                 self.closed_trades.append(trade)
                 continue
+
+            if (duration_min >= stale_phase1 and profit_pips <= 0
+                    and stale_phase2 > stale_phase1
+                    and not getattr(trade, "_stale_tightened", False)):
+                # Phase 1: tighten SL to half for volatile crosses
+                if trade.sl_pips > 0:
+                    half_sl = trade.sl_pips / 2.0
+                    pip_size = profile.min_sl_pips / profile.min_sl_pips if profile.min_sl_pips > 0 else 0.0001
+                    if trade.direction == Direction.BUY:
+                        trade.stop_loss = trade.entry_price - half_sl * pip_size
+                    else:
+                        trade.stop_loss = trade.entry_price + half_sl * pip_size
+                    trade._stale_tightened = True
+                    actions.append(f"STALE TIGHTEN: {trade.symbol} SL halved at {duration_min:.0f}min")
 
             # --- T1 partial close at 1:1 RR ---
             if not trade.t1_closed:
@@ -553,13 +580,28 @@ class BacktestRunner:
         else:
             entry_price = float(bar["Close"]) - spread / 2
 
-        # SL from session bounds (Asian range)
+        # SL from session bounds (Asian range) with sensible cap
+        # Per MMM: SL goes behind the formation that invalidates the trade.
+        # But if the stop hunt was deep, SL can end up absurdly far from entry.
+        # Cap SL distance at expected_level_move_pips — if SL needs to be wider
+        # than one full level move, the entry is too far from the structure.
+        max_sl_dist = profile.expected_level_move_pips * pip_size
         if analysis.fifteen_min.asian_range_low and analysis.fifteen_min.asian_range_high:
             buffer = profile.sl_buffer_pips * pip_size
             if direction == Direction.BUY:
-                sl_price = analysis.fifteen_min.asian_range_low - buffer
+                structural_sl = analysis.fifteen_min.asian_range_low - buffer
+                sl_dist = entry_price - structural_sl
+                if sl_dist > max_sl_dist:
+                    sl_price = entry_price - max_sl_dist
+                else:
+                    sl_price = structural_sl
             else:
-                sl_price = analysis.fifteen_min.asian_range_high + buffer
+                structural_sl = analysis.fifteen_min.asian_range_high + buffer
+                sl_dist = structural_sl - entry_price
+                if sl_dist > max_sl_dist:
+                    sl_price = entry_price + max_sl_dist
+                else:
+                    sl_price = structural_sl
         else:
             # Fallback: 30 pips
             fallback = 30.0 * pip_size
@@ -696,7 +738,7 @@ def main(argv: Optional[list] = None) -> None:
     parser.add_argument("--end", type=str, help="End date (YYYY-MM-DD)")
     parser.add_argument("--pairs", type=str, help="Comma-separated pairs (default: all 13)")
     parser.add_argument("--equity", type=float, default=1000.0, help="Starting equity")
-    parser.add_argument("--min-confluence", type=int, default=50, help="Min confluence score")
+    parser.add_argument("--min-confluence", type=int, default=55, help="Min confluence score")
     parser.add_argument("--max-positions", type=int, default=3, help="Max concurrent positions")
     parser.add_argument("--verbose", "-v", action="store_true", help="Detailed trade logging")
     args = parser.parse_args(argv)
@@ -713,7 +755,7 @@ def main(argv: Optional[list] = None) -> None:
     if args.pairs:
         symbols = [p.strip() for p in args.pairs.split(",")]
     else:
-        symbols = list(PAIR_PROFILES.keys())
+        symbols = get_tradeable_symbols()
 
     print(f"\nHelix V3 Backtest: {start.strftime('%Y-%m-%d')} to {end.strftime('%Y-%m-%d')}")
     print(f"Pairs: {', '.join(symbols)}")

@@ -253,15 +253,22 @@ class MT5ExecutionGatekeeper:
         else:
             return None
 
-        # SL placement: pair-specific buffer behind peak formation
+        # SL placement: behind structural level with sensible cap
+        # Cap at expected_level_move_pips — if SL needs to be wider than one
+        # full level move, the entry is too far from the formation.
         profile = get_pair_profile(symbol)
         buffer = profile.sl_buffer_pips * pip_size
+        max_sl_dist = profile.expected_level_move_pips * pip_size
 
         if signal.session_bounds is not None:
             if direction == Direction.BUY:
-                sl = signal.session_bounds.low - buffer
+                structural_sl = signal.session_bounds.low - buffer
+                sl_dist = entry - structural_sl
+                sl = entry - min(sl_dist, max_sl_dist) if sl_dist > 0 else structural_sl
             else:
-                sl = signal.session_bounds.high + buffer
+                structural_sl = signal.session_bounds.high + buffer
+                sl_dist = structural_sl - entry
+                sl = entry + min(sl_dist, max_sl_dist) if sl_dist > 0 else structural_sl
         else:
             # Fallback: use stop hunt breach or fixed 30 pips
             fallback_pips = 30.0
@@ -273,14 +280,20 @@ class MT5ExecutionGatekeeper:
         sl_pips = abs(entry - sl) / pip_size
         lot_size = self.calculate_lot_size(symbol, sl_pips)
 
-        # TP levels
+        # TP levels — calibrated from 90-day validation data
+        # T1: 1:1 RR (locks in profit, SL to breakeven)
+        # T2: min(expected_level_move, 3x SL) — targets realistic move, not blind multiple
         risk_distance = abs(entry - sl)
+        level_move_dist = profile.expected_level_move_pips * pip_size
+        tp2_dist = min(level_move_dist, risk_distance * 3.0)
+        tp2_dist = max(tp2_dist, risk_distance * 1.5)  # Never less than 1.5:1 RR
+
         if direction == Direction.BUY:
             tp1 = entry + risk_distance  # 1:1 RR
-            tp2 = entry + (risk_distance * 2.5)  # 2.5:1 RR
+            tp2 = entry + tp2_dist
         else:
             tp1 = entry - risk_distance
-            tp2 = entry - (risk_distance * 2.5)
+            tp2 = entry - tp2_dist
 
         rr = abs(entry - tp2) / abs(entry - sl) if abs(entry - sl) > 0 else 0
 
@@ -483,25 +496,72 @@ class MT5ExecutionGatekeeper:
                 )
                 continue
 
-            # --- 2. Stale Trade Detection (90 min universal, exit if NOT in profit) ---
-            stale_min = pp.stale_minutes  # 90 min for all pairs
-            if duration_min >= stale_min and profit_pips <= 0 and order.status == "FILLED":
+            # --- 2. Tiered Stale Trade Management (calibrated from 90-day validation) ---
+            # Phase 1 (stale_minutes, 90 min): Tighten SL to half original distance.
+            #   Risk is halved — if the setup was right, reduced SL gives it room.
+            #   If the setup was wrong, the tighter SL cuts loss sooner.
+            # Phase 2 (stale_exit_minutes): Full exit — no more waiting.
+            # For low-vol pairs (stale_exit == stale_minutes), phases collapse to immediate exit.
+            stale_phase1 = pp.stale_minutes       # 90 min — universal tighten point
+            stale_phase2 = pp.stale_exit_minutes   # 90-150 min — pair-specific exit
+
+            if duration_min >= stale_phase2 and profit_pips <= 0 and order.status in ("FILLED", "STALE_TIGHTENED"):
+                # Phase 2: Full exit — extended window exhausted
                 logger.warning(
-                    "STALE TRADE: %s ticket=%d | %+.1f pips after %.0f min (not in profit) — closing",
+                    "STALE EXIT (Phase 2): %s ticket=%d | %+.1f pips after %.0f min (limit=%d) — closing",
+                    pos.symbol, ticket, profit_pips, duration_min, stale_phase2,
+                )
+                self._partial_close(pos, pos.volume)
+                actions.append(
+                    f"STALE EXIT: {pos.symbol} ticket={ticket} {profit_pips:+.1f} pips after {duration_min:.0f}min"
+                )
+                continue
+
+            if (duration_min >= stale_phase1 and profit_pips <= 0
+                    and order.status == "FILLED" and stale_phase2 > stale_phase1):
+                # Phase 1: Tighten SL to half original distance (reduce risk exposure)
+                # Only applies to pairs with extended window (GBPAUD, GBPJPY, GBPNZD)
+                if order.sl_pips > 0:
+                    half_sl_dist = (order.sl_pips / 2.0) * pip_size
+                    if order.direction == Direction.BUY:
+                        new_sl = entry - half_sl_dist
+                        if new_sl > pos.sl:  # Only tighten, never widen
+                            self._modify_sl(ticket, pos.symbol, new_sl)
+                    else:
+                        new_sl = entry + half_sl_dist
+                        if new_sl < pos.sl:
+                            self._modify_sl(ticket, pos.symbol, new_sl)
+
+                    order.status = "STALE_TIGHTENED"
+                    logger.warning(
+                        "STALE TIGHTEN (Phase 1): %s ticket=%d | %+.1f pips after %.0f min — "
+                        "SL tightened to 50%% (%.1f pips), exit at %d min",
+                        pos.symbol, ticket, profit_pips, duration_min,
+                        order.sl_pips / 2.0, stale_phase2,
+                    )
+                    actions.append(
+                        f"STALE TIGHTEN: {pos.symbol} ticket={ticket} SL halved at {duration_min:.0f}min, "
+                        f"exit at {stale_phase2}min if still flat"
+                    )
+
+            elif duration_min >= stale_phase1 and profit_pips <= 0 and order.status == "FILLED":
+                # No extension — immediate exit (low-vol pairs where stale_exit == stale_minutes)
+                logger.warning(
+                    "STALE EXIT: %s ticket=%d | %+.1f pips after %.0f min (not in profit) — closing",
                     pos.symbol, ticket, profit_pips, duration_min,
                 )
                 self._partial_close(pos, pos.volume)
                 actions.append(
-                    f"STALE EXIT: {pos.symbol} ticket={ticket} {profit_pips:+.1f} pips after {duration_min:.0f}min (not in profit)"
+                    f"STALE EXIT: {pos.symbol} ticket={ticket} {profit_pips:+.1f} pips after {duration_min:.0f}min"
                 )
                 continue
-            # NOTE: If profit_pips > 0 after 90 min, trade STAYS OPEN and trails via rule 5
+            # NOTE: If profit_pips > 0 after stale threshold, trade STAYS OPEN and trails via rule 5
 
             # --- 3. Session-Based Exit (pair-gated) ---
             from helix_v3.scanner.market_scanner import _get_session_name
             current_session = _get_session_name()
             close_session = pp.close_before_session
-            if current_session == close_session and order.status in ("FILLED", "T1_HIT"):
+            if current_session == close_session and order.status in ("FILLED", "T1_HIT", "STALE_TIGHTENED"):
                 if profit_pips < self._risk_cfg.stale_trade_max_pips:
                     logger.warning(
                         "SESSION EXIT: %s ticket=%d closing before %s | pips=%+.1f",
@@ -514,7 +574,7 @@ class MT5ExecutionGatekeeper:
                     continue
 
             # --- 4. T1 Partial Close at 1:1 RR ---
-            if hit_t1 and order.status == "FILLED":
+            if hit_t1 and order.status in ("FILLED", "STALE_TIGHTENED"):
                 close_volume = round(
                     pos.volume * self._risk_cfg.partial_close_ratio, 2
                 )
