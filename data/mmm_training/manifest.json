@@ -1,0 +1,54 @@
+{
+  "created_at": "2026-06-07T06:59:33.083967+00:00",
+  "content_policy": "Store concise methodology notes and source references; avoid full redistributed course transcripts.",
+  "videos": [
+    {
+      "id": "video_001",
+      "title": "MMM 8-2-2011 Day 1",
+      "path": "videos\\MMM 8-2-2011 Day 1 .mp4",
+      "size_bytes": 195899073,
+      "modified_at": "2026-06-07T06:34:08.034969+00:00",
+      "duration_seconds": 13875.469206,
+      "width": 1024,
+      "height": 768,
+      "fps": 15.0,
+      "probe_status": "ok"
+    },
+    {
+      "id": "video_002",
+      "title": "MMM 8-3-2011 Day 2",
+      "path": "videos\\MMM 8-3-2011 Day 2 .mp4",
+      "size_bytes": 232517293,
+      "modified_at": "2026-06-07T06:34:53.074073+00:00",
+      "duration_seconds": 15081.859093,
+      "width": 1024,
+      "height": 768,
+      "fps": 15.0,
+      "probe_status": "ok"
+    },
+    {
+      "id": "video_003",
+      "title": "MMM 8-4-2011 Day 3",
+      "path": "videos\\MMM 8-4-2011 Day 3 .mp4",
+      "size_bytes": 234125524,
+      "modified_at": "2026-06-07T06:35:03.591870+00:00",
+      "duration_seconds": 14547.940726,
+      "width": 1024,
+      "height": 768,
+      "fps": 15.0,
+      "probe_status": "ok"
+    },
+    {
+      "id": "video_004",
+      "title": "MMM 8-4-2011 Day 4",
+      "path": "videos\\MMM 8-4-2011 Day 4.mp4",
+      "size_bytes": 310609112,
+      "modified_at": "2026-06-07T06:35:42.653036+00:00",
+      "duration_seconds": 14284.219501,
+      "width": 960,
+      "height": 720,
+      "fps": 15.0,
+      "probe_status": "ok"
+    }
+  ]
+}

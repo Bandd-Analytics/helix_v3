@@ -159,6 +159,38 @@ Historical mining uses MT5 only for candle history. It slices each timeframe at 
 snapshot, runs the same Weekly/H4/H1/M15 analyzer, saves `HISTORICAL` flashcards with real
 backdated timestamps, records MMM event outcomes, and promotes repeated profitable signatures.
 
+Build the local Steve Mauro MMM training-material index:
+
+```powershell
+.venv\Scripts\python.exe -m helix_v3.training.video_mmm_extractor manifest
+.venv\Scripts\python.exe -m helix_v3.training.video_mmm_extractor init-md
+```
+
+The training extractor reads videos from `data/mmm_training/videos`, writes a local source manifest,
+and creates timestamped note/rule/skill scaffolds under `data/mmm_training`. Keep methodology notes
+as paraphrased, timestamped, testable rules with visual evidence references. Do not rebuild paid
+course videos as full redistributed markdown transcripts. Raw local transcripts, if generated for
+analysis, belong in `data/mmm_training/transcripts` and should feed concise rule cards.
+
+Audio/keyframe extraction requires ffmpeg:
+
+```powershell
+.venv\Scripts\python.exe -m helix_v3.training.video_mmm_extractor extract-audio
+.venv\Scripts\python.exe -m helix_v3.training.video_mmm_extractor extract-frames --every-seconds 30
+```
+
+If ffmpeg/ffprobe is not on PATH, pass `--ffmpeg-path` or `--ffprobe-path`. Transcription can run
+locally through ffmpeg's Whisper filter after a whisper.cpp ggml model is placed under
+`data/mmm_training/models`:
+
+```powershell
+.venv\Scripts\python.exe -m helix_v3.training.video_mmm_extractor transcribe --model-path data\mmm_training\models\ggml-base.en.bin
+```
+
+Promote extracted
+teachings into `data/mmm_training/skills/CODEX_MMM_STRATEGY.md` and
+`data/mmm_training/skills/CLAUDE_MMM_STRATEGY.md` only after market replay validates the rule.
+
 ## Verification Expectations
 
 For backtest/vision changes, run at least:

@@ -23,3 +23,9 @@ logs/*.db-wal
 
 # Verdicts (regenerated per session)
 verdicts/*.json
+
+# Training data binaries (too large for git)
+data/mmm_training/videos/
+data/mmm_training/audio/
+data/mmm_training/frames/
+data/mmm_training/ocr/
