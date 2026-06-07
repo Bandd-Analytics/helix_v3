@@ -27,3 +27,12 @@ Every extracted teaching must pass through this validation layer before it becom
 - `watch`: keep for more samples.
 - `rejected`: keep as training-only context, not live logic.
 
+## Current First-Pass Result
+
+Report: `taught_rule_validation_report.md`.
+
+- No taught rule has been promoted.
+- `MMM-TRAIN-004` is the main watchlist family, especially GBPJPY, AUDUSD, and USDJPY.
+- `MMM-TRAIN-002` is weak pair-specific evidence on GBPJPY only.
+- `MMM-TRAIN-003` and `MMM-TRAIN-006` need stricter filters before further use.
+- The scanner baseline remains the benchmark to beat before promotion.

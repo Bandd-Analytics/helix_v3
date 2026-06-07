@@ -1,0 +1,42 @@
+[
+  {
+    "avg_exit_pips": 0.10000000000004955,
+    "avg_mae": 3.536363636363186,
+    "avg_mfe": 5.609090909091119,
+    "baseline_split_passes": 0,
+    "direct_profit": 2,
+    "direct_profit_rate": 18.181818181818183,
+    "direction": "BUY",
+    "favorable": 2,
+    "favorable_rate": 18.181818181818183,
+    "first_snapshot": "2023-07-10T05:15:00+00:00",
+    "last_snapshot": "2024-02-12T05:00:00+00:00",
+    "normalized_key": "THE_33_MW|BUY|EARLY_WEEK|L3|STOP_HUNT|AR_TIGHT|HUNT_PAIR_RANGE|PUSH3_PLUS|W_BOTTOM|NO_RRT|TDI_NONE|THE_33|CONF_75_PLUS",
+    "primary_theme": "GBP_STRENGTH",
+    "profitable_source_ids": [
+      1966,
+      7121
+    ],
+    "raw_key": "GBPCHF|BUY|EARLY_WEEK|BUY|L3|SELL|STOP_HUNT|NEUTRAL|AR_11.6|HUNT_29.4|PUSH3_PLUS|W_BOTTOM|NO_RRT|TDI_NONE|THE_33",
+    "realistic_target_pips": 2.5240909090910035,
+    "setup_family": "THE_33_MW",
+    "split_stats": {
+      "train": {
+        "avg_exit_pips": 0.10000000000004955,
+        "avg_mae": 3.536363636363186,
+        "avg_mfe": 5.609090909091119,
+        "direct_profit": 2,
+        "direct_profit_rate": 18.181818181818183,
+        "favorable": 2,
+        "favorable_rate": 18.181818181818183,
+        "t1_hits": 0,
+        "t1_rate": 0.0,
+        "total": 11
+      }
+    },
+    "symbol": "GBPCHF",
+    "t1_hits": 0,
+    "t1_rate": 0.0,
+    "total": 11
+  }
+]

@@ -1,0 +1,535 @@
+[
+  {
+    "avg_exit_pips": -3.635000000000166,
+    "avg_mae": 6.020000000000358,
+    "avg_mfe": 5.90999999999986,
+    "baseline_split_passes": 0,
+    "direct_profit": 3,
+    "direct_profit_rate": 30.0,
+    "direction": "BUY",
+    "favorable": 3,
+    "favorable_rate": 30.0,
+    "first_snapshot": "2023-07-19T12:00:00+00:00",
+    "last_snapshot": "2024-07-03T10:00:00+00:00",
+    "normalized_key": "THE_33_MW|BUY|MID_WEEK|L0|TRUE_TREND|AR_VALID|HUNT_PAIR_RANGE|PUSH3_PLUS|W_BOTTOM|NO_RRT|TDI_CONFIRM|THE_33|CONF_50_74",
+    "primary_theme": "EUR_STRENGTH",
+    "profitable_source_ids": [
+      940,
+      3059,
+      3271
+    ],
+    "raw_key": "EURUSD|BUY|MID_WEEK|BUY|L0|NEUTRAL|TRUE_TREND|NEUTRAL|AR_21.5|HUNT_28.8|PUSH3_PLUS|W_BOTTOM|NO_RRT|TDI_CONFIRM|THE_33",
+    "realistic_target_pips": 2.659499999999937,
+    "setup_family": "THE_33_MW",
+    "split_stats": {
+      "train": {
+        "avg_exit_pips": -3.635000000000166,
+        "avg_mae": 6.020000000000358,
+        "avg_mfe": 5.90999999999986,
+        "direct_profit": 3,
+        "direct_profit_rate": 30.0,
+        "favorable": 3,
+        "favorable_rate": 30.0,
+        "t1_hits": 1,
+        "t1_rate": 10.0,
+        "total": 10
+      }
+    },
+    "symbol": "EURUSD",
+    "t1_hits": 1,
+    "t1_rate": 10.0,
+    "total": 10
+  },
+  {
+    "avg_exit_pips": -1.7933333333335355,
+    "avg_mae": 7.853333333333415,
+    "avg_mfe": 10.586666666666595,
+    "baseline_split_passes": 0,
+    "direct_profit": 5,
+    "direct_profit_rate": 33.33333333333333,
+    "direction": "BUY",
+    "favorable": 4,
+    "favorable_rate": 26.666666666666668,
+    "first_snapshot": "2023-06-12T12:45:00+00:00",
+    "last_snapshot": "2024-07-29T09:30:00+00:00",
+    "normalized_key": "THE_33_MW|BUY|EARLY_WEEK|L0|TRUE_TREND|AR_TIGHT|HUNT_PAIR_RANGE|PUSH3_PLUS|W_BOTTOM|NO_RRT|TDI_CONFLICT|THE_33|CONF_50_74",
+    "primary_theme": "EUR_STRENGTH",
+    "profitable_source_ids": [
+      916,
+      959,
+      2493,
+      2599,
+      2638
+    ],
+    "raw_key": "EURUSD|BUY|EARLY_WEEK|BUY|L0|NEUTRAL|TRUE_TREND|NEUTRAL|AR_10.3|HUNT_48.0|PUSH3_PLUS|W_BOTTOM|NO_RRT|TDI_CONFLICT|THE_33",
+    "realistic_target_pips": 4.763999999999968,
+    "setup_family": "THE_33_MW",
+    "split_stats": {
+      "train": {
+        "avg_exit_pips": -1.7933333333335355,
+        "avg_mae": 7.853333333333415,
+        "avg_mfe": 10.586666666666595,
+        "direct_profit": 5,
+        "direct_profit_rate": 33.33333333333333,
+        "favorable": 4,
+        "favorable_rate": 26.666666666666668,
+        "t1_hits": 5,
+        "t1_rate": 33.33333333333333,
+        "total": 15
+      }
+    },
+    "symbol": "EURUSD",
+    "t1_hits": 5,
+    "t1_rate": 33.33333333333333,
+    "total": 15
+  },
+  {
+    "avg_exit_pips": -0.42083333333349976,
+    "avg_mae": 3.9583333333335453,
+    "avg_mfe": 7.1666666666664325,
+    "baseline_split_passes": 0,
+    "direct_profit": 3,
+    "direct_profit_rate": 25.0,
+    "direction": "BUY",
+    "favorable": 3,
+    "favorable_rate": 25.0,
+    "first_snapshot": "2023-06-27T05:00:00+00:00",
+    "last_snapshot": "2024-05-07T05:45:00+00:00",
+    "normalized_key": "THE_33_MW|BUY|MID_WEEK|L0|STOP_HUNT|AR_VALID|HUNT_PAIR_RANGE|PUSH3_PLUS|W_BOTTOM|RRT|TDI_NONE|THE_33|CONF_50_74",
+    "primary_theme": "EUR_STRENGTH",
+    "profitable_source_ids": [
+      2631,
+      2930,
+      2973
+    ],
+    "raw_key": "EURUSD|BUY|MID_WEEK|BUY|L0|NEUTRAL|STOP_HUNT|NEUTRAL|AR_35.5|HUNT_21.1|PUSH3_PLUS|W_BOTTOM|RRT|TDI_NONE|THE_33",
+    "realistic_target_pips": 3.224999999999895,
+    "setup_family": "THE_33_MW",
+    "split_stats": {
+      "train": {
+        "avg_exit_pips": -0.42083333333349976,
+        "avg_mae": 3.9583333333335453,
+        "avg_mfe": 7.1666666666664325,
+        "direct_profit": 3,
+        "direct_profit_rate": 25.0,
+        "favorable": 3,
+        "favorable_rate": 25.0,
+        "t1_hits": 2,
+        "t1_rate": 16.666666666666664,
+        "total": 12
+      }
+    },
+    "symbol": "EURUSD",
+    "t1_hits": 2,
+    "t1_rate": 16.666666666666664,
+    "total": 12
+  },
+  {
+    "avg_exit_pips": 0.3299999999997194,
+    "avg_mae": 2.340000000000453,
+    "avg_mfe": 6.119999999999681,
+    "baseline_split_passes": 0,
+    "direct_profit": 2,
+    "direct_profit_rate": 20.0,
+    "direction": "BUY",
+    "favorable": 2,
+    "favorable_rate": 20.0,
+    "first_snapshot": "2023-07-05T01:00:00+00:00",
+    "last_snapshot": "2024-07-31T01:00:00+00:00",
+    "normalized_key": "THE_33_MW|BUY|MID_WEEK|L0|ACCUMULATION|AR_TIGHT|HUNT_PAIR_RANGE|PUSH3_PLUS|W_BOTTOM|NO_RRT|TDI_CONFIRM|THE_33|CONF_50_74",
+    "primary_theme": "EUR_STRENGTH",
+    "profitable_source_ids": [
+      2873,
+      2999
+    ],
+    "raw_key": "EURUSD|BUY|MID_WEEK|BUY|L0|NEUTRAL|ACCUMULATION|NEUTRAL|AR_14.6|HUNT_29.4|PUSH3_PLUS|W_BOTTOM|NO_RRT|TDI_CONFIRM|THE_33",
+    "realistic_target_pips": 2.7539999999998566,
+    "setup_family": "THE_33_MW",
+    "split_stats": {
+      "train": {
+        "avg_exit_pips": 0.3299999999997194,
+        "avg_mae": 2.340000000000453,
+        "avg_mfe": 6.119999999999681,
+        "direct_profit": 2,
+        "direct_profit_rate": 20.0,
+        "favorable": 2,
+        "favorable_rate": 20.0,
+        "t1_hits": 4,
+        "t1_rate": 40.0,
+        "total": 10
+      }
+    },
+    "symbol": "EURUSD",
+    "t1_hits": 4,
+    "t1_rate": 40.0,
+    "total": 10
+  },
+  {
+    "avg_exit_pips": 0.21000000000026553,
+    "avg_mae": 4.0999999999997705,
+    "avg_mfe": 7.100000000000328,
+    "baseline_split_passes": 0,
+    "direct_profit": 2,
+    "direct_profit_rate": 20.0,
+    "direction": "BUY",
+    "favorable": 2,
+    "favorable_rate": 20.0,
+    "first_snapshot": "2023-07-31T07:00:00+00:00",
+    "last_snapshot": "2024-07-29T05:00:00+00:00",
+    "normalized_key": "THE_33_MW|BUY|EARLY_WEEK|L0|STOP_HUNT|AR_TIGHT|HUNT_PAIR_RANGE|PUSH3_PLUS|W_BOTTOM|NO_RRT|TDI_NONE|THE_33|CONF_50_74",
+    "primary_theme": "EUR_STRENGTH",
+    "profitable_source_ids": [
+      985,
+      3089
+    ],
+    "raw_key": "EURUSD|BUY|EARLY_WEEK|BUY|L0|NEUTRAL|STOP_HUNT|NEUTRAL|AR_10.3|HUNT_48.0|PUSH3_PLUS|W_BOTTOM|NO_RRT|TDI_NONE|THE_33",
+    "realistic_target_pips": 3.1950000000001477,
+    "setup_family": "THE_33_MW",
+    "split_stats": {
+      "train": {
+        "avg_exit_pips": 0.21000000000026553,
+        "avg_mae": 4.0999999999997705,
+        "avg_mfe": 7.100000000000328,
+        "direct_profit": 2,
+        "direct_profit_rate": 20.0,
+        "favorable": 2,
+        "favorable_rate": 20.0,
+        "t1_hits": 1,
+        "t1_rate": 10.0,
+        "total": 10
+      }
+    },
+    "symbol": "EURUSD",
+    "t1_hits": 1,
+    "t1_rate": 10.0,
+    "total": 10
+  },
+  {
+    "avg_exit_pips": -4.023076923077403,
+    "avg_mae": 4.700000000000046,
+    "avg_mfe": 6.4307692307695135,
+    "baseline_split_passes": 0,
+    "direct_profit": 2,
+    "direct_profit_rate": 15.384615384615385,
+    "direction": "BUY",
+    "favorable": 2,
+    "favorable_rate": 15.384615384615385,
+    "first_snapshot": "2023-06-14T09:45:00+00:00",
+    "last_snapshot": "2025-12-17T10:00:00+00:00",
+    "normalized_key": "THE_33_MW|BUY|MID_WEEK|L0|TRUE_TREND|AR_VALID|HUNT_PAIR_RANGE|PUSH3_PLUS|W_BOTTOM|RRT|TDI_CONFIRM|THE_33|CONF_50_74",
+    "primary_theme": "EUR_STRENGTH",
+    "profitable_source_ids": [
+      863,
+      2363
+    ],
+    "raw_key": "EURUSD|BUY|MID_WEEK|BUY|L0|NEUTRAL|TRUE_TREND|NEUTRAL|AR_30.9|HUNT_32.0|PUSH3_PLUS|W_BOTTOM|RRT|TDI_CONFIRM|THE_33",
+    "realistic_target_pips": 2.893846153846281,
+    "setup_family": "THE_33_MW",
+    "split_stats": {
+      "out_of_sample": {
+        "avg_exit_pips": -15.500000000001624,
+        "avg_mae": 0.8999999999992347,
+        "avg_mfe": 9.100000000001884,
+        "direct_profit": 0,
+        "direct_profit_rate": 0.0,
+        "favorable": 0,
+        "favorable_rate": 0.0,
+        "t1_hits": 0,
+        "t1_rate": 0.0,
+        "total": 1
+      },
+      "train": {
+        "avg_exit_pips": -3.0666666666670506,
+        "avg_mae": 5.01666666666678,
+        "avg_mfe": 6.208333333333482,
+        "direct_profit": 2,
+        "direct_profit_rate": 16.666666666666664,
+        "favorable": 2,
+        "favorable_rate": 16.666666666666664,
+        "t1_hits": 3,
+        "t1_rate": 25.0,
+        "total": 12
+      }
+    },
+    "symbol": "EURUSD",
+    "t1_hits": 3,
+    "t1_rate": 23.076923076923077,
+    "total": 13
+  },
+  {
+    "avg_exit_pips": -0.560000000000116,
+    "avg_mae": 6.66000000000011,
+    "avg_mfe": 8.080000000000235,
+    "baseline_split_passes": 0,
+    "direct_profit": 3,
+    "direct_profit_rate": 20.0,
+    "direction": "BUY",
+    "favorable": 2,
+    "favorable_rate": 13.333333333333334,
+    "first_snapshot": "2023-08-02T08:45:00+00:00",
+    "last_snapshot": "2024-06-19T10:00:00+00:00",
+    "normalized_key": "THE_33_MW|BUY|MID_WEEK|L0|TRUE_TREND|AR_VALID|HUNT_PAIR_RANGE|PUSH3_PLUS|W_BOTTOM|NO_RRT|TDI_NONE|THE_33|CONF_50_74",
+    "primary_theme": "EUR_STRENGTH",
+    "profitable_source_ids": [
+      1049,
+      2621,
+      2931
+    ],
+    "raw_key": "EURUSD|BUY|MID_WEEK|BUY|L0|NEUTRAL|TRUE_TREND|NEUTRAL|AR_21.5|HUNT_34.5|PUSH3_PLUS|W_BOTTOM|NO_RRT|TDI_NONE|THE_33",
+    "realistic_target_pips": 3.636000000000106,
+    "setup_family": "THE_33_MW",
+    "split_stats": {
+      "train": {
+        "avg_exit_pips": -0.560000000000116,
+        "avg_mae": 6.66000000000011,
+        "avg_mfe": 8.080000000000235,
+        "direct_profit": 3,
+        "direct_profit_rate": 20.0,
+        "favorable": 2,
+        "favorable_rate": 13.333333333333334,
+        "t1_hits": 5,
+        "t1_rate": 33.33333333333333,
+        "total": 15
+      }
+    },
+    "symbol": "EURUSD",
+    "t1_hits": 5,
+    "t1_rate": 33.33333333333333,
+    "total": 15
+  },
+  {
+    "avg_exit_pips": -0.5299999999996974,
+    "avg_mae": 3.4600000000004627,
+    "avg_mfe": 5.349999999999744,
+    "baseline_split_passes": 0,
+    "direct_profit": 1,
+    "direct_profit_rate": 10.0,
+    "direction": "BUY",
+    "favorable": 1,
+    "favorable_rate": 10.0,
+    "first_snapshot": "2023-08-08T01:15:00+00:00",
+    "last_snapshot": "2024-07-31T02:30:00+00:00",
+    "normalized_key": "THE_33_MW|BUY|MID_WEEK|L0|ACCUMULATION|AR_TIGHT|HUNT_PAIR_RANGE|PUSH3_PLUS|W_BOTTOM|NO_RRT|TDI_SQUEEZE|THE_33|CONF_50_74",
+    "primary_theme": "EUR_STRENGTH",
+    "profitable_source_ids": [
+      3339
+    ],
+    "raw_key": "EURUSD|BUY|MID_WEEK|BUY|L0|NEUTRAL|ACCUMULATION|BUY|AR_16.7|HUNT_29.9|PUSH3_PLUS|W_BOTTOM|NO_RRT|TDI_SQUEEZE|THE_33",
+    "realistic_target_pips": 2.4074999999998847,
+    "setup_family": "THE_33_MW",
+    "split_stats": {
+      "train": {
+        "avg_exit_pips": -0.5299999999996974,
+        "avg_mae": 3.4600000000004627,
+        "avg_mfe": 5.349999999999744,
+        "direct_profit": 1,
+        "direct_profit_rate": 10.0,
+        "favorable": 1,
+        "favorable_rate": 10.0,
+        "t1_hits": 4,
+        "t1_rate": 40.0,
+        "total": 10
+      }
+    },
+    "symbol": "EURUSD",
+    "t1_hits": 4,
+    "t1_rate": 40.0,
+    "total": 10
+  },
+  {
+    "avg_exit_pips": -0.7349999999995971,
+    "avg_mae": 3.1599999999996076,
+    "avg_mfe": 4.020000000000135,
+    "baseline_split_passes": 0,
+    "direct_profit": 1,
+    "direct_profit_rate": 10.0,
+    "direction": "BUY",
+    "favorable": 1,
+    "favorable_rate": 10.0,
+    "first_snapshot": "2023-06-21T05:00:00+00:00",
+    "last_snapshot": "2024-07-16T05:00:00+00:00",
+    "normalized_key": "THE_33_MW|BUY|MID_WEEK|L0|STOP_HUNT|AR_TIGHT|HUNT_PAIR_RANGE|PUSH3_PLUS|W_BOTTOM|RRT|TDI_CONFIRM|THE_33|CONF_50_74",
+    "primary_theme": "EUR_STRENGTH",
+    "profitable_source_ids": [
+      3135
+    ],
+    "raw_key": "EURUSD|BUY|MID_WEEK|BUY|L0|NEUTRAL|STOP_HUNT|NEUTRAL|AR_13.1|HUNT_21.8|PUSH3_PLUS|W_BOTTOM|RRT|TDI_CONFIRM|THE_33",
+    "realistic_target_pips": 1.8090000000000606,
+    "setup_family": "THE_33_MW",
+    "split_stats": {
+      "train": {
+        "avg_exit_pips": -0.7349999999995971,
+        "avg_mae": 3.1599999999996076,
+        "avg_mfe": 4.020000000000135,
+        "direct_profit": 1,
+        "direct_profit_rate": 10.0,
+        "favorable": 1,
+        "favorable_rate": 10.0,
+        "t1_hits": 3,
+        "t1_rate": 30.0,
+        "total": 10
+      }
+    },
+    "symbol": "EURUSD",
+    "t1_hits": 3,
+    "t1_rate": 30.0,
+    "total": 10
+  },
+  {
+    "avg_exit_pips": -4.855000000000387,
+    "avg_mae": 6.920000000000482,
+    "avg_mfe": 5.459999999999576,
+    "baseline_split_passes": 0,
+    "direct_profit": 1,
+    "direct_profit_rate": 10.0,
+    "direction": "BUY",
+    "favorable": 1,
+    "favorable_rate": 10.0,
+    "first_snapshot": "2023-07-31T09:00:00+00:00",
+    "last_snapshot": "2024-07-29T12:30:00+00:00",
+    "normalized_key": "THE_33_MW|BUY|EARLY_WEEK|L0|TRUE_TREND|AR_TIGHT|HUNT_PAIR_RANGE|PUSH3_PLUS|W_BOTTOM|NO_RRT|TDI_CONFIRM|THE_33|CONF_50_74",
+    "primary_theme": "EUR_STRENGTH",
+    "profitable_source_ids": [
+      2561
+    ],
+    "raw_key": "EURUSD|BUY|EARLY_WEEK|BUY|L0|NEUTRAL|TRUE_TREND|NEUTRAL|AR_16.7|HUNT_29.9|PUSH3_PLUS|W_BOTTOM|NO_RRT|TDI_CONFIRM|THE_33",
+    "realistic_target_pips": 2.4569999999998093,
+    "setup_family": "THE_33_MW",
+    "split_stats": {
+      "train": {
+        "avg_exit_pips": -4.855000000000387,
+        "avg_mae": 6.920000000000482,
+        "avg_mfe": 5.459999999999576,
+        "direct_profit": 1,
+        "direct_profit_rate": 10.0,
+        "favorable": 1,
+        "favorable_rate": 10.0,
+        "t1_hits": 3,
+        "t1_rate": 30.0,
+        "total": 10
+      }
+    },
+    "symbol": "EURUSD",
+    "t1_hits": 3,
+    "t1_rate": 30.0,
+    "total": 10
+  },
+  {
+    "avg_exit_pips": -4.1363636363636855,
+    "avg_mae": 8.018181818181864,
+    "avg_mfe": 5.472727272726993,
+    "baseline_split_passes": 0,
+    "direct_profit": 1,
+    "direct_profit_rate": 9.090909090909092,
+    "direction": "BUY",
+    "favorable": 1,
+    "favorable_rate": 9.090909090909092,
+    "first_snapshot": "2023-08-04T08:15:00+00:00",
+    "last_snapshot": "2024-02-15T08:00:00+00:00",
+    "normalized_key": "THE_33_MW|BUY|LATE_WEEK|L0|TRUE_TREND|AR_VALID|HUNT_PAIR_RANGE|PUSH3_PLUS|W_BOTTOM|NO_RRT|TDI_CONFIRM|THE_33|CONF_50_74",
+    "primary_theme": "EUR_STRENGTH",
+    "profitable_source_ids": [
+      2817
+    ],
+    "raw_key": "EURUSD|BUY|LATE_WEEK|BUY|L0|NEUTRAL|TRUE_TREND|NEUTRAL|AR_26.8|HUNT_31.6|PUSH3_PLUS|W_BOTTOM|NO_RRT|TDI_CONFIRM|THE_33",
+    "realistic_target_pips": 2.4627272727271468,
+    "setup_family": "THE_33_MW",
+    "split_stats": {
+      "train": {
+        "avg_exit_pips": -4.1363636363636855,
+        "avg_mae": 8.018181818181864,
+        "avg_mfe": 5.472727272726993,
+        "direct_profit": 1,
+        "direct_profit_rate": 9.090909090909092,
+        "favorable": 1,
+        "favorable_rate": 9.090909090909092,
+        "t1_hits": 2,
+        "t1_rate": 18.181818181818183,
+        "total": 11
+      }
+    },
+    "symbol": "EURUSD",
+    "t1_hits": 2,
+    "t1_rate": 18.181818181818183,
+    "total": 11
+  },
+  {
+    "avg_exit_pips": -3.112499999999944,
+    "avg_mae": 6.5833333333331625,
+    "avg_mfe": 5.700000000000334,
+    "baseline_split_passes": 0,
+    "direct_profit": 2,
+    "direct_profit_rate": 16.666666666666664,
+    "direction": "BUY",
+    "favorable": 1,
+    "favorable_rate": 8.333333333333332,
+    "first_snapshot": "2023-07-31T09:45:00+00:00",
+    "last_snapshot": "2024-07-29T08:00:00+00:00",
+    "normalized_key": "THE_33_MW|BUY|EARLY_WEEK|L0|TRUE_TREND|AR_TIGHT|HUNT_PAIR_RANGE|PUSH3_PLUS|W_BOTTOM|NO_RRT|TDI_NONE|THE_33|CONF_50_74",
+    "primary_theme": "EUR_STRENGTH",
+    "profitable_source_ids": [
+      2430,
+      3070
+    ],
+    "raw_key": "EURUSD|BUY|EARLY_WEEK|BUY|L0|NEUTRAL|TRUE_TREND|BUY|AR_14.1|HUNT_47.0|PUSH3_PLUS|W_BOTTOM|NO_RRT|TDI_NONE|THE_33",
+    "realistic_target_pips": 2.5650000000001505,
+    "setup_family": "THE_33_MW",
+    "split_stats": {
+      "train": {
+        "avg_exit_pips": -3.112499999999944,
+        "avg_mae": 6.5833333333331625,
+        "avg_mfe": 5.700000000000334,
+        "direct_profit": 2,
+        "direct_profit_rate": 16.666666666666664,
+        "favorable": 1,
+        "favorable_rate": 8.333333333333332,
+        "t1_hits": 2,
+        "t1_rate": 16.666666666666664,
+        "total": 12
+      }
+    },
+    "symbol": "EURUSD",
+    "t1_hits": 2,
+    "t1_rate": 16.666666666666664,
+    "total": 12
+  },
+  {
+    "avg_exit_pips": -1.6599999999997728,
+    "avg_mae": 4.526666666666272,
+    "avg_mfe": 5.900000000000313,
+    "baseline_split_passes": 0,
+    "direct_profit": 1,
+    "direct_profit_rate": 6.666666666666667,
+    "direction": "BUY",
+    "favorable": 1,
+    "favorable_rate": 6.666666666666667,
+    "first_snapshot": "2023-07-26T01:00:00+00:00",
+    "last_snapshot": "2024-01-31T02:30:00+00:00",
+    "normalized_key": "THE_33_MW|BUY|MID_WEEK|L0|ACCUMULATION|AR_VALID|HUNT_PAIR_RANGE|PUSH3_PLUS|W_BOTTOM|NO_RRT|TDI_CONFLICT|THE_33|CONF_50_74",
+    "primary_theme": "EUR_STRENGTH",
+    "profitable_source_ids": [
+      2513
+    ],
+    "raw_key": "EURUSD|BUY|MID_WEEK|BUY|L0|NEUTRAL|ACCUMULATION|BUY|AR_30.9|HUNT_38.2|PUSH3_PLUS|W_BOTTOM|NO_RRT|TDI_CONFLICT|THE_33",
+    "realistic_target_pips": 2.655000000000141,
+    "setup_family": "THE_33_MW",
+    "split_stats": {
+      "train": {
+        "avg_exit_pips": -1.6599999999997728,
+        "avg_mae": 4.526666666666272,
+        "avg_mfe": 5.900000000000313,
+        "direct_profit": 1,
+        "direct_profit_rate": 6.666666666666667,
+        "favorable": 1,
+        "favorable_rate": 6.666666666666667,
+        "t1_hits": 3,
+        "t1_rate": 20.0,
+        "total": 15
+      }
+    },
+    "symbol": "EURUSD",
+    "t1_hits": 3,
+    "t1_rate": 20.0,
+    "total": 15
+  }
+]

@@ -1,0 +1,289 @@
+[
+  {
+    "avg_exit_pips": 2.5800000000000267,
+    "avg_mae": 5.8000000000006935,
+    "avg_mfe": 8.769999999999278,
+    "baseline_split_passes": 0,
+    "direct_profit": 3,
+    "direct_profit_rate": 30.0,
+    "direction": "BUY",
+    "favorable": 3,
+    "favorable_rate": 30.0,
+    "first_snapshot": "2023-06-12T06:45:00+00:00",
+    "last_snapshot": "2024-06-17T06:30:00+00:00",
+    "normalized_key": "THE_33_MW|BUY|EARLY_WEEK|L3|STOP_HUNT|AR_TIGHT|HUNT_EXTENDED|PUSH3_PLUS|W_BOTTOM|NO_RRT|TDI_CONFIRM|THE_33|CONF_50_74",
+    "primary_theme": "GBP_STRENGTH",
+    "profitable_source_ids": [
+      1111,
+      1285,
+      3598
+    ],
+    "raw_key": "GBPUSD|BUY|EARLY_WEEK|BUY|L3|SELL|STOP_HUNT|NEUTRAL|AR_14.9|HUNT_133.4|PUSH3_PLUS|W_BOTTOM|NO_RRT|TDI_CONFIRM|THE_33",
+    "realistic_target_pips": 3.9464999999996753,
+    "setup_family": "THE_33_MW",
+    "split_stats": {
+      "train": {
+        "avg_exit_pips": 2.5800000000000267,
+        "avg_mae": 5.8000000000006935,
+        "avg_mfe": 8.769999999999278,
+        "direct_profit": 3,
+        "direct_profit_rate": 30.0,
+        "favorable": 3,
+        "favorable_rate": 30.0,
+        "t1_hits": 3,
+        "t1_rate": 30.0,
+        "total": 10
+      }
+    },
+    "symbol": "GBPUSD",
+    "t1_hits": 3,
+    "t1_rate": 30.0,
+    "total": 10
+  },
+  {
+    "avg_exit_pips": 4.619999999999033,
+    "avg_mae": 22.079999999999878,
+    "avg_mfe": 30.039999999999917,
+    "baseline_split_passes": 0,
+    "direct_profit": 4,
+    "direct_profit_rate": 26.666666666666668,
+    "direction": "BUY",
+    "favorable": 4,
+    "favorable_rate": 26.666666666666668,
+    "first_snapshot": "2023-08-15T13:00:00+00:00",
+    "last_snapshot": "2024-04-23T15:30:00+00:00",
+    "normalized_key": "THE_33_MW|BUY|MID_WEEK|L0|NYC_REVERSAL|AR_VALID|HUNT_PAIR_RANGE|PUSH3_PLUS|W_BOTTOM|NO_RRT|TDI_CONFLICT|THE_33|CONF_50_74",
+    "primary_theme": "GBP_STRENGTH",
+    "profitable_source_ids": [
+      1282,
+      3593,
+      3932,
+      4189
+    ],
+    "raw_key": "GBPUSD|BUY|MID_WEEK|BUY|L0|NEUTRAL|NYC_REVERSAL|BUY|AR_26.4|HUNT_30.6|PUSH3_PLUS|W_BOTTOM|NO_RRT|TDI_CONFLICT|THE_33",
+    "realistic_target_pips": 13.517999999999963,
+    "setup_family": "THE_33_MW",
+    "split_stats": {
+      "train": {
+        "avg_exit_pips": 4.619999999999033,
+        "avg_mae": 22.079999999999878,
+        "avg_mfe": 30.039999999999917,
+        "direct_profit": 4,
+        "direct_profit_rate": 26.666666666666668,
+        "favorable": 4,
+        "favorable_rate": 26.666666666666668,
+        "t1_hits": 4,
+        "t1_rate": 26.666666666666668,
+        "total": 15
+      }
+    },
+    "symbol": "GBPUSD",
+    "t1_hits": 4,
+    "t1_rate": 26.666666666666668,
+    "total": 15
+  },
+  {
+    "avg_exit_pips": 0.00769230769252889,
+    "avg_mae": 5.14615384615357,
+    "avg_mfe": 7.0000000000000835,
+    "baseline_split_passes": 0,
+    "direct_profit": 4,
+    "direct_profit_rate": 30.76923076923077,
+    "direction": "BUY",
+    "favorable": 3,
+    "favorable_rate": 23.076923076923077,
+    "first_snapshot": "2023-08-16T04:00:00+00:00",
+    "last_snapshot": "2024-06-18T04:00:00+00:00",
+    "normalized_key": "THE_33_MW|BUY|MID_WEEK|L0|ACCUMULATION|AR_VALID|HUNT_PAIR_RANGE|PUSH3_PLUS|W_BOTTOM|NO_RRT|TDI_SQUEEZE|THE_33|CONF_50_74",
+    "primary_theme": "GBP_STRENGTH",
+    "profitable_source_ids": [
+      1252,
+      3523,
+      3584,
+      3795
+    ],
+    "raw_key": "GBPUSD|BUY|MID_WEEK|BUY|L0|NEUTRAL|ACCUMULATION|BUY|AR_25.1|HUNT_31.9|PUSH3_PLUS|W_BOTTOM|NO_RRT|TDI_SQUEEZE|THE_33",
+    "realistic_target_pips": 3.1500000000000377,
+    "setup_family": "THE_33_MW",
+    "split_stats": {
+      "train": {
+        "avg_exit_pips": 0.00769230769252889,
+        "avg_mae": 5.14615384615357,
+        "avg_mfe": 7.0000000000000835,
+        "direct_profit": 4,
+        "direct_profit_rate": 30.76923076923077,
+        "favorable": 3,
+        "favorable_rate": 23.076923076923077,
+        "t1_hits": 6,
+        "t1_rate": 46.15384615384615,
+        "total": 13
+      }
+    },
+    "symbol": "GBPUSD",
+    "t1_hits": 6,
+    "t1_rate": 46.15384615384615,
+    "total": 13
+  },
+  {
+    "avg_exit_pips": 2.7649999999995734,
+    "avg_mae": 6.530000000000146,
+    "avg_mfe": 12.10999999999962,
+    "baseline_split_passes": 0,
+    "direct_profit": 3,
+    "direct_profit_rate": 30.0,
+    "direction": "BUY",
+    "favorable": 2,
+    "favorable_rate": 20.0,
+    "first_snapshot": "2023-06-30T12:45:00+00:00",
+    "last_snapshot": "2024-06-14T11:00:00+00:00",
+    "normalized_key": "THE_33_MW|BUY|LATE_WEEK|L0|TRUE_TREND|AR_VALID|HUNT_PAIR_RANGE|PUSH3_PLUS|W_BOTTOM|NO_RRT|TDI_CONFIRM|THE_33|CONF_50_74",
+    "primary_theme": "GBP_STRENGTH",
+    "profitable_source_ids": [
+      3398,
+      3574,
+      3844
+    ],
+    "raw_key": "GBPUSD|BUY|LATE_WEEK|BUY|L0|NEUTRAL|TRUE_TREND|NEUTRAL|AR_38.3|HUNT_89.0|PUSH3_PLUS|W_BOTTOM|NO_RRT|TDI_CONFIRM|THE_33",
+    "realistic_target_pips": 5.449499999999829,
+    "setup_family": "THE_33_MW",
+    "split_stats": {
+      "train": {
+        "avg_exit_pips": 2.7649999999995734,
+        "avg_mae": 6.530000000000146,
+        "avg_mfe": 12.10999999999962,
+        "direct_profit": 3,
+        "direct_profit_rate": 30.0,
+        "favorable": 2,
+        "favorable_rate": 20.0,
+        "t1_hits": 3,
+        "t1_rate": 30.0,
+        "total": 10
+      }
+    },
+    "symbol": "GBPUSD",
+    "t1_hits": 3,
+    "t1_rate": 30.0,
+    "total": 10
+  },
+  {
+    "avg_exit_pips": -0.01999999999990898,
+    "avg_mae": 4.439999999999555,
+    "avg_mfe": 6.440000000000223,
+    "baseline_split_passes": 0,
+    "direct_profit": 2,
+    "direct_profit_rate": 20.0,
+    "direction": "BUY",
+    "favorable": 2,
+    "favorable_rate": 20.0,
+    "first_snapshot": "2023-08-09T05:15:00+00:00",
+    "last_snapshot": "2024-05-15T06:30:00+00:00",
+    "normalized_key": "THE_33_MW|BUY|MID_WEEK|L3|STOP_HUNT|AR_VALID|HUNT_PAIR_RANGE|PUSH3_PLUS|W_BOTTOM|NO_RRT|TDI_SQUEEZE|THE_33|CONF_75_PLUS",
+    "primary_theme": "GBP_STRENGTH",
+    "profitable_source_ids": [
+      3497,
+      4253
+    ],
+    "raw_key": "GBPUSD|BUY|MID_WEEK|BUY|L3|SELL|STOP_HUNT|BUY|AR_46.0|HUNT_55.2|PUSH3_PLUS|W_BOTTOM|NO_RRT|TDI_SQUEEZE|THE_33",
+    "realistic_target_pips": 2.8980000000001005,
+    "setup_family": "THE_33_MW",
+    "split_stats": {
+      "train": {
+        "avg_exit_pips": -0.01999999999990898,
+        "avg_mae": 4.439999999999555,
+        "avg_mfe": 6.440000000000223,
+        "direct_profit": 2,
+        "direct_profit_rate": 20.0,
+        "favorable": 2,
+        "favorable_rate": 20.0,
+        "t1_hits": 3,
+        "t1_rate": 30.0,
+        "total": 10
+      }
+    },
+    "symbol": "GBPUSD",
+    "t1_hits": 3,
+    "t1_rate": 30.0,
+    "total": 10
+  },
+  {
+    "avg_exit_pips": -20.010000000000083,
+    "avg_mae": 5.179999999999962,
+    "avg_mfe": 13.750000000000593,
+    "baseline_split_passes": 0,
+    "direct_profit": 3,
+    "direct_profit_rate": 30.0,
+    "direction": "BUY",
+    "favorable": 2,
+    "favorable_rate": 20.0,
+    "first_snapshot": "2023-06-28T15:00:00+00:00",
+    "last_snapshot": "2024-04-10T13:00:00+00:00",
+    "normalized_key": "THE_33_MW|BUY|MID_WEEK|L0|NYC_REVERSAL|AR_VALID|HUNT_PAIR_RANGE|PUSH3_PLUS|W_BOTTOM|NO_RRT|TDI_NEUTRAL|THE_33|CONF_50_74",
+    "primary_theme": "GBP_STRENGTH",
+    "profitable_source_ids": [
+      1214,
+      3595,
+      4004
+    ],
+    "raw_key": "GBPUSD|BUY|MID_WEEK|BUY|L0|NEUTRAL|NYC_REVERSAL|BUY|AR_26.4|HUNT_30.6|PUSH3_PLUS|W_BOTTOM|NO_RRT|TDI_NEUTRAL|THE_33",
+    "realistic_target_pips": 6.187500000000267,
+    "setup_family": "THE_33_MW",
+    "split_stats": {
+      "train": {
+        "avg_exit_pips": -20.010000000000083,
+        "avg_mae": 5.179999999999962,
+        "avg_mfe": 13.750000000000593,
+        "direct_profit": 3,
+        "direct_profit_rate": 30.0,
+        "favorable": 2,
+        "favorable_rate": 20.0,
+        "t1_hits": 0,
+        "t1_rate": 0.0,
+        "total": 10
+      }
+    },
+    "symbol": "GBPUSD",
+    "t1_hits": 0,
+    "t1_rate": 0.0,
+    "total": 10
+  },
+  {
+    "avg_exit_pips": -3.835000000000477,
+    "avg_mae": 8.159999999999945,
+    "avg_mfe": 6.209999999999827,
+    "baseline_split_passes": 0,
+    "direct_profit": 2,
+    "direct_profit_rate": 20.0,
+    "direction": "BUY",
+    "favorable": 1,
+    "favorable_rate": 10.0,
+    "first_snapshot": "2023-08-01T11:00:00+00:00",
+    "last_snapshot": "2024-06-05T10:15:00+00:00",
+    "normalized_key": "THE_33_MW|BUY|MID_WEEK|L0|TRUE_TREND|AR_VALID|HUNT_PAIR_RANGE|PUSH3_PLUS|W_BOTTOM|RRT|TDI_CONFIRM|THE_33|CONF_50_74",
+    "primary_theme": "GBP_STRENGTH",
+    "profitable_source_ids": [
+      3771,
+      3929
+    ],
+    "raw_key": "GBPUSD|BUY|MID_WEEK|BUY|L0|NEUTRAL|TRUE_TREND|NEUTRAL|AR_42.9|HUNT_44.5|PUSH3_PLUS|W_BOTTOM|RRT|TDI_CONFIRM|THE_33",
+    "realistic_target_pips": 2.794499999999922,
+    "setup_family": "THE_33_MW",
+    "split_stats": {
+      "train": {
+        "avg_exit_pips": -3.835000000000477,
+        "avg_mae": 8.159999999999945,
+        "avg_mfe": 6.209999999999827,
+        "direct_profit": 2,
+        "direct_profit_rate": 20.0,
+        "favorable": 1,
+        "favorable_rate": 10.0,
+        "t1_hits": 2,
+        "t1_rate": 20.0,
+        "total": 10
+      }
+    },
+    "symbol": "GBPUSD",
+    "t1_hits": 2,
+    "t1_rate": 20.0,
+    "total": 10
+  }
+]

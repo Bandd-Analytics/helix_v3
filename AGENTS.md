@@ -42,6 +42,7 @@ Important auth boundary: Codex ChatGPT login is not the same as `OPENAI_API_KEY`
 - `helix_v3/backtest/validation_library.py`: promoted profitable setup signatures for validating new entries.
 - `helix_v3/journal/flashcards.py`: market-structure flashcards with M/W type, TDI, pattern, and convergence metadata.
 - `helix_v3/execution/gatekeeper.py`: live order construction and trade management.
+- `helix_v3/training/taught_rule_validator.py`: validates paraphrased Steve Mauro candidate rule cards against historical OHLC.
 
 ## Databases
 
@@ -155,6 +156,32 @@ Mine backdated historical flashcards and build the validation library:
 .venv\Scripts\python.exe -m helix_v3.backtest.historical_flashcard_miner validate-current --symbols EURUSD,GBPUSD,GBPJPY,USDJPY,EURJPY,GBPCHF,AUDUSD
 ```
 
+Run the per-pair 3-year dense research archive. This mines each pair separately, saves historical
+flashcards, labels direct-profit outcomes, requires scanner-baseline qualification, and writes
+`data/mmm_training/pair_research/<PAIR>/` artifacts:
+
+```powershell
+.venv\Scripts\python.exe -m helix_v3.backtest.historical_flashcard_miner pair-study --symbols EURUSD,GBPUSD,GBPJPY,USDJPY,EURJPY,GBPCHF,AUDUSD --days 1095 --step-bars 1 --limit-per-symbol 1000 --min-confluence 50 --min-spacing-minutes 90 --min-total 10 --min-favorable-rate 55 --min-avg-exit-pips 0 --baseline-favorable-rate 85 --baseline-avg-exit-pips 10.9 --split-min-total 3 --required-split-passes 2 --validation-days 365 --out-of-sample-days 180 --max-examples 150
+```
+
+Regenerate reports without touching MT5:
+
+```powershell
+.venv\Scripts\python.exe -m helix_v3.backtest.historical_flashcard_miner pair-study --archive-only --symbols EURUSD,GBPUSD,GBPJPY,USDJPY,EURJPY,GBPCHF,AUDUSD --days 1095 --min-total 10 --min-favorable-rate 55 --min-avg-exit-pips 0 --baseline-favorable-rate 85 --baseline-avg-exit-pips 10.9 --split-min-total 3 --required-split-passes 2 --validation-days 365 --out-of-sample-days 180 --max-examples 150
+```
+
+Rebuild validation records strictly from replay signatures:
+
+```powershell
+.venv\Scripts\python.exe -m helix_v3.backtest.validation_library rebuild --min-total 10 --min-favorable-rate 85 --min-avg-exit-pips 10.9 --min-symbols 2
+```
+
+Build winner-vs-loser chart packets for paid-account ChatGPT/Claude vision review:
+
+```powershell
+.venv\Scripts\python.exe -m helix_v3.training.vision_review_packet_builder --symbols GBPJPY,EURJPY --min-total 10 --min-favorable-rate 55 --min-avg-exit-pips 0 --max-setups-per-pair 3 --winners-per-setup 8 --losers-per-setup 8
+```
+
 Historical mining uses MT5 only for candle history. It slices each timeframe at the historical
 snapshot, runs the same Weekly/H4/H1/M15 analyzer, saves `HISTORICAL` flashcards with real
 backdated timestamps, records MMM event outcomes, and promotes repeated profitable signatures.
@@ -188,9 +215,33 @@ locally through ffmpeg's Whisper filter after a whisper.cpp ggml model is placed
 .venv\Scripts\python.exe -m helix_v3.training.video_mmm_extractor transcribe --video-id video_001 --model-path data\mmm_training\models\ggml-base.en.bin
 ```
 
+For faster GPU transcription without API keys, use Google Colab with
+`notebooks/colab_transcribe_mmm.ipynb` and `scripts/colab_transcribe_mmm.py`. The Colab script
+uses `faster-whisper`, reads `data/mmm_training/manifest.json`, prefers `audio/video_XXX.wav`
+when present, falls back to source videos, and writes JSON-line transcripts under
+`data/mmm_training/transcripts`.
+
 Promote extracted
 teachings into `data/mmm_training/skills/CODEX_MMM_STRATEGY.md` and
 `data/mmm_training/skills/CLAUDE_MMM_STRATEGY.md` only after market replay validates the rule.
+
+Build a transcript pointer index without reproducing full transcripts:
+
+```powershell
+.venv\Scripts\python.exe -m helix_v3.training.video_mmm_extractor transcript-index --window-seconds 180 --min-score 12 --top-limit 120
+```
+
+Validate taught candidate rules against historical candles:
+
+```powershell
+.venv\Scripts\python.exe -m helix_v3.training.taught_rule_validator validate --days 180 --symbols EURUSD,GBPUSD,GBPJPY,USDJPY,EURJPY,GBPCHF,AUDUSD --step-bars 4 --limit-per-rule 50 --min-spacing-minutes 90 --replace-scope
+```
+
+Export the taught-rule validation report:
+
+```powershell
+.venv\Scripts\python.exe -m helix_v3.training.taught_rule_validator export-report --min-total 1 --scanner-baseline "90m scanner baseline: N=100, Fav=85.0%, AvgExit=+10.9p, MFE=+24.0p, MAE=+4.5p"
+```
 
 ## Verification Expectations
 

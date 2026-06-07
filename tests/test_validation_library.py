@@ -118,3 +118,26 @@ def test_validation_library_schema_has_unique_key(tmp_path) -> None:
         conn.close()
 
     assert any(index[2] for index in indexes)
+
+
+def test_validation_library_rebuild_clears_records_that_fail_new_gate(tmp_path) -> None:
+    replay_db = tmp_path / "vision_backtests.db"
+    store = MMMReplayStore(replay_db)
+    try:
+        for source_id in range(1, 4):
+            setup = _setup(source_id)
+            sig_id = store.record_signature(build_setup_signature(setup))
+            store.record_outcome(_outcome(setup), sig_id)
+    finally:
+        store.close()
+
+    library = ValidationLibrary(db_path=tmp_path / "library.db", replay_db_path=replay_db)
+    try:
+        assert library.promote_from_replay(min_total=3, min_favorable_rate=55) == 1
+        rebuilt = library.rebuild_from_replay(min_total=3, min_favorable_rate=101)
+        report = library.report()
+    finally:
+        library.close()
+
+    assert rebuilt == 0
+    assert "No validation-library records" in report

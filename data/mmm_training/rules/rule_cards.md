@@ -2,6 +2,10 @@
 
 Each card should be a concise, testable rule. Example schema:
 
+Candidate cards extracted from the training transcripts live in
+`candidate_rule_cards.md`. They must remain `candidate` until historical replay
+validates the setup behavior.
+
 ```json
 {
   "rule_id": "MMM-001",

@@ -1,0 +1,964 @@
+{
+  "counts": {
+    "items": 13,
+    "losers": 5,
+    "winners": 8
+  },
+  "generated_at": "2026-06-07T15:15:17.452679+00:00",
+  "instructions": {
+    "answer_key": "answer_key.csv",
+    "blind_prompt": "blind_prompt.md",
+    "labeled_prompt": "labeled_comparison_prompt.md",
+    "review_matrix": "review_matrix.csv"
+  },
+  "items": [
+    {
+      "context": {
+        "advisory_confidence_score": 59.75,
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 26.39999999999816,
+        "confluence_score": 75,
+        "event_path": [
+          "ENTRY",
+          "STALE_TIGHTEN",
+          "TIME_EXIT_LOSS"
+        ],
+        "h1_session": "TRUE_TREND",
+        "h1_trend": "BUY",
+        "h4_level": 3,
+        "h4_trend": "BUY",
+        "m_w_pattern": "W_BOTTOM",
+        "pattern_trade_type": "THE_33",
+        "push_count": 5,
+        "ratios": {
+          "asian_range_to_pair_max": 0.5279999999999632,
+          "confluence": 0.75,
+          "hunt_to_expected_level_move": 1.1500000000000057,
+          "hunt_to_pair_max": 0.884615384615389,
+          "single_setup_theme_score": 0.5
+        },
+        "rrt_detected": true,
+        "stop_hunt_detected": true,
+        "stop_hunt_direction": "BUY",
+        "stop_hunt_pips": 115.00000000000057,
+        "tags": [
+          "historical",
+          "TIME_EXIT_LOSS",
+          "BUY",
+          "L3",
+          "EARLY_WEEK"
+        ],
+        "tdi_crossed_signal": "bearish",
+        "tdi_divergence": "none",
+        "tdi_shark_direction": "SHORT",
+        "tdi_shark_fin": true,
+        "tdi_signals": [
+          "SIGNAL_CROSS_BEARISH",
+          "SHARK_FIN_SHORT"
+        ],
+        "tdi_vb_squeeze": false,
+        "theme_tags": [
+          "GBP_STRENGTH",
+          "JPY_WEAKNESS"
+        ],
+        "weekly_phase": "EARLY_WEEK",
+        "weekly_trend": "SELL"
+      },
+      "direction": "BUY",
+      "exit_pips": -12.20000000000141,
+      "flashcard_id": 4540,
+      "image_path": "images/c01_fc4540_20240219T081500.png",
+      "label": "loser",
+      "max_adverse_pips": 29.000000000002046,
+      "max_favorable_pips": 9.600000000000364,
+      "minutes_to_t1": null,
+      "outcome": "TIME_EXIT_LOSS",
+      "review_id": "C01",
+      "snapshot_at": "2024-02-19T08:15:00+00:00",
+      "source_chart_path": "charts\\annotated\\GBPJPY_M15_annotated_20260607_154227_528434.png",
+      "symbol": "GBPJPY",
+      "t1_hit": false,
+      "timeframe": "M15"
+    },
+    {
+      "context": {
+        "advisory_confidence_score": 63.0,
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 48.30000000000041,
+        "confluence_score": 80,
+        "event_path": [
+          "ENTRY",
+          "STALE_TIGHTEN",
+          "TIME_EXIT_LOSS"
+        ],
+        "h1_session": "TRUE_TREND",
+        "h1_trend": "BUY",
+        "h4_level": 3,
+        "h4_trend": "BUY",
+        "m_w_pattern": "W_BOTTOM",
+        "pattern_trade_type": "THE_33",
+        "push_count": 5,
+        "ratios": {
+          "asian_range_to_pair_max": 0.9660000000000082,
+          "confluence": 0.8,
+          "hunt_to_expected_level_move": 0.6839999999999975,
+          "hunt_to_pair_max": 0.5261538461538442,
+          "single_setup_theme_score": 0.52
+        },
+        "rrt_detected": true,
+        "stop_hunt_detected": true,
+        "stop_hunt_direction": "BUY",
+        "stop_hunt_pips": 68.39999999999975,
+        "tags": [
+          "historical",
+          "TIME_EXIT_LOSS",
+          "BUY",
+          "L3",
+          "EARLY_WEEK"
+        ],
+        "tdi_crossed_signal": "none",
+        "tdi_divergence": "none",
+        "tdi_shark_direction": "",
+        "tdi_shark_fin": false,
+        "tdi_signals": [
+          "MBL_CROSS_BEARISH"
+        ],
+        "tdi_vb_squeeze": false,
+        "theme_tags": [
+          "GBP_STRENGTH",
+          "JPY_WEAKNESS"
+        ],
+        "weekly_phase": "EARLY_WEEK",
+        "weekly_trend": "SELL"
+      },
+      "direction": "BUY",
+      "exit_pips": -17.599999999998772,
+      "flashcard_id": 718,
+      "image_path": "images/c02_fc718_20240122T120000.png",
+      "label": "loser",
+      "max_adverse_pips": 23.799999999999955,
+      "max_favorable_pips": 6.299999999998818,
+      "minutes_to_t1": null,
+      "outcome": "TIME_EXIT_LOSS",
+      "review_id": "C02",
+      "snapshot_at": "2024-01-22T12:00:00+00:00",
+      "source_chart_path": "charts\\annotated\\GBPJPY_M15_annotated_20260607_144647_980606.png",
+      "symbol": "GBPJPY",
+      "t1_hit": false,
+      "timeframe": "M15"
+    },
+    {
+      "context": {
+        "advisory_confidence_score": 63.0,
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 35.20000000000039,
+        "confluence_score": 80,
+        "event_path": [
+          "ENTRY",
+          "TIME_EXIT_PROFIT"
+        ],
+        "h1_session": "TRUE_TREND",
+        "h1_trend": "BUY",
+        "h4_level": 3,
+        "h4_trend": "BUY",
+        "m_w_pattern": "W_BOTTOM",
+        "pattern_trade_type": "THE_33",
+        "push_count": 5,
+        "ratios": {
+          "asian_range_to_pair_max": 0.7040000000000077,
+          "confluence": 0.8,
+          "hunt_to_expected_level_move": 0.45599999999998886,
+          "hunt_to_pair_max": 0.3507692307692222,
+          "single_setup_theme_score": 0.52
+        },
+        "rrt_detected": true,
+        "stop_hunt_detected": true,
+        "stop_hunt_direction": "BUY",
+        "stop_hunt_pips": 45.599999999998886,
+        "tags": [
+          "historical",
+          "TIME_EXIT_PROFIT",
+          "BUY",
+          "L3",
+          "EARLY_WEEK"
+        ],
+        "tdi_crossed_signal": "none",
+        "tdi_divergence": "none",
+        "tdi_shark_direction": "SHORT",
+        "tdi_shark_fin": true,
+        "tdi_signals": [
+          "SHARK_FIN_SHORT"
+        ],
+        "tdi_vb_squeeze": false,
+        "theme_tags": [
+          "GBP_STRENGTH",
+          "JPY_WEAKNESS"
+        ],
+        "weekly_phase": "EARLY_WEEK",
+        "weekly_trend": "SELL"
+      },
+      "direction": "BUY",
+      "exit_pips": 11.599999999998545,
+      "flashcard_id": 4559,
+      "image_path": "images/c03_fc4559_20240226T124500.png",
+      "label": "winner",
+      "max_adverse_pips": 6.800000000001205,
+      "max_favorable_pips": 33.899999999999864,
+      "minutes_to_t1": null,
+      "outcome": "TIME_EXIT_PROFIT",
+      "review_id": "C03",
+      "snapshot_at": "2024-02-26T12:45:00+00:00",
+      "source_chart_path": "charts\\annotated\\GBPJPY_M15_annotated_20260607_154237_139157.png",
+      "symbol": "GBPJPY",
+      "t1_hit": false,
+      "timeframe": "M15"
+    },
+    {
+      "context": {
+        "advisory_confidence_score": 59.75,
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 26.900000000000546,
+        "confluence_score": 75,
+        "event_path": [
+          "ENTRY",
+          "STALE_TIGHTEN",
+          "TIME_EXIT_PROFIT"
+        ],
+        "h1_session": "TRUE_TREND",
+        "h1_trend": "NEUTRAL",
+        "h4_level": 3,
+        "h4_trend": "SELL",
+        "m_w_pattern": "W_BOTTOM",
+        "pattern_trade_type": "THE_33",
+        "push_count": 5,
+        "ratios": {
+          "asian_range_to_pair_max": 0.5380000000000109,
+          "confluence": 0.75,
+          "hunt_to_expected_level_move": 1.0439999999999827,
+          "hunt_to_pair_max": 0.8030769230769098,
+          "single_setup_theme_score": 0.5
+        },
+        "rrt_detected": true,
+        "stop_hunt_detected": true,
+        "stop_hunt_direction": "BUY",
+        "stop_hunt_pips": 104.39999999999827,
+        "tags": [
+          "historical",
+          "TIME_EXIT_PROFIT",
+          "BUY",
+          "L3",
+          "EARLY_WEEK"
+        ],
+        "tdi_crossed_signal": "none",
+        "tdi_divergence": "none",
+        "tdi_shark_direction": "SHORT",
+        "tdi_shark_fin": true,
+        "tdi_signals": [
+          "VB_SQUEEZE",
+          "SHARK_FIN_SHORT"
+        ],
+        "tdi_vb_squeeze": true,
+        "theme_tags": [
+          "GBP_STRENGTH",
+          "JPY_WEAKNESS"
+        ],
+        "weekly_phase": "EARLY_WEEK",
+        "weekly_trend": "BUY"
+      },
+      "direction": "BUY",
+      "exit_pips": 13.100000000000023,
+      "flashcard_id": 648,
+      "image_path": "images/c04_fc648_20230925T110000.png",
+      "label": "winner",
+      "max_adverse_pips": 22.59999999999991,
+      "max_favorable_pips": 32.30000000000075,
+      "minutes_to_t1": null,
+      "outcome": "TIME_EXIT_PROFIT",
+      "review_id": "C04",
+      "snapshot_at": "2023-09-25T11:00:00+00:00",
+      "source_chart_path": "charts\\annotated\\GBPJPY_M15_annotated_20260607_144621_990029.png",
+      "symbol": "GBPJPY",
+      "t1_hit": false,
+      "timeframe": "M15"
+    },
+    {
+      "context": {
+        "advisory_confidence_score": 63.0,
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 38.700000000000045,
+        "confluence_score": 80,
+        "event_path": [
+          "ENTRY",
+          "STALE_TIGHTEN",
+          "TIME_EXIT_PROFIT"
+        ],
+        "h1_session": "TRUE_TREND",
+        "h1_trend": "BUY",
+        "h4_level": 3,
+        "h4_trend": "BUY",
+        "m_w_pattern": "W_BOTTOM",
+        "pattern_trade_type": "THE_33",
+        "push_count": 5,
+        "ratios": {
+          "asian_range_to_pair_max": 0.7740000000000009,
+          "confluence": 0.8,
+          "hunt_to_expected_level_move": 0.3849999999999909,
+          "hunt_to_pair_max": 0.29615384615383916,
+          "single_setup_theme_score": 0.52
+        },
+        "rrt_detected": true,
+        "stop_hunt_detected": true,
+        "stop_hunt_direction": "BUY",
+        "stop_hunt_pips": 38.49999999999909,
+        "tags": [
+          "historical",
+          "TIME_EXIT_PROFIT",
+          "BUY",
+          "L3",
+          "EARLY_WEEK"
+        ],
+        "tdi_crossed_signal": "none",
+        "tdi_divergence": "none",
+        "tdi_shark_direction": "SHORT",
+        "tdi_shark_fin": true,
+        "tdi_signals": [
+          "SHARK_FIN_SHORT"
+        ],
+        "tdi_vb_squeeze": false,
+        "theme_tags": [
+          "GBP_STRENGTH",
+          "JPY_WEAKNESS"
+        ],
+        "weekly_phase": "EARLY_WEEK",
+        "weekly_trend": "SELL"
+      },
+      "direction": "BUY",
+      "exit_pips": 16.0000000000025,
+      "flashcard_id": 4881,
+      "image_path": "images/c05_fc4881_20251208T081500.png",
+      "label": "winner",
+      "max_adverse_pips": 14.099999999999113,
+      "max_favorable_pips": 18.500000000000227,
+      "minutes_to_t1": null,
+      "outcome": "TIME_EXIT_PROFIT",
+      "review_id": "C05",
+      "snapshot_at": "2025-12-08T08:15:00+00:00",
+      "source_chart_path": "charts\\annotated\\GBPJPY_M15_annotated_20260607_155244_608332.png",
+      "symbol": "GBPJPY",
+      "t1_hit": false,
+      "timeframe": "M15"
+    },
+    {
+      "context": {
+        "advisory_confidence_score": 59.75,
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 26.900000000000546,
+        "confluence_score": 75,
+        "event_path": [
+          "ENTRY",
+          "T1_HIT",
+          "TRAIL_STOP"
+        ],
+        "h1_session": "TRUE_TREND",
+        "h1_trend": "NEUTRAL",
+        "h4_level": 3,
+        "h4_trend": "SELL",
+        "m_w_pattern": "W_BOTTOM",
+        "pattern_trade_type": "THE_33",
+        "push_count": 5,
+        "ratios": {
+          "asian_range_to_pair_max": 0.5380000000000109,
+          "confluence": 0.75,
+          "hunt_to_expected_level_move": 1.0439999999999827,
+          "hunt_to_pair_max": 0.8030769230769098,
+          "single_setup_theme_score": 0.5
+        },
+        "rrt_detected": true,
+        "stop_hunt_detected": true,
+        "stop_hunt_direction": "BUY",
+        "stop_hunt_pips": 104.39999999999827,
+        "tags": [
+          "historical",
+          "TRAIL_STOP",
+          "BUY",
+          "L3",
+          "EARLY_WEEK"
+        ],
+        "tdi_crossed_signal": "none",
+        "tdi_divergence": "none",
+        "tdi_shark_direction": "SHORT",
+        "tdi_shark_fin": true,
+        "tdi_signals": [
+          "VB_SQUEEZE",
+          "MBL_CROSS_BEARISH",
+          "SHARK_FIN_SHORT"
+        ],
+        "tdi_vb_squeeze": true,
+        "theme_tags": [
+          "GBP_STRENGTH",
+          "JPY_WEAKNESS"
+        ],
+        "weekly_phase": "EARLY_WEEK",
+        "weekly_trend": "BUY"
+      },
+      "direction": "BUY",
+      "exit_pips": 17.499999999998295,
+      "flashcard_id": 4412,
+      "image_path": "images/c06_fc4412_20230925T111500.png",
+      "label": "winner",
+      "max_adverse_pips": 16.59999999999968,
+      "max_favorable_pips": 38.30000000000098,
+      "minutes_to_t1": 105.0,
+      "outcome": "TRAIL_STOP",
+      "review_id": "C06",
+      "snapshot_at": "2023-09-25T11:15:00+00:00",
+      "source_chart_path": "charts\\annotated\\GBPJPY_M15_annotated_20260607_154011_487087.png",
+      "symbol": "GBPJPY",
+      "t1_hit": true,
+      "timeframe": "M15"
+    },
+    {
+      "context": {
+        "advisory_confidence_score": 59.75,
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 38.700000000000045,
+        "confluence_score": 75,
+        "event_path": [
+          "ENTRY",
+          "TIME_EXIT_PROFIT"
+        ],
+        "h1_session": "TRUE_TREND",
+        "h1_trend": "BUY",
+        "h4_level": 3,
+        "h4_trend": "BUY",
+        "m_w_pattern": "W_BOTTOM",
+        "pattern_trade_type": "THE_33",
+        "push_count": 5,
+        "ratios": {
+          "asian_range_to_pair_max": 0.7740000000000009,
+          "confluence": 0.75,
+          "hunt_to_expected_level_move": 0.3849999999999909,
+          "hunt_to_pair_max": 0.6416666666666515,
+          "single_setup_theme_score": 0.5
+        },
+        "rrt_detected": true,
+        "stop_hunt_detected": true,
+        "stop_hunt_direction": "BUY",
+        "stop_hunt_pips": 38.49999999999909,
+        "tags": [
+          "historical",
+          "TIME_EXIT_PROFIT",
+          "BUY",
+          "L3",
+          "EARLY_WEEK"
+        ],
+        "tdi_crossed_signal": "bearish",
+        "tdi_divergence": "none",
+        "tdi_shark_direction": "SHORT",
+        "tdi_shark_fin": true,
+        "tdi_signals": [
+          "SIGNAL_CROSS_BEARISH",
+          "SHARK_FIN_SHORT"
+        ],
+        "tdi_vb_squeeze": false,
+        "theme_tags": [
+          "GBP_STRENGTH",
+          "JPY_WEAKNESS"
+        ],
+        "weekly_phase": "EARLY_WEEK",
+        "weekly_trend": "SELL"
+      },
+      "direction": "BUY",
+      "exit_pips": 21.60000000000082,
+      "flashcard_id": 513,
+      "image_path": "images/c07_fc513_20251208T080000.png",
+      "label": "winner",
+      "max_adverse_pips": 4.200000000000159,
+      "max_favorable_pips": 27.700000000001523,
+      "minutes_to_t1": null,
+      "outcome": "TIME_EXIT_PROFIT",
+      "review_id": "C07",
+      "snapshot_at": "2025-12-08T08:00:00+00:00",
+      "source_chart_path": "charts\\annotated\\GBPJPY_M15_annotated_20260605_164614_428058.png",
+      "symbol": "GBPJPY",
+      "t1_hit": false,
+      "timeframe": "M15"
+    },
+    {
+      "context": {
+        "advisory_confidence_score": 63.0,
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 38.30000000000098,
+        "confluence_score": 80,
+        "event_path": [
+          "ENTRY",
+          "TIME_EXIT_PROFIT"
+        ],
+        "h1_session": "TRUE_TREND",
+        "h1_trend": "BUY",
+        "h4_level": 3,
+        "h4_trend": "BUY",
+        "m_w_pattern": "W_BOTTOM",
+        "pattern_trade_type": "THE_33",
+        "push_count": 5,
+        "ratios": {
+          "asian_range_to_pair_max": 0.7660000000000196,
+          "confluence": 0.8,
+          "hunt_to_expected_level_move": 0.5769999999999982,
+          "hunt_to_pair_max": 0.44384615384615245,
+          "single_setup_theme_score": 0.52
+        },
+        "rrt_detected": true,
+        "stop_hunt_detected": true,
+        "stop_hunt_direction": "BUY",
+        "stop_hunt_pips": 57.69999999999982,
+        "tags": [
+          "historical",
+          "TIME_EXIT_PROFIT",
+          "BUY",
+          "L3",
+          "EARLY_WEEK"
+        ],
+        "tdi_crossed_signal": "none",
+        "tdi_divergence": "none",
+        "tdi_shark_direction": "SHORT",
+        "tdi_shark_fin": true,
+        "tdi_signals": [
+          "RSI_OVERBOUGHT",
+          "SHARK_FIN_SHORT"
+        ],
+        "tdi_vb_squeeze": false,
+        "theme_tags": [
+          "GBP_STRENGTH",
+          "JPY_WEAKNESS"
+        ],
+        "weekly_phase": "EARLY_WEEK",
+        "weekly_trend": "SELL"
+      },
+      "direction": "BUY",
+      "exit_pips": 17.600000000001614,
+      "flashcard_id": 4486,
+      "image_path": "images/c08_fc4486_20231113T094500.png",
+      "label": "winner",
+      "max_adverse_pips": 7.099999999999795,
+      "max_favorable_pips": 25.499999999999545,
+      "minutes_to_t1": null,
+      "outcome": "TIME_EXIT_PROFIT",
+      "review_id": "C08",
+      "snapshot_at": "2023-11-13T09:45:00+00:00",
+      "source_chart_path": "charts\\annotated\\GBPJPY_M15_annotated_20260607_154104_042266.png",
+      "symbol": "GBPJPY",
+      "t1_hit": false,
+      "timeframe": "M15"
+    },
+    {
+      "context": {
+        "advisory_confidence_score": 59.75,
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 40.399999999999636,
+        "confluence_score": 75,
+        "event_path": [
+          "ENTRY",
+          "SL_HIT"
+        ],
+        "h1_session": "TRUE_TREND",
+        "h1_trend": "SELL",
+        "h4_level": 3,
+        "h4_trend": "SELL",
+        "m_w_pattern": "W_BOTTOM",
+        "pattern_trade_type": "THE_33",
+        "push_count": 5,
+        "ratios": {
+          "asian_range_to_pair_max": 0.8079999999999927,
+          "confluence": 0.75,
+          "hunt_to_expected_level_move": 1.1270000000000095,
+          "hunt_to_pair_max": 0.8669230769230842,
+          "single_setup_theme_score": 0.5
+        },
+        "rrt_detected": true,
+        "stop_hunt_detected": true,
+        "stop_hunt_direction": "BUY",
+        "stop_hunt_pips": 112.70000000000095,
+        "tags": [
+          "historical",
+          "LOSS",
+          "BUY",
+          "L3",
+          "EARLY_WEEK"
+        ],
+        "tdi_crossed_signal": "bearish",
+        "tdi_divergence": "none",
+        "tdi_shark_direction": "",
+        "tdi_shark_fin": false,
+        "tdi_signals": [
+          "SIGNAL_CROSS_BEARISH"
+        ],
+        "tdi_vb_squeeze": false,
+        "theme_tags": [
+          "GBP_STRENGTH",
+          "JPY_WEAKNESS"
+        ],
+        "weekly_phase": "EARLY_WEEK",
+        "weekly_trend": "BUY"
+      },
+      "direction": "BUY",
+      "exit_pips": -23.500000000001364,
+      "flashcard_id": 4616,
+      "image_path": "images/c09_fc4616_20240422T121500.png",
+      "label": "loser",
+      "max_adverse_pips": 28.49999999999966,
+      "max_favorable_pips": 1.8000000000000682,
+      "minutes_to_t1": null,
+      "outcome": "LOSS",
+      "review_id": "C09",
+      "snapshot_at": "2024-04-22T12:15:00+00:00",
+      "source_chart_path": "charts\\annotated\\GBPJPY_M15_annotated_20260607_154334_417474.png",
+      "symbol": "GBPJPY",
+      "t1_hit": false,
+      "timeframe": "M15"
+    },
+    {
+      "context": {
+        "advisory_confidence_score": 63.0,
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 40.500000000000114,
+        "confluence_score": 80,
+        "event_path": [
+          "ENTRY",
+          "TIME_EXIT_PROFIT"
+        ],
+        "h1_session": "TRUE_TREND",
+        "h1_trend": "BUY",
+        "h4_level": 3,
+        "h4_trend": "BUY",
+        "m_w_pattern": "W_BOTTOM",
+        "pattern_trade_type": "THE_33",
+        "push_count": 5,
+        "ratios": {
+          "asian_range_to_pair_max": 0.8100000000000023,
+          "confluence": 0.8,
+          "hunt_to_expected_level_move": 0.5320000000000107,
+          "hunt_to_pair_max": 0.40923076923077745,
+          "single_setup_theme_score": 0.52
+        },
+        "rrt_detected": true,
+        "stop_hunt_detected": true,
+        "stop_hunt_direction": "BUY",
+        "stop_hunt_pips": 53.20000000000107,
+        "tags": [
+          "historical",
+          "TIME_EXIT_PROFIT",
+          "BUY",
+          "L3",
+          "EARLY_WEEK"
+        ],
+        "tdi_crossed_signal": "none",
+        "tdi_divergence": "none",
+        "tdi_shark_direction": "SHORT",
+        "tdi_shark_fin": true,
+        "tdi_signals": [
+          "SHARK_FIN_SHORT"
+        ],
+        "tdi_vb_squeeze": false,
+        "theme_tags": [
+          "GBP_STRENGTH",
+          "JPY_WEAKNESS"
+        ],
+        "weekly_phase": "EARLY_WEEK",
+        "weekly_trend": "SELL"
+      },
+      "direction": "BUY",
+      "exit_pips": 45.599999999998886,
+      "flashcard_id": 4874,
+      "image_path": "images/c10_fc4874_20251117T110000.png",
+      "label": "winner",
+      "max_adverse_pips": 5.400000000000205,
+      "max_favorable_pips": 58.099999999998886,
+      "minutes_to_t1": null,
+      "outcome": "TIME_EXIT_PROFIT",
+      "review_id": "C10",
+      "snapshot_at": "2025-11-17T11:00:00+00:00",
+      "source_chart_path": "charts\\annotated\\GBPJPY_M15_annotated_20260607_155224_442838.png",
+      "symbol": "GBPJPY",
+      "t1_hit": false,
+      "timeframe": "M15"
+    },
+    {
+      "context": {
+        "advisory_confidence_score": 63.0,
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 44.70000000000027,
+        "confluence_score": 80,
+        "event_path": [
+          "ENTRY",
+          "TIME_EXIT_PROFIT"
+        ],
+        "h1_session": "TRUE_TREND",
+        "h1_trend": "BUY",
+        "h4_level": 3,
+        "h4_trend": "BUY",
+        "m_w_pattern": "W_BOTTOM",
+        "pattern_trade_type": "THE_33",
+        "push_count": 5,
+        "ratios": {
+          "asian_range_to_pair_max": 0.8940000000000055,
+          "confluence": 0.8,
+          "hunt_to_expected_level_move": 0.3340000000000032,
+          "hunt_to_pair_max": 0.25692307692307936,
+          "single_setup_theme_score": 0.52
+        },
+        "rrt_detected": true,
+        "stop_hunt_detected": true,
+        "stop_hunt_direction": "BUY",
+        "stop_hunt_pips": 33.40000000000032,
+        "tags": [
+          "historical",
+          "TIME_EXIT_PROFIT",
+          "BUY",
+          "L3",
+          "EARLY_WEEK"
+        ],
+        "tdi_crossed_signal": "bearish",
+        "tdi_divergence": "none",
+        "tdi_shark_direction": "",
+        "tdi_shark_fin": false,
+        "tdi_signals": [
+          "SIGNAL_CROSS_BEARISH"
+        ],
+        "tdi_vb_squeeze": false,
+        "theme_tags": [
+          "GBP_STRENGTH",
+          "JPY_WEAKNESS"
+        ],
+        "weekly_phase": "EARLY_WEEK",
+        "weekly_trend": "SELL"
+      },
+      "direction": "BUY",
+      "exit_pips": 29.599999999999227,
+      "flashcard_id": 4690,
+      "image_path": "images/c11_fc4690_20241014T094500.png",
+      "label": "winner",
+      "max_adverse_pips": 6.700000000000728,
+      "max_favorable_pips": 35.40000000000134,
+      "minutes_to_t1": null,
+      "outcome": "TIME_EXIT_PROFIT",
+      "review_id": "C11",
+      "snapshot_at": "2024-10-14T09:45:00+00:00",
+      "source_chart_path": "charts\\annotated\\GBPJPY_M15_annotated_20260607_154608_549125.png",
+      "symbol": "GBPJPY",
+      "t1_hit": false,
+      "timeframe": "M15"
+    },
+    {
+      "context": {
+        "advisory_confidence_score": 59.75,
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 40.500000000000114,
+        "confluence_score": 75,
+        "event_path": [
+          "ENTRY",
+          "STALE_TIGHTEN",
+          "STALE_EXIT"
+        ],
+        "h1_session": "TRUE_TREND",
+        "h1_trend": "BUY",
+        "h4_level": 3,
+        "h4_trend": "BUY",
+        "m_w_pattern": "W_BOTTOM",
+        "pattern_trade_type": "THE_33",
+        "push_count": 5,
+        "ratios": {
+          "asian_range_to_pair_max": 0.8100000000000023,
+          "confluence": 0.75,
+          "hunt_to_expected_level_move": 0.42799999999999727,
+          "hunt_to_pair_max": 0.3292307692307671,
+          "single_setup_theme_score": 0.5
+        },
+        "rrt_detected": true,
+        "stop_hunt_detected": true,
+        "stop_hunt_direction": "BUY",
+        "stop_hunt_pips": 42.79999999999973,
+        "tags": [
+          "historical",
+          "STALE_EXIT",
+          "BUY",
+          "L3",
+          "EARLY_WEEK"
+        ],
+        "tdi_crossed_signal": "bearish",
+        "tdi_divergence": "none",
+        "tdi_shark_direction": "SHORT",
+        "tdi_shark_fin": true,
+        "tdi_signals": [
+          "RSI_OVERBOUGHT",
+          "SIGNAL_CROSS_BEARISH",
+          "HOOK_BEARISH",
+          "SHARK_FIN_SHORT"
+        ],
+        "tdi_vb_squeeze": false,
+        "theme_tags": [
+          "GBP_STRENGTH",
+          "JPY_WEAKNESS"
+        ],
+        "weekly_phase": "EARLY_WEEK",
+        "weekly_trend": "SELL"
+      },
+      "direction": "BUY",
+      "exit_pips": -12.90000000000191,
+      "flashcard_id": 4889,
+      "image_path": "images/c12_fc4889_20251222T111500.png",
+      "label": "loser",
+      "max_adverse_pips": 46.20000000000175,
+      "max_favorable_pips": 28.49999999999966,
+      "minutes_to_t1": null,
+      "outcome": "STALE_EXIT",
+      "review_id": "C12",
+      "snapshot_at": "2025-12-22T11:15:00+00:00",
+      "source_chart_path": "charts\\annotated\\GBPJPY_M15_annotated_20260607_155259_214061.png",
+      "symbol": "GBPJPY",
+      "t1_hit": false,
+      "timeframe": "M15"
+    },
+    {
+      "context": {
+        "advisory_confidence_score": 63.0,
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 42.99999999999784,
+        "confluence_score": 80,
+        "event_path": [
+          "ENTRY",
+          "STALE_TIGHTEN",
+          "TIME_EXIT_LOSS"
+        ],
+        "h1_session": "TRUE_TREND",
+        "h1_trend": "BUY",
+        "h4_level": 3,
+        "h4_trend": "BUY",
+        "m_w_pattern": "W_BOTTOM",
+        "pattern_trade_type": "THE_33",
+        "push_count": 5,
+        "ratios": {
+          "asian_range_to_pair_max": 0.8599999999999568,
+          "confluence": 0.8,
+          "hunt_to_expected_level_move": 0.9819999999999993,
+          "hunt_to_pair_max": 0.7553846153846149,
+          "single_setup_theme_score": 0.52
+        },
+        "rrt_detected": true,
+        "stop_hunt_detected": true,
+        "stop_hunt_direction": "BUY",
+        "stop_hunt_pips": 98.19999999999993,
+        "tags": [
+          "historical",
+          "TIME_EXIT_LOSS",
+          "BUY",
+          "L3",
+          "EARLY_WEEK"
+        ],
+        "tdi_crossed_signal": "bearish",
+        "tdi_divergence": "none",
+        "tdi_shark_direction": "",
+        "tdi_shark_fin": false,
+        "tdi_signals": [
+          "SIGNAL_CROSS_BEARISH",
+          "MBL_CROSS_BEARISH"
+        ],
+        "tdi_vb_squeeze": false,
+        "theme_tags": [
+          "GBP_STRENGTH",
+          "JPY_WEAKNESS"
+        ],
+        "weekly_phase": "EARLY_WEEK",
+        "weekly_trend": "SELL"
+      },
+      "direction": "BUY",
+      "exit_pips": -21.999999999999886,
+      "flashcard_id": 4772,
+      "image_path": "images/c13_fc4772_20250818T080000.png",
+      "label": "loser",
+      "max_adverse_pips": 51.09999999999957,
+      "max_favorable_pips": 8.400000000000318,
+      "minutes_to_t1": null,
+      "outcome": "TIME_EXIT_LOSS",
+      "review_id": "C13",
+      "snapshot_at": "2025-08-18T08:00:00+00:00",
+      "source_chart_path": "charts\\annotated\\GBPJPY_M15_annotated_20260607_155040_811231.png",
+      "symbol": "GBPJPY",
+      "t1_hit": false,
+      "timeframe": "M15"
+    }
+  ],
+  "normalized_key": "THE_33_MW|BUY|EARLY_WEEK|L3|TRUE_TREND|AR_VALID|HUNT_PAIR_RANGE|PUSH3_PLUS|W_BOTTOM|RRT|TDI_CONFLICT|THE_33|CONF_75_PLUS",
+  "setup_performance": {
+    "avg_exit_pips": 6.235714285714015,
+    "avg_mae": 19.914285714285995,
+    "avg_mfe": 23.950000000000063,
+    "baseline_split_passes": 0,
+    "direct_profit": 9,
+    "direct_profit_rate": 64.28571428571429,
+    "direction": "BUY",
+    "favorable": 9,
+    "favorable_rate": 64.28571428571429,
+    "first_snapshot": "2023-09-25T11:00:00+00:00",
+    "last_snapshot": "2025-12-22T11:15:00+00:00",
+    "normalized_key": "THE_33_MW|BUY|EARLY_WEEK|L3|TRUE_TREND|AR_VALID|HUNT_PAIR_RANGE|PUSH3_PLUS|W_BOTTOM|RRT|TDI_CONFLICT|THE_33|CONF_75_PLUS",
+    "primary_theme": "GBP_STRENGTH",
+    "profitable_source_ids": [
+      513,
+      648,
+      4412,
+      4486,
+      4488,
+      4559,
+      4690,
+      4874,
+      4881
+    ],
+    "raw_key": "GBPJPY|BUY|EARLY_WEEK|BUY|L3|SELL|TRUE_TREND|NEUTRAL|AR_26.9|HUNT_104.4|PUSH3_PLUS|W_BOTTOM|RRT|TDI_CONFLICT|THE_33",
+    "realistic_target_pips": 10.777500000000028,
+    "setup_family": "THE_33_MW",
+    "split_stats": {
+      "out_of_sample": {
+        "avg_exit_pips": -12.90000000000191,
+        "avg_mae": 46.20000000000175,
+        "avg_mfe": 28.49999999999966,
+        "direct_profit": 0,
+        "direct_profit_rate": 0.0,
+        "favorable": 0,
+        "favorable_rate": 0.0,
+        "t1_hits": 0,
+        "t1_rate": 0.0,
+        "total": 1
+      },
+      "train": {
+        "avg_exit_pips": 4.333333333332866,
+        "avg_mae": 17.533333333333683,
+        "avg_mfe": 21.566666666666695,
+        "direct_profit": 6,
+        "direct_profit_rate": 66.66666666666666,
+        "favorable": 6,
+        "favorable_rate": 66.66666666666666,
+        "t1_hits": 1,
+        "t1_rate": 11.11111111111111,
+        "total": 9
+      },
+      "validation": {
+        "avg_exit_pips": 15.30000000000058,
+        "avg_mae": 18.69999999999976,
+        "avg_mfe": 28.17500000000024,
+        "direct_profit": 3,
+        "direct_profit_rate": 75.0,
+        "favorable": 3,
+        "favorable_rate": 75.0,
+        "t1_hits": 0,
+        "t1_rate": 0.0,
+        "total": 4
+      }
+    },
+    "symbol": "GBPJPY",
+    "t1_hits": 1,
+    "t1_rate": 7.142857142857142,
+    "total": 14
+  },
+  "symbol": "GBPJPY"
+}

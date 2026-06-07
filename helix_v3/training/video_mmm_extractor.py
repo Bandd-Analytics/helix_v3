@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
 import subprocess
 from dataclasses import asdict, dataclass, field
@@ -66,6 +67,77 @@ class RuleCard:
     visual_evidence: list[str] = field(default_factory=list)
     validation_status: str = "unvalidated"
 
+
+@dataclass(frozen=True)
+class TranscriptSegment:
+    video_id: str
+    start_ms: int
+    end_ms: int
+    text: str
+
+
+@dataclass(frozen=True)
+class MethodologyHit:
+    video_id: str
+    title: str
+    start_ms: int
+    end_ms: int
+    score: int
+    keywords: list[str]
+    summary: str
+    frame_hint: Optional[str] = None
+
+
+METHODOLOGY_KEYWORDS = {
+    "asian": 5,
+    "accumulation": 6,
+    "session": 3,
+    "london": 3,
+    "new york": 3,
+    "stop hunt": 8,
+    "stop": 2,
+    "high of the day": 7,
+    "low of the day": 7,
+    "hod": 5,
+    "lod": 5,
+    "m formation": 8,
+    "w formation": 8,
+    "m pattern": 7,
+    "w pattern": 7,
+    "three pushes": 8,
+    "push": 3,
+    "level": 3,
+    "levels": 3,
+    "reset": 5,
+    "ema": 4,
+    "tdi": 6,
+    "shark fin": 8,
+    "reversal": 5,
+    "continuation": 4,
+    "entry": 6,
+    "exit": 5,
+    "target": 5,
+    "profit": 2,
+    "pip": 3,
+    "pips": 3,
+    "risk": 4,
+    "stop loss": 7,
+    "break even": 5,
+    "breakeven": 5,
+    "pair": 2,
+    "yen": 2,
+    "pound": 2,
+    "euro": 2,
+    "swiss": 2,
+    "dollar": 2,
+    "market maker": 6,
+    "technical": 3,
+    "trade plan": 7,
+    "homework": 2,
+    "chart": 3,
+    "candle": 3,
+    "trend": 4,
+}
 
 def ensure_training_dirs(root: Path = TRAINING_ROOT) -> None:
     for path in [
@@ -311,6 +383,171 @@ def initialize_methodology_files(*, root: Path = TRAINING_ROOT) -> None:
     write_rule_templates(root=root)
     write_skill_documents(root=root)
     write_validation_plan(root=root)
+
+
+def build_transcript_index(
+    *,
+    root: Path = TRAINING_ROOT,
+    window_seconds: int = 180,
+    min_score: int = 10,
+    top_limit: int = 80,
+) -> list[MethodologyHit]:
+    assets = load_manifest(root=root)
+    hits: list[MethodologyHit] = []
+    for asset in assets:
+        segments = load_transcript_segments(asset.id, root=root)
+        hits.extend(
+            score_transcript_windows(
+                segments=segments,
+                asset=asset,
+                root=root,
+                window_seconds=window_seconds,
+                min_score=min_score,
+            )
+        )
+
+    hits = sorted(hits, key=lambda item: (-item.score, item.video_id, item.start_ms))[:top_limit]
+    write_transcript_index(hits, root=root)
+    return hits
+
+
+def load_transcript_segments(video_id: str, *, root: Path = TRAINING_ROOT) -> list[TranscriptSegment]:
+    path = root / "transcripts" / f"{video_id}.json"
+    if not path.exists():
+        return []
+
+    segments: list[TranscriptSegment] = []
+    for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        if not line.strip():
+            continue
+        data = parse_transcript_line(line, path=path, line_number=line_number)
+        segments.append(
+            TranscriptSegment(
+                video_id=video_id,
+                start_ms=int(data["start"]),
+                end_ms=int(data["end"]),
+                text=str(data["text"]).strip(),
+            )
+        )
+    return segments
+
+
+def parse_transcript_line(line: str, *, path: Path, line_number: int) -> dict[str, Any]:
+    try:
+        return json.loads(line)
+    except json.JSONDecodeError:
+        # ffmpeg's whisper filter can emit unescaped double quotes inside text.
+        match = re.fullmatch(r'\{"start":\s*(\d+),\s*"end":\s*(\d+),\s*"text":"(.*)"\}', line)
+        if match:
+            return {
+                "start": int(match.group(1)),
+                "end": int(match.group(2)),
+                "text": match.group(3),
+            }
+    raise ValueError(f"Invalid transcript JSON at {path}:{line_number}")
+
+
+def score_transcript_windows(
+    *,
+    segments: list[TranscriptSegment],
+    asset: VideoAsset,
+    root: Path = TRAINING_ROOT,
+    window_seconds: int = 180,
+    min_score: int = 10,
+) -> list[MethodologyHit]:
+    if not segments:
+        return []
+
+    window_ms = window_seconds * 1000
+    windows: list[MethodologyHit] = []
+    index = 0
+    while index < len(segments):
+        start_ms = segments[index].start_ms
+        end_ms = start_ms + window_ms
+        bucket: list[TranscriptSegment] = []
+        while index < len(segments) and segments[index].start_ms < end_ms:
+            bucket.append(segments[index])
+            index += 1
+
+        text = " ".join(segment.text for segment in bucket)
+        score, keywords = score_methodology_text(text)
+        if score >= min_score:
+            windows.append(
+                MethodologyHit(
+                    video_id=asset.id,
+                    title=asset.title,
+                    start_ms=bucket[0].start_ms,
+                    end_ms=bucket[-1].end_ms,
+                    score=score,
+                    keywords=keywords,
+                    summary=summarize_methodology_keywords(keywords),
+                    frame_hint=nearest_frame_hint(
+                        video_id=asset.id,
+                        start_ms=bucket[0].start_ms,
+                        root=root,
+                    ),
+                )
+            )
+    return windows
+
+
+def score_methodology_text(text: str) -> tuple[int, list[str]]:
+    lowered = text.lower()
+    matched: list[str] = []
+    score = 0
+    for keyword, weight in METHODOLOGY_KEYWORDS.items():
+        if keyword in lowered:
+            matched.append(keyword)
+            score += weight
+    return score, matched
+
+
+def summarize_methodology_keywords(keywords: list[str], *, max_keywords: int = 8) -> str:
+    if not keywords:
+        return "Methodology relevance detected by context."
+    visible = keywords[:max_keywords]
+    return f"Methodology discussion involving: {', '.join(visible)}."
+
+
+def nearest_frame_hint(
+    *,
+    video_id: str,
+    start_ms: int,
+    root: Path = TRAINING_ROOT,
+    every_seconds: int = 30,
+) -> Optional[str]:
+    frame_index = int(round((start_ms / 1000) / every_seconds)) + 1
+    frame_path = root / "frames" / video_id / f"frame_{frame_index:06d}.jpg"
+    if frame_path.exists():
+        return str(frame_path.relative_to(root))
+    return None
+
+
+def write_transcript_index(hits: list[MethodologyHit], *, root: Path = TRAINING_ROOT) -> Path:
+    path = root / "transcript_index.md"
+    lines = [
+        "# MMM Transcript Methodology Index",
+        "",
+        "This is a pointer index into local transcripts. It intentionally avoids full transcript reproduction.",
+        "",
+        "| Video | Time | Score | Keywords | Frame | Summary |",
+        "|---|---:|---:|---|---|---|",
+    ]
+    for hit in hits:
+        frame = f"`{hit.frame_hint}`" if hit.frame_hint else ""
+        lines.append(
+            f"| {hit.video_id} | {format_timestamp(hit.start_ms)}-{format_timestamp(hit.end_ms)} | "
+            f"{hit.score} | {', '.join(hit.keywords[:8])} | {frame} | {hit.summary} |"
+        )
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return path
+
+
+def format_timestamp(milliseconds: int) -> str:
+    total_seconds = milliseconds // 1000
+    minutes_total, seconds = divmod(total_seconds, 60)
+    hours, minutes = divmod(minutes_total, 60)
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
 
 
 def write_source_index(assets: list[VideoAsset], *, root: Path = TRAINING_ROOT) -> Path:
@@ -684,6 +921,11 @@ def main(argv: Optional[list[str]] = None) -> None:
         help="Transcribe only this manifest video ID. Repeat for multiple IDs.",
     )
 
+    p_index = sub.add_parser("transcript-index", help="Build methodology pointer index")
+    p_index.add_argument("--window-seconds", type=int, default=180)
+    p_index.add_argument("--min-score", type=int, default=10)
+    p_index.add_argument("--top-limit", type=int, default=80)
+
     args = parser.parse_args(argv)
     root = _parse_root(args.root)
 
@@ -720,6 +962,14 @@ def main(argv: Optional[list[str]] = None) -> None:
             video_ids=args.video_ids,
         )
         print(f"Transcribed/reused {len(outputs)} transcript files.")
+    elif args.command == "transcript-index":
+        hits = build_transcript_index(
+            root=root,
+            window_seconds=args.window_seconds,
+            min_score=args.min_score,
+            top_limit=args.top_limit,
+        )
+        print(f"Wrote {len(hits)} transcript methodology hits: {root / 'transcript_index.md'}")
 
 
 if __name__ == "__main__":

@@ -108,6 +108,23 @@ class ValidationLibrary:
     def close(self) -> None:
         self._conn.close()
 
+    def rebuild_from_replay(
+        self,
+        *,
+        min_total: int = 5,
+        min_favorable_rate: float = 55.0,
+        min_avg_exit_pips: float = 0.0,
+        min_symbols: int = 2,
+    ) -> int:
+        self._conn.execute("DELETE FROM validation_setups")
+        self._conn.commit()
+        return self.promote_from_replay(
+            min_total=min_total,
+            min_favorable_rate=min_favorable_rate,
+            min_avg_exit_pips=min_avg_exit_pips,
+            min_symbols=min_symbols,
+        )
+
     def promote_from_replay(
         self,
         *,
@@ -534,6 +551,15 @@ def main(argv: Optional[list[str]] = None) -> None:
     p_promote.add_argument("--min-avg-exit-pips", type=float, default=0.0)
     p_promote.add_argument("--min-symbols", type=int, default=2)
 
+    p_rebuild = sub.add_parser(
+        "rebuild",
+        help="Clear validation records and rebuild from replay signatures",
+    )
+    p_rebuild.add_argument("--min-total", type=int, default=5)
+    p_rebuild.add_argument("--min-favorable-rate", type=float, default=55.0)
+    p_rebuild.add_argument("--min-avg-exit-pips", type=float, default=0.0)
+    p_rebuild.add_argument("--min-symbols", type=int, default=2)
+
     p_report = sub.add_parser("report", help="Show validation-library records")
     p_report.add_argument("--scope", choices=("PAIR", "CROSS_PAIR"))
     p_report.add_argument("--symbol")
@@ -550,6 +576,14 @@ def main(argv: Optional[list[str]] = None) -> None:
                 min_symbols=args.min_symbols,
             )
             print(f"Promoted/reused {count} validation records.")
+        elif args.command == "rebuild":
+            count = library.rebuild_from_replay(
+                min_total=args.min_total,
+                min_favorable_rate=args.min_favorable_rate,
+                min_avg_exit_pips=args.min_avg_exit_pips,
+                min_symbols=args.min_symbols,
+            )
+            print(f"Rebuilt validation library with {count} records.")
         elif args.command == "report":
             print(library.report(scope=args.scope, symbol=args.symbol, limit=args.limit))
     finally:

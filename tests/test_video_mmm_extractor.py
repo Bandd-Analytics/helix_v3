@@ -139,3 +139,64 @@ def test_transcribe_rejects_unknown_video_id(tmp_path) -> None:
 
     with pytest.raises(ValueError, match="Unknown video IDs"):
         extractor.transcribe_audio(root=tmp_path, video_ids=["video_999"])
+
+
+def test_build_transcript_index_writes_keyword_pointer_index(tmp_path) -> None:
+    _add_video(tmp_path, "MMM Day 1.mp4")
+    extractor.build_manifest(root=tmp_path)
+    transcript_dir = tmp_path / "transcripts"
+    transcript_dir.mkdir(parents=True, exist_ok=True)
+    transcript_dir.joinpath("video_001.json").write_text(
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "start": 0,
+                        "end": 10_000,
+                        "text": "Asian accumulation and stop hunt entry rules are discussed.",
+                    }
+                ),
+                json.dumps(
+                    {
+                        "start": 20_000,
+                        "end": 30_000,
+                        "text": "The chart shows an M formation with three pushes and a target.",
+                    }
+                ),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    frame_dir = tmp_path / "frames" / "video_001"
+    frame_dir.mkdir(parents=True, exist_ok=True)
+    (frame_dir / "frame_000001.jpg").write_bytes(b"fake frame")
+
+    hits = extractor.build_transcript_index(
+        root=tmp_path,
+        window_seconds=60,
+        min_score=10,
+        top_limit=10,
+    )
+
+    assert hits
+    index_text = (tmp_path / "transcript_index.md").read_text(encoding="utf-8")
+    assert "00:00:00-00:00:30" in index_text
+    assert "asian" in index_text
+    assert "frames/video_001/frame_000001.jpg" in index_text.replace("\\", "/")
+    assert "Asian accumulation and stop hunt entry rules are discussed" not in index_text
+
+
+def test_load_transcript_segments_tolerates_ffmpeg_unescaped_quotes(tmp_path) -> None:
+    transcript_dir = tmp_path / "transcripts"
+    transcript_dir.mkdir(parents=True, exist_ok=True)
+    transcript_dir.joinpath("video_001.json").write_text(
+        '{"start":47104,"end":48704,"text":"We were stuck going, "We will start crazy.""}\n',
+        encoding="utf-8",
+    )
+
+    segments = extractor.load_transcript_segments("video_001", root=tmp_path)
+
+    assert len(segments) == 1
+    assert segments[0].start_ms == 47104
+    assert 'We will start crazy' in segments[0].text
