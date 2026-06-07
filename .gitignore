@@ -29,3 +29,5 @@ data/mmm_training/videos/
 data/mmm_training/audio/
 data/mmm_training/frames/
 data/mmm_training/ocr/
+data/mmm_training/models/
+*.bin
