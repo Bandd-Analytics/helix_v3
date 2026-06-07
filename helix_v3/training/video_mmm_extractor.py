@@ -247,8 +247,9 @@ def transcribe_audio(
     output_format: str = "json",
     overwrite: bool = False,
     use_gpu: bool = False,
+    video_ids: Optional[list[str]] = None,
 ) -> list[Path]:
-    assets = load_manifest(root=root)
+    assets = _filter_assets(load_manifest(root=root), video_ids)
     ffmpeg = ffmpeg_path or shutil.which("ffmpeg")
     if not ffmpeg:
         raise RuntimeError("ffmpeg is not available on PATH. Install ffmpeg or pass --ffmpeg-path.")
@@ -574,6 +575,22 @@ def load_manifest(*, root: Path = TRAINING_ROOT, missing_ok: bool = False) -> li
     return [VideoAsset(**item) for item in data.get("videos", [])]
 
 
+def _filter_assets(
+    assets: list[VideoAsset],
+    video_ids: Optional[list[str]],
+) -> list[VideoAsset]:
+    if not video_ids:
+        return assets
+
+    wanted = set(video_ids)
+    selected = [asset for asset in assets if asset.id in wanted]
+    found = {asset.id for asset in selected}
+    missing = sorted(wanted - found)
+    if missing:
+        raise ValueError(f"Unknown video IDs: {', '.join(missing)}")
+    return selected
+
+
 def _replace_asset(asset: VideoAsset, **changes: Any) -> VideoAsset:
     data = asdict(asset)
     data.update(changes)
@@ -660,6 +677,12 @@ def main(argv: Optional[list[str]] = None) -> None:
     p_transcribe.add_argument("--format", choices=["json", "srt", "text"], default="json")
     p_transcribe.add_argument("--overwrite", action="store_true")
     p_transcribe.add_argument("--use-gpu", action="store_true")
+    p_transcribe.add_argument(
+        "--video-id",
+        action="append",
+        dest="video_ids",
+        help="Transcribe only this manifest video ID. Repeat for multiple IDs.",
+    )
 
     args = parser.parse_args(argv)
     root = _parse_root(args.root)
@@ -694,6 +717,7 @@ def main(argv: Optional[list[str]] = None) -> None:
             output_format=args.format,
             overwrite=args.overwrite,
             use_gpu=args.use_gpu,
+            video_ids=args.video_ids,
         )
         print(f"Transcribed/reused {len(outputs)} transcript files.")
 
