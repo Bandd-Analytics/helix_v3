@@ -104,3 +104,38 @@ def test_transcribe_rejects_invalid_output_format(tmp_path, monkeypatch) -> None
 
     with pytest.raises(ValueError, match="output_format"):
         extractor.transcribe_audio(root=tmp_path, output_format="vtt")
+
+
+def test_transcribe_can_target_one_video(tmp_path, monkeypatch) -> None:
+    _add_video(tmp_path, "MMM Day 1.mp4")
+    _add_video(tmp_path, "MMM Day 2.mp4")
+    extractor.build_manifest(root=tmp_path)
+    (tmp_path / "models").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "models" / "ggml-base.en.bin").write_bytes(b"fake model")
+    (tmp_path / "audio").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "audio" / "video_001.wav").write_bytes(b"fake audio")
+    (tmp_path / "audio" / "video_002.wav").write_bytes(b"fake audio")
+    calls = []
+
+    def fake_run(cmd, cwd, check):  # noqa: ANN001
+        calls.append((cmd, cwd, check))
+
+    monkeypatch.setattr(extractor.subprocess, "run", fake_run)
+
+    outputs = extractor.transcribe_audio(
+        root=tmp_path,
+        ffmpeg_path="ffmpeg",
+        video_ids=["video_002"],
+    )
+
+    assert outputs == [tmp_path / "transcripts" / "video_002.json"]
+    assert len(calls) == 1
+    assert "video_002.wav" in calls[0][0][3]
+
+
+def test_transcribe_rejects_unknown_video_id(tmp_path) -> None:
+    _add_video(tmp_path, "MMM Day 1.mp4")
+    extractor.build_manifest(root=tmp_path)
+
+    with pytest.raises(ValueError, match="Unknown video IDs"):
+        extractor.transcribe_audio(root=tmp_path, video_ids=["video_999"])

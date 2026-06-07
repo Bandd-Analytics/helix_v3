@@ -185,6 +185,7 @@ locally through ffmpeg's Whisper filter after a whisper.cpp ggml model is placed
 
 ```powershell
 .venv\Scripts\python.exe -m helix_v3.training.video_mmm_extractor transcribe --model-path data\mmm_training\models\ggml-base.en.bin
+.venv\Scripts\python.exe -m helix_v3.training.video_mmm_extractor transcribe --video-id video_001 --model-path data\mmm_training\models\ggml-base.en.bin
 ```
 
 Promote extracted
