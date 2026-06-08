@@ -1,0 +1,85 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © M0rty
+
+//@version=5
+indicator("Candle Colored by Volume Z-score [Morty]", overlay=true, format=format.price)
+
+// inputs
+i_src = input.string("Volume", title="Source", options=["Volume", "Body size", "Any", "All"],
+         tooltip="If you select any, any outlier that meets the condition will be displayed. \nIf you select all, all the exceptions that satisfy the condition will be displayed")
+len = input(20, "Z-Score MA Length")
+z1 = input.float(1.5, "Threshold z1", step=0.1, tooltip="Default 1.5\nZ-score between z1 and z2 is defined as 'Large'")
+z2 = input.float(2.5, "Threshold z2", step=0.1, tooltip="Default 2.5\nZ-score greater than z2 is defined as 'Extreme'")
+
+i_chart_type = input.string("Bar", title="Chart Type", options=["Bar", "Candle"],
+                 tooltip="Bar will color current bars. \nCandle will plot candles on the chart.")
+
+show_low_volume_candle = input.bool(true, "Show low volume", inline="l1", group="Low Volume")
+i_only_show_imbalance = input.bool(false, "Only Show imbalance", inline="l1", group="Low Volume")
+i_color_low_volume = input.color(#eaea00, title="", inline="l1", group="Low Volume") // yellow
+low_volume_z = input.float(-1.0, "Low Volume Threshold", step=0.1, tooltip="default -1.0\nVolume Z-score less than this value is defined as 'Low Voluem'", group="Low Volume")
+
+color_up_normal = input.color(#d1d4dc, "normal", inline="l2", group="Up color")       // white
+color_up_large = input.color(#0080ff, "large", inline="l2", group="Up color")         // blue
+color_up_excheme = input.color(#069c76, "excheme", inline="l2", group="Up color")     // green
+
+color_down_normal = input.color(#06090b, "normal", inline="l3", group="Down color")   // black
+color_down_large = input.color(#8000ff, "large", inline="l3", group="Down color")     // purple
+color_down_excheme = input.color(#ff0f0f, "excheme", inline="l3", group="Down color") // red
+
+// functions
+f_zscore(src, len) =>
+    mean = ta.sma(src, len)
+    std = ta.stdev(src, len)
+    z = (src - mean) / std
+
+// calculations
+z_volume = f_zscore(volume, len)
+z_body = f_zscore(math.abs(close-open), len)
+
+float z = switch i_src
+    "Volume" => z_volume
+    "Body size" => z_body
+    "Any" => math.max(z_volume, z_body)
+    "All" => math.min(z_volume, z_body)
+
+normal = z < z1
+large = z >= z1 and z < z2
+extreme = z >= z2
+
+up = close >= open
+down = close < open
+
+up_normal = up and normal
+up_large = up and large
+up_extreme = up and extreme
+
+down_normal = down and normal
+down_large = down and large
+down_extreme = down and extreme
+
+// plots
+low_volume_cond = i_only_show_imbalance ? z_volume<=low_volume_z and z_body>=0 : z_volume<=low_volume_z
+color_low_volume = show_low_volume_candle and low_volume_cond ? i_color_low_volume : na
+color_up = up_extreme ? color_up_excheme :
+           up_large ? color_up_large:
+           up_normal ? color_up_normal : na
+color_down = down_extreme ? color_down_excheme :
+           down_large ? color_down_large :
+           down_normal ? color_down_normal : na
+
+barcolor(i_chart_type=="Bar" ? color_low_volume : na, editable=false, title="Low Volume Bar")
+barcolor(i_chart_type=="Bar" ? color_up : na, editable=false, title="Up Bar")
+barcolor(i_chart_type=="Bar" ? color_down : na, editable=false, title="Down Bar")
+
+color_candle = up_extreme ? color_up_excheme :
+               up_large ? color_up_large :
+               up_normal ? color_up_normal :
+               down_extreme ? color_down_excheme :
+               down_large ? color_down_large :
+               down_normal ? color_down_normal : na
+plotcandle(i_chart_type=="Candle" ? open : na, high, low, close, title='Candle Colored', color=color_candle, wickcolor=color.gray, editable=false)
+
+// alerts
+alertcondition(extreme, title='Extreme Alert', message="{{time}}\nprice {{exchange}}:{{ticker}} = {{close}}")
+alertcondition(large, title='Large Alert', message="{{time}}\nprice {{exchange}}:{{ticker}} = {{close}}")
