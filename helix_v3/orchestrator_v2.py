@@ -233,7 +233,12 @@ class HelixOrchestratorV2:
         self._live_replay_setups: Dict[str, object] = {}
         self.notifier = self._create_notifier()
         self._running = False
-        self._symbols: List[str] = list(settings.trading.symbols)
+        # Filter to tradeable pairs only (respects PairProfile.tradeable flag)
+        from config.pair_profiles import get_pair_profile
+        self._symbols: List[str] = [
+            s for s in settings.trading.symbols
+            if get_pair_profile(s).tradeable
+        ]
         self._last_market_scan: float = 0
         self._last_session: str = ""
         self._reports_sent_today: Set[str] = set()
