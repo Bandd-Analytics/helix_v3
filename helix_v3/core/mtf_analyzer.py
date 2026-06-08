@@ -601,24 +601,41 @@ class MTFAnalyzer:
     # ------------------------------------------------------------------
 
     def _compute_confluence(self, a: MTFAnalysis) -> None:
-        """Score the alignment across all 4 timeframes."""
+        """Score the alignment across all 4 timeframes.
+
+        DESIGN: M/W on M15 is the PRIMARY direction signal (per MMM).
+        Higher timeframes (D1, H4, H1) are WEIGHTING factors:
+        - With-trend: bonus points (best setups)
+        - Counter-trend: reduced points (still valid, smaller target)
+        - They NEVER hard-reject the M/W direction.
+
+        Only hard rejections: no entry signal, session timing, ADR exhausted.
+        """
         score = 0
         reasons: List[str] = []
 
-        # Weekly direction should agree with entry
         entry_dir = a.fifteen_min.entry_direction
         if entry_dir == Direction.NEUTRAL:
             reasons.append("No 15M entry signal")
-        elif a.weekly.trend_direction == entry_dir:
-            score += 20
-        elif a.weekly.trend_direction != Direction.NEUTRAL:
-            reasons.append(f"Weekly trend {a.weekly.trend_direction.value} conflicts with entry {entry_dir.value}")
+
+        # --- D1/Weekly: context weighting, NOT directional override ---
+        # With-trend = best. Counter-trend = still valid per MMM (the M/W
+        # IS the reversal signal), but gets less confluence.
+        if entry_dir != Direction.NEUTRAL:
+            if a.weekly.trend_direction == entry_dir:
+                score += 20  # With-trend: full bonus
+            elif a.weekly.trend_direction == Direction.NEUTRAL:
+                score += 10  # No weekly bias: half bonus
+            else:
+                score += 5   # Counter-trend: minimal bonus, not a rejection
+                # Flag it for awareness but NOT as a rejection reason
+                a.fifteen_min.notes += f" | COUNTER-TREND vs D1 {a.weekly.trend_direction.value}"
 
         # Mid-week reversal alignment
         if a.weekly.midweek_reversal_expected:
-            score += 10  # More opportunity for reversals
+            score += 10
 
-        # 4H level count: L3 entries are highest probability per MMM
+        # --- H4: level count + trend weighting ---
         if a.four_hour.level_count == 3:
             score += 15
         elif a.four_hour.level_count == 2:
@@ -626,13 +643,17 @@ class MTFAnalyzer:
         if a.four_hour.is_choppy and a.four_hour.level_count < 3:
             reasons.append("H4 choppy but not at L3 — avoid")
 
-        # 4H trend agrees
-        if a.four_hour.trend_direction == entry_dir:
-            score += 10
-        elif a.four_hour.trend_direction != Direction.NEUTRAL:
-            reasons.append(f"H4 trend {a.four_hour.trend_direction.value} conflicts")
+        # H4 trend: weighting, not rejection
+        if entry_dir != Direction.NEUTRAL:
+            if a.four_hour.trend_direction == entry_dir:
+                score += 10  # H4 agrees: full bonus
+            elif a.four_hour.trend_direction == Direction.NEUTRAL:
+                score += 5
+            else:
+                score += 0   # H4 disagrees: no bonus, no rejection
+                a.fifteen_min.notes += f" | H4 {a.four_hour.trend_direction.value} disagrees"
 
-        # 1H confirmation
+        # --- H1: session and intraday confirmation ---
         if a.one_hour.trend_direction == entry_dir:
             score += 10
         if a.one_hour.hod_locked or a.one_hour.lod_locked:
