@@ -216,12 +216,23 @@ class MTFAnalyzer:
         days_since_high = (df_d1.index[-1] - peak_high_idx).days
         days_since_low = (df_d1.index[-1] - peak_low_idx).days
 
-        # Determine if we're coming from a peak high or peak low
+        # Determine weekly trend from D1 EMA stack — NOT just peak proximity.
+        # Bug fix: "near peak low" in a bearish EMA stack = downtrend continuation,
+        # not a buy signal. The EMA stack is the primary trend indicator.
+        current_price = float(closes.iloc[-1])
+        ema5 = ema_stack[5]
+        ema13 = ema_stack[13]
+
+        if ema5 > ema13 and current_price > ema5:
+            trend = Direction.BUY   # Price above rising EMAs = uptrend
+        elif ema5 < ema13 and current_price < ema5:
+            trend = Direction.SELL  # Price below falling EMAs = downtrend
+        else:
+            trend = Direction.NEUTRAL  # Mixed — no clear weekly bias
+
         if days_since_high < days_since_low:
-            trend = Direction.SELL  # Coming down from peak high
             days_since_peak = days_since_high
         else:
-            trend = Direction.BUY  # Coming up from peak low
             days_since_peak = days_since_low
 
         # Week phase
