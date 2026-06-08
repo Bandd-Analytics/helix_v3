@@ -131,6 +131,8 @@ class FifteenMinEntry:
     entry_direction: Direction
     entry_confidence: float
     m_w_pattern: str = ""                   # "W_BOTTOM" / "M_TOP" / ""
+    adr_pct_used: float = 0.0              # How much of ADR consumed today (0-200%+)
+    volume_z_asian: float = 0.0            # Volume Z during Asian (< -1 = genuine accumulation)
     notes: str = ""
 
 
@@ -528,6 +530,41 @@ class MTFAnalyzer:
                                (hunt_dir == Direction.SELL and current < ar_low)):
             conf += 0.10
 
+        # --- ADR% used: how much of today's expected range is consumed ---
+        # If > 80%, the day's move may be done — entering is risky (stale exit likely)
+        adr_pct = 0.0
+        try:
+            df_d1 = self._engine.fetch_rates(symbol, "D1", 20)
+            from helix_v3.core.tdi import _wilder_atr
+            atr = _wilder_atr(df_d1["High"], df_d1["Low"], df_d1["Close"], 14)
+            adr_val = float(atr.iloc[-1])
+            # Today's range from M15 data
+            today = df.index[-1].date()
+            today_bars = df[df.index.date == today]
+            if not today_bars.empty and adr_val > 0:
+                today_range = float(today_bars["High"].max()) - float(today_bars["Low"].min())
+                adr_pct = (today_range / adr_val) * 100.0
+        except Exception:
+            adr_pct = 0.0
+
+        # --- Volume Z during Asian session: confirms genuine accumulation ---
+        # Z < -1.0 = abnormally quiet (genuine accumulation)
+        # Z > 0 = normal/active volume during Asian (not true accumulation)
+        vol_z_asian = 0.0
+        try:
+            vol_col = "Volume" if "Volume" in df.columns else "tick_volume"
+            if vol_col in df.columns and not asian.empty:
+                asian_vols = asian[vol_col].values.astype(float)
+                all_vols = df[vol_col].values.astype(float)
+                if len(all_vols) > 20:
+                    vol_mean = np.mean(all_vols[-100:])
+                    vol_std = np.std(all_vols[-100:])
+                    if vol_std > 0 and len(asian_vols) > 0:
+                        asian_avg_vol = np.mean(asian_vols)
+                        vol_z_asian = (asian_avg_vol - vol_mean) / vol_std
+        except Exception:
+            vol_z_asian = 0.0
+
         return FifteenMinEntry(
             asian_range_high=ar_high,
             asian_range_low=ar_low,
@@ -543,7 +580,9 @@ class MTFAnalyzer:
             entry_direction=entry_dir,
             entry_confidence=min(1.0, conf),
             m_w_pattern=m_w_pattern,
-            notes=f"AR={ar_pips:.0f}p valid={accum_valid} hunt={hunt_detected} pushes={push_count} M/W={m_w}",
+            adr_pct_used=adr_pct,
+            volume_z_asian=vol_z_asian,
+            notes=f"AR={ar_pips:.0f}p valid={accum_valid} hunt={hunt_detected} pushes={push_count} M/W={m_w} ADR%={adr_pct:.0f}",
         )
 
     # ------------------------------------------------------------------
@@ -614,6 +653,25 @@ class MTFAnalyzer:
                 reasons.append("M/W outside London — reduced confidence")
         if a.fifteen_min.rrt_detected:
             score += 5
+
+        # --- ADR% used filter (from Helix AR indicator) ---
+        # If > 80% of ADR consumed, the day's move is likely done.
+        # Entering now risks a stale exit. Hard rejection.
+        adr_pct = a.fifteen_min.adr_pct_used
+        if adr_pct > 120:
+            reasons.append(f"ADR exhausted: {adr_pct:.0f}% used (>120%) — move is done")
+        elif adr_pct > 80:
+            reasons.append(f"ADR mostly used: {adr_pct:.0f}% (>80%) — late entry risk")
+
+        # --- Volume Z accumulation quality (from Volume Z-Score indicator) ---
+        # Genuine accumulation has low volume (Z < -1). Normal/high volume
+        # during Asian range means the range is contested, not accumulated.
+        vol_z = a.fifteen_min.volume_z_asian
+        if vol_z < -1.0:
+            score += 5  # Genuine quiet accumulation — bonus
+        elif vol_z > 0.5 and a.fifteen_min.accumulation_valid:
+            # Range is tight but volume is active — not true accumulation
+            reasons.append(f"Asian range tight but volume active (Z={vol_z:.1f}) — contested, not accumulated")
 
         # Final assessment
         # CALIBRATED: threshold 50 -> 55. Filters worst setups without killing volume.

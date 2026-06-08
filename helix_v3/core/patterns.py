@@ -125,17 +125,36 @@ def scan_patterns(
         price = c
         is_bullish = c > o
 
-        # --- Spike / Empire State candle ---
-        # Oversized candle relative to recent average
-        recent_bodies = [abs(closes[j] - opens[j]) for j in range(max(0, i - 10), i)]
-        avg_body = np.mean(recent_bodies) if recent_bodies else body
-        if avg_body > 0 and body > avg_body * 2.5:
-            sig = _context_significance(price, prev_hod, prev_lod, asian_high, asian_low)
-            result.patterns.append(DetectedPattern(
-                PatternType.SPIKE_CANDLE, i, price, sig,
-                "Oversized candle — MM trap, expect pullback",
-            ))
-            result.spike_count += 1
+        # --- Spike / Empire State candle (Z-score based) ---
+        # Uses statistical Z-score instead of hardcoded 2.5x multiplier.
+        # Adapts to pair-specific volatility automatically.
+        # Z >= 2.5 = extreme (spike), Z >= 1.5 = large (significant)
+        lookback = min(20, i)
+        if lookback >= 5:
+            recent_bodies = np.array([abs(closes[j] - opens[j]) for j in range(i - lookback, i)])
+            body_mean = np.mean(recent_bodies)
+            body_std = np.std(recent_bodies)
+            body_z = (body - body_mean) / body_std if body_std > 0 else 0
+
+            # Also compute volume Z if volume data available
+            vol_z = 0.0
+            if "Volume" in df.columns or "tick_volume" in df.columns:
+                vol_col = "Volume" if "Volume" in df.columns else "tick_volume"
+                recent_vols = df[vol_col].values[i - lookback:i].astype(float)
+                cur_vol = float(df[vol_col].values[i])
+                vol_mean = np.mean(recent_vols)
+                vol_std = np.std(recent_vols)
+                vol_z = (cur_vol - vol_mean) / vol_std if vol_std > 0 else 0
+
+            # Extreme: body Z >= 2.5 OR (body Z >= 1.5 AND volume Z >= 1.5)
+            is_extreme = body_z >= 2.5 or (body_z >= 1.5 and vol_z >= 1.5)
+            if is_extreme:
+                sig = _context_significance(price, prev_hod, prev_lod, asian_high, asian_low)
+                note = f"Spike candle — body Z={body_z:.1f} vol Z={vol_z:.1f}, MM trap"
+                result.patterns.append(DetectedPattern(
+                    PatternType.SPIKE_CANDLE, i, price, sig, note,
+                ))
+                result.spike_count += 1
 
         # --- Doji ---
         if body_ratio < 0.1 and full_range / pip_size > 3:
