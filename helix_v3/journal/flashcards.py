@@ -165,6 +165,23 @@ FLASHCARD_COLUMN_MIGRATIONS = {
     "advisory_action": "TEXT",
     "advisory_reasons": "TEXT",
     "advisory_blockers": "TEXT",
+    "feature_hunt_to_ar_ratio": "REAL",
+    "feature_candles_since_hunt_extreme": "INTEGER",
+    "feature_close_to_ar_low_pips": "REAL",
+    "feature_close_to_ar_mid_pips": "REAL",
+    "feature_close_to_ar_high_pips": "REAL",
+    "feature_range_pos": "REAL",
+    "feature_close_to_hod_pips": "REAL",
+    "feature_close_to_lod_pips": "REAL",
+    "feature_pullback_from_session_extreme_pips": "REAL",
+    "feature_distance_from_hunt_extreme_pips": "REAL",
+    "feature_prior_8_candle_expansion_pips": "REAL",
+    "feature_prior_8_candle_directional_move_pips": "REAL",
+    "feature_bars_since_first_ar_edge_break": "INTEGER",
+    "feature_ema50_ema200_spread_pips": "REAL",
+    "feature_ema200_slope_8_pips": "REAL",
+    "feature_tdi_rsi_minus_signal": "REAL",
+    "feature_updated_at": "TEXT",
 }
 
 

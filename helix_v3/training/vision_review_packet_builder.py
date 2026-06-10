@@ -42,6 +42,7 @@ class PacketConfig:
     winners_per_setup: int = 8
     losers_per_setup: int = 8
     copy_images: bool = True
+    require_w_bottom: bool = True
 
 
 def build_review_packets(config: PacketConfig) -> list[Path]:
@@ -119,7 +120,10 @@ def _load_setup_candidates(config: PacketConfig, symbol: str) -> list[dict[str, 
         if int(row.get("total") or 0) >= config.min_total
         and float(row.get("favorable_rate") or 0.0) >= config.min_favorable_rate
         and float(row.get("avg_exit_pips") or 0.0) >= config.min_avg_exit_pips
-        and "W_BOTTOM" in str(row.get("normalized_key") or "")
+        and (
+            not config.require_w_bottom
+            or "W_BOTTOM" in str(row.get("normalized_key") or "")
+        )
     ]
     return sorted(
         candidates,
@@ -584,6 +588,11 @@ def main(argv: Optional[list[str]] = None) -> None:
     parser.add_argument("--winners-per-setup", type=int, default=8)
     parser.add_argument("--losers-per-setup", type=int, default=8)
     parser.add_argument("--no-copy-images", action="store_true")
+    parser.add_argument(
+        "--include-non-w-bottom",
+        action="store_true",
+        help="Allow RRT/M-top/stop-hunt setup packets instead of W-bottom only",
+    )
     args = parser.parse_args(argv)
 
     packets = build_review_packets(
@@ -600,6 +609,7 @@ def main(argv: Optional[list[str]] = None) -> None:
             winners_per_setup=args.winners_per_setup,
             losers_per_setup=args.losers_per_setup,
             copy_images=not args.no_copy_images,
+            require_w_bottom=not args.include_non_w_bottom,
         )
     )
     print(f"Wrote {len(packets)} vision review packet(s) to {args.output_root}")

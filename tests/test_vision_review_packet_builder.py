@@ -11,7 +11,11 @@ from helix_v3.backtest.mmm_event_replay import (
 )
 from helix_v3.core.types import Direction
 from helix_v3.journal.flashcards import FlashcardSystem
-from helix_v3.training.vision_review_packet_builder import PacketConfig, build_review_packets
+from helix_v3.training.vision_review_packet_builder import (
+    PacketConfig,
+    _load_setup_candidates,
+    build_review_packets,
+)
 
 
 def _setup(source_id: int, snapshot_at: datetime) -> ReplaySetup:
@@ -170,3 +174,52 @@ def test_vision_review_packet_builder_exports_balanced_packet(tmp_path) -> None:
     image_names = [path.name for path in (packet / "images").glob("*.png")]
     assert len(image_names) == 3
     assert all("winner" not in name and "loser" not in name for name in image_names)
+
+
+def test_vision_review_packet_builder_can_include_non_w_bottom_candidates(tmp_path) -> None:
+    pair_root = tmp_path / "pair_research"
+    output_root = tmp_path / "packets"
+    pair_dir = pair_root / "XAUUSD"
+    pair_dir.mkdir(parents=True)
+    rrt_key = "RRT_REVERSAL|SELL|MID_WEEK|L0|RETURN_ACCUM|AR_TIGHT|NO_MW|RRT"
+    (pair_dir / "setup_performance.json").write_text(
+        json.dumps(
+            [
+                {
+                    "symbol": "XAUUSD",
+                    "direction": "SELL",
+                    "normalized_key": rrt_key,
+                    "total": 17,
+                    "favorable_rate": 70.6,
+                    "avg_exit_pips": 358.7,
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    default_candidates = _load_setup_candidates(
+        PacketConfig(
+            pair_research_root=pair_root,
+            output_root=output_root,
+            symbols=("XAUUSD",),
+            min_total=10,
+            copy_images=False,
+        ),
+        "XAUUSD",
+    )
+    all_shape_candidates = _load_setup_candidates(
+        PacketConfig(
+            pair_research_root=pair_root,
+            output_root=output_root,
+            symbols=("XAUUSD",),
+            min_total=10,
+            copy_images=False,
+            require_w_bottom=False,
+        ),
+        "XAUUSD",
+    )
+
+    assert default_candidates == []
+    assert len(all_shape_candidates) == 1
+    assert all_shape_candidates[0]["normalized_key"] == rrt_key
