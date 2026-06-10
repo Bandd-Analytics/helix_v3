@@ -1,0 +1,1277 @@
+{
+  "summary": "Winners were not defined by stop-hunt size; they either entered before daily expansion was exhausted or came from a fresh LOD/lower-range reclaim. Losers were mostly late top-side buys after HOD/ADR exhaustion, stale re-entries after the original W had already paid, or outright counter-bias breakdowns.",
+  "winner_traits": [
+    "Weekly and H4 context stayed BUY with confluence >= 95; H1 could be NEUTRAL and still work.",
+    "Most winners had TDR <= 4400p and ADR% < 85 at snapshot.",
+    "Continuation winners held above a rising 50 EMA with 5/13 EMA stacked or re-stacking upward.",
+    "Late-session winners showed a fresh lower-range reclaim: sharp bullish close back above LOD/AR-low or EMA cluster after a flush.",
+    "Small XAUUSD stop hunts still worked when reclaim quality was strong; C01 and C11 won with 413p and 612p hunts."
+  ],
+  "loser_traits": [
+    "C02 and C09 were high-range exhaustion buys: ADR% > 100, large TDR, price near HOD/AR high, TDI overbought or curling down.",
+    "C03 and C05 were late after a completed HOD run; the original W-bottom had already paid and current structure was chop/re-entry.",
+    "C08 was a structural invalidation: H1/H4 SELL, weekly NEUTRAL, confluence 80, price breaking below LOD with bearish EMA structure.",
+    "Losers often had price in the upper quarter of the visible range while TDI green/red were rolling down or below the yellow baseline."
+  ],
+  "filters_to_test": [
+    {
+      "name": "higher_tf_alignment_floor",
+      "rule": "For BUY, reject if weekly_trend != BUY or h4_trend != BUY or confluence_score < 95.",
+      "targets": ["C08"]
+    },
+    {
+      "name": "large_range_exhaustion",
+      "rule": "Reject BUY if TDR >= 5000p or ADR_pct >= 100, unless the last 4 candles include a bullish reclaim close from below LOD/AR-low back above EMA13 and EMA50.",
+      "targets": ["C02", "C08", "C09"]
+    },
+    {
+      "name": "stale_upper_quarter_buy",
+      "rule": "Reject BUY when close_position_in_day_range >= 0.75, bars_since_hod_sweep <= 12, no fresh high breakout in last 3 candles, and either EMA5 <= EMA13 or TDI_green_slope_3 <= 0.",
+      "targets": ["C02", "C03", "C09"]
+    },
+    {
+      "name": "post_hod_reentry_requires_reclaim",
+      "rule": "If price dropped >= 0.30 * asian_range from HOD after the stop-hunt run, allow BUY only when a candle within the last 4 bars closes above EMA13 and EMA50 with body >= 0.5 * ATR14 and TDI_green_slope_3 > 0.",
+      "targets": ["C05"],
+      "keeps": ["C01", "C11"]
+    },
+    {
+      "name": "below_lod_bear_stack_reject",
+      "rule": "Reject BUY if close < LOD - 0.05 * asian_range and EMA5 < EMA13 < EMA50 with EMA13_slope_5 < 0.",
+      "targets": ["C08"]
+    }
+  ],
+  "filters_to_reject": [
+    "Do not reject solely on small stop_hunt_pips; C01 and C11 were profitable with sub-1000p hunts.",
+    "Do not reject all Friday entries; C11 was a Friday winner when weekly/H4 stayed BUY.",
+    "Do not reject all RSI_OVERBOUGHT or TDI divergence; C07 and C06 still won.",
+    "Do not reject solely on asian_range_pips > 5000; C04, C10, and C11 show range size alone is not enough."
+  ],
+  "pair_specific_notes": [
+    "For XAUUSD, raw stop-hunt size is less useful than current-day exhaustion. TDR >= 5000p and ADR% >= 100 were stronger warning signals in this packet.",
+    "The main visual split is not W-bottom detection; it is whether the current BUY is fresh/reclaiming or stale after the HOD expansion.",
+    "Use EAT reporting for session buckets; loser snapshots clustered around 12:00-18:30 EAT, but late entries can still win when they reclaim LOD cleanly."
+  ],
+  "uncertain_items": [
+    "C05 hit T1 then breakeven, so it may be more of a management failure than a bad entry.",
+    "C01 was profitable without T1 and visually late; treat it as a weak winner when optimizing.",
+    "C10 winner versus C03 loser on the same large-hunt day suggests bars_since_original_W and bars_since_HOD_sweep are critical features."
+  ],
+  "next_backtest_spec": {
+    "scope": "XAUUSD only, same normalized setup signature, archived pair-study records plus this packet.",
+    "features": [
+      "TDR_pips",
+      "ADR_pct",
+      "close_position_in_day_range",
+      "close_position_in_asian_range",
+      "bars_since_hod_sweep",
+      "bars_since_lod_reclaim",
+      "bars_since_first_close_above_ema50_after_hunt",
+      "EMA5_EMA13_EMA50_stack",
+      "EMA13_slope_5",
+      "TDI_green_slope_3",
+      "TDI_green_vs_red",
+      "TDI_green_vs_yellow",
+      "last_4_bars_reclaim_body_ATR_ratio"
+    ],
+    "tests": [
+      "baseline signature",
+      "higher_tf_alignment_floor",
+      "large_range_exhaustion",
+      "stale_upper_quarter_buy",
+      "post_hod_reentry_requires_reclaim",
+      "all_filters_combined"
+    ],
+    "metrics": [
+      "favorable_rate",
+      "avg_exit_pips",
+      "t1_rate",
+      "avg_mae",
+      "validation_split_passes",
+      "out_of_sample_passes"
+    ]
+  }
+}
+OpenAI Codex v0.137.0
+--------
+workdir: C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019eacc3-8dcf-7e33-83de-c919ed7c358e
+--------
+user
+Use the Read tool to inspect the local chart images when needed.
+Packet directory: C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\XAUUSD_the_33_mw_buy_mid_week_l3_stop_hunt_ae62129df2
+
+You are now allowed to use `answer_key.csv` after completing the blind review.
+
+Compare winners against losers for this exact same MMM setup signature.
+
+Pair: XAUUSD
+Shared setup signature: THE_33_MW|BUY|MID_WEEK|L3|STOP_HUNT|AR_VALID|HUNT_PAIR_RANGE|PUSH3_PLUS|W_BOTTOM|RRT|TDI_CONFIRM|THE_33|CONF_75_PLUS
+
+Goal: identify the visual/structural filters that separate profitable examples from failed examples.
+
+Return a concise JSON object with:
+`summary`, `winner_traits`, `loser_traits`, `filters_to_test`, `filters_to_reject`, `pair_specific_notes`, `uncertain_items`, and `next_backtest_spec`.
+
+Each `filters_to_test` item must be deterministic enough for Codex to encode. Include measurable thresholds where possible, such as candles, pips, ratios, relative position to Asian range, or TDI state.
+
+Do not recommend live trading. These are research filters only.
+
+
+Local chart images:
+- C01: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\XAUUSD_the_33_mw_buy_mid_week_l3_stop_hunt_ae62129df2\images\c01_fc48267_20251126T171500.png`
+- C02: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\XAUUSD_the_33_mw_buy_mid_week_l3_stop_hunt_ae62129df2\images\c02_fc43353_20251008T151500.png`
+- C03: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\XAUUSD_the_33_mw_buy_mid_week_l3_stop_hunt_ae62129df2\images\c03_fc43331_20251007T091500.png`
+- C04: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\XAUUSD_the_33_mw_buy_mid_week_l3_stop_hunt_ae62129df2\images\c04_fc42968_20250902T040000.png`
+- C05: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\XAUUSD_the_33_mw_buy_mid_week_l3_stop_hunt_ae62129df2\images\c05_fc48482_20251217T150000.png`
+- C06: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\XAUUSD_the_33_mw_buy_mid_week_l3_stop_hunt_ae62129df2\images\c06_fc43051_20250909T023000.png`
+- C07: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\XAUUSD_the_33_mw_buy_mid_week_l3_stop_hunt_ae62129df2\images\c07_fc48531_20251223T010000.png`
+- C08: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\XAUUSD_the_33_mw_buy_mid_week_l3_stop_hunt_ae62129df2\images\c08_fc48230_20251121T090000.png`
+- C09: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\XAUUSD_the_33_mw_buy_mid_week_l3_stop_hunt_ae62129df2\images\c09_fc48524_20251222T153000.png`
+- C10: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\XAUUSD_the_33_mw_buy_mid_week_l3_stop_hunt_ae62129df2\images\c10_fc43329_20251007T061500.png`
+- C11: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\XAUUSD_the_33_mw_buy_mid_week_l3_stop_hunt_ae62129df2\images\c11_fc48294_20251128T154500.png`
+
+Answer key:
+review_id,label,flashcard_id,snapshot_at,outcome,exit_pips,max_favorable_pips,max_adverse_pips,t1_hit,image_path
+C01,winner,48267,2025-11-26T17:15:00+00:00,TIME_EXIT_PROFIT,1118.99999999996,1494.9999999999818,101.00000000002183,False,images/c01_fc48267_20251126T171500.png
+C02,loser,43353,2025-10-08T15:15:00+00:00,STALE_EXIT,-200.0,924.0000000000236,1389.9999999999636,False,images/c02_fc43353_20251008T151500.png
+C03,loser,43331,2025-10-07T09:15:00+00:00,LOSS,-844.0000000000055,44.00000000000546,1011.0000000000127,False,images/c03_fc43331_20251007T091500.png
+C04,winner,42968,2025-09-02T04:00:00+00:00,TRAIL_STOP,463.99999999998727,1990.9999999999854,65.0000000000091,True,images/c04_fc42968_20250902T040000.png
+C05,loser,48482,2025-12-17T15:00:00+00:00,BREAKEVEN_AFTER_T1,0.0,2288.000000000011,27.999999999974534,True,images/c05_fc48482_20251217T150000.png
+C06,winner,43051,2025-09-09T02:30:00+00:00,TARGET_2,730.0000000001319,1009.9999999999909,8.000000000038199,True,images/c06_fc43051_20250909T023000.png
+C07,winner,48531,2025-12-23T01:00:00+00:00,TRAIL_STOP,1235.0000000000364,1478.9999999999964,225.0,True,images/c07_fc48531_20251223T010000.png
+C08,loser,48230,2025-11-21T09:00:00+00:00,LOSS,-1531.999999999971,523.9999999999782,173.00000000000182,False,images/c08_fc48230_20251121T090000.png
+C09,loser,48524,2025-12-22T15:30:00+00:00,STALE_EXIT,-787.99999999992,516.0000000000764,992.9999999999382,False,images/c09_fc48524_20251222T153000.png
+C10,winner,43329,2025-10-07T06:15:00+00:00,TRAIL_STOP,901.9999999999982,1194.0000000000055,57.999999999992724,True,images/c10_fc43329_20251007T061500.png
+C11,winner,48294,2025-11-28T15:45:00+00:00,TRAIL_STOP,1476.9999999999527,2642.0000000000073,1.9999999999527063,True,images/c11_fc48294_20251128T154500.png
+
+
+Blind Codex review:
+[
+  {
+    "review_id": "C01",
+    "predicted_label": "loser",
+    "confidence_0_100": 68,
+    "real_mmm_stop_hunt": "weak",
+    "return_inside_asian_range": true,
+    "clean_w_bottom": false,
+    "second_leg_quality": "poor; entry appears after an extended push into HOD/THE_33 rather than at the actual W bottom",
+    "tdi_state_visible": "mixed; late bullish curl from oversold but below/near midline after prior bearish drop",
+    "entry_timing": "late_after_hod_rejection",
+    "reject_reason": "Buy is triggered near the top of the range after a strong selloff from HOD; structure looks like late continuation/reclaim rather than a fresh low stop-hunt reversal.",
+    "proposed_filter": "Reject BUY signals when the latest entry is above Asian range mid/high after a fresh HOD rejection and no fresh second-leg low is visible."
+  },
+  {
+    "review_id": "C02",
+    "predicted_label": "winner",
+    "confidence_0_100": 72,
+    "real_mmm_stop_hunt": "yes",
+    "return_inside_asian_range": true,
+    "clean_w_bottom": true,
+    "second_leg_quality": "good; clear sell-side raid followed by sustained reclaim and trend continuation",
+    "tdi_state_visible": "bullish recovery after prior weakness, though slightly late/overbought",
+    "entry_timing": "acceptable_continuation",
+    "reject_reason": "",
+    "proposed_filter": "Allow when stop hunt occurs below the range and price reclaims LOD/AR with stacked 5/13/50 EMA support."
+  },
+  {
+    "review_id": "C03",
+    "predicted_label": "loser",
+    "confidence_0_100": 63,
+    "real_mmm_stop_hunt": "weak",
+    "return_inside_asian_range": true,
+    "clean_w_bottom": false,
+    "second_leg_quality": "poor; price is already compressed near HOD after a long prior rally",
+    "tdi_state_visible": "bearish/weak; green and red are below the yellow baseline and rolling down",
+    "entry_timing": "late_at_hod",
+    "reject_reason": "The buy is into HOD/Asian high after trend exhaustion, with no clean recent W-bottom trigger at the entry zone.",
+    "proposed_filter": "Reject BUY when TDI is below the yellow baseline and curling down while price is parked at HOD/AR high."
+  },
+  {
+    "review_id": "C04",
+    "predicted_label": "winner",
+    "confidence_0_100": 66,
+    "real_mmm_stop_hunt": "yes",
+    "return_inside_asian_range": true,
+    "clean_w_bottom": true,
+    "second_leg_quality": "fair; strong reclaim from low and later consolidation above LOD",
+    "tdi_state_visible": "improving; signal cross bullish from lower band area",
+    "entry_timing": "acceptable_reclaim",
+    "reject_reason": "",
+    "proposed_filter": "Prefer cases where the post-hunt reclaim holds above LOD/50 EMA and TDI crosses up from the lower half."
+  },
+  {
+    "review_id": "C05",
+    "predicted_label": "loser",
+    "confidence_0_100": 70,
+    "real_mmm_stop_hunt": "yes",
+    "return_inside_asian_range": true,
+    "clean_w_bottom": false,
+    "second_leg_quality": "mixed; initial reversal worked but current entry is after a sharp HOD rejection and range chop",
+    "tdi_state_visible": "weak; green is below midline and only starting to curl",
+    "entry_timing": "late_after_distribution",
+    "reject_reason": "Entry follows a completed run into HOD and a selloff back toward AR mid/LOD, making the buy a late re-entry in chop.",
+    "proposed_filter": "Reject second-chance BUYs after a full HOD run unless price forms a fresh higher-low W above the 50 EMA with TDI above midline."
+  },
+  {
+    "review_id": "C06",
+    "predicted_label": "loser",
+    "confidence_0_100": 69,
+    "real_mmm_stop_hunt": "yes",
+    "return_inside_asian_range": true,
+    "clean_w_bottom": true,
+    "second_leg_quality": "initially strong but current setup is extended after the move",
+    "tdi_state_visible": "bearish divergence/rolling down from upper band",
+    "entry_timing": "very_late_after_impulse",
+    "reject_reason": "The actual W-bottom has already paid; the visible entry is near LOD/HOD consolidation after a large impulse with TDI divergence.",
+    "proposed_filter": "Reject BUY when the stop-hunt reversal has already traveled multiple pushes and TDI shows bearish divergence."
+  },
+  {
+    "review_id": "C07",
+    "predicted_label": "winner",
+    "confidence_0_100": 71,
+    "real_mmm_stop_hunt": "yes",
+    "return_inside_asian_range": true,
+    "clean_w_bottom": true,
+    "second_leg_quality": "good; base forms below/near weekly open then pushes cleanly back through range",
+    "tdi_state_visible": "bullish recovery with green turning up from lower band",
+    "entry_timing": "acceptable_breakout_retest",
+    "reject_reason": "",
+    "proposed_filter": "Allow if price reclaims the weekly open/LOD area after the stop hunt and holds above rising 13/50 EMA."
+  },
+  {
+    "review_id": "C08",
+    "predicted_label": "loser",
+    "confidence_0_100": 82,
+    "real_mmm_stop_hunt": "unclear",
+    "return_inside_asian_range": false,
+    "clean_w_bottom": false,
+    "second_leg_quality": "poor; price is breaking down hard through LOD with no bullish reclaim",
+    "tdi_state_visible": "bearish; green/red falling near lower band",
+    "entry_timing": "countertrend_knife_catch",
+    "reject_reason": "Despite the BUY label, visual structure is a decisive bearish breakdown below the Asian range and LOD.",
+    "proposed_filter": "Reject BUY if current price is below Asian range low/LOD and 5/13 EMAs are sharply bearish."
+  },
+  {
+    "review_id": "C09",
+    "predicted_label": "winner",
+    "confidence_0_100": 78,
+    "real_mmm_stop_hunt": "yes",
+    "return_inside_asian_range": true,
+    "clean_w_bottom": true,
+    "second_leg_quality": "strong; tight low base, clean reclaim, then powerful expansion toward HOD",
+    "tdi_state_visible": "bullish expansion from lower half into upper band",
+    "entry_timing": "good",
+    "reject_reason": "",
+    "proposed_filter": "Keep setups with compact base below LOD/weekly open followed by clean EMA stack and TDI expansion."
+  },
+  {
+    "review_id": "C10",
+    "predicted_label": "loser",
+    "confidence_0_100": 61,
+    "real_mmm_stop_hunt": "weak",
+    "return_inside_asian_range": true,
+    "clean_w_bottom": false,
+    "second_leg_quality": "poor; entry is at the top-side consolidation after a long advance",
+    "tdi_state_visible": "weak; TDI is under midline and recovering only late",
+    "entry_timing": "late_at_hod",
+    "reject_reason": "The buy is late near HOD/Asian high after multiple pushes and TDI weakness, not at the original reversal.",
+    "proposed_filter": "Reject BUY when price has already completed 3+ pushes into HOD and TDI is below 50 at entry."
+  },
+  {
+    "review_id": "C11",
+    "predicted_label": "winner",
+    "confidence_0_100": 64,
+    "real_mmm_stop_hunt": "yes",
+    "return_inside_asian_range": true,
+    "clean_w_bottom": false,
+    "second_leg_quality": "mixed; large HOD rejection but current candle reclaims sharply from LOD/200 EMA area",
+    "tdi_state_visible": "bullish rebound from lower band, but still recovering",
+    "entry_timing": "aggressive_reversal",
+    "reject_reason": "",
+    "proposed_filter": "Allow only if the LOD reclaim candle closes back inside range and TDI green crosses up from the lower band."
+  }
+]
+
+Blind Claude review:
+[{"review_id":"C01","predicted_label":"loser","confidence_0_100":72,"real_mmm_stop_hunt":true,"return_inside_asian_range":false,"clean_w_bottom":false,"second_leg_quality":"poor","tdi_state_visible":"shark_fin_long_fading","entry_timing":"late","reject_reason":"Price already peaked at HOD with TDI green crossing below red; entry during retracement off high; ADR% 49.6 suggests move already half-spent","proposed_filter":"reject_entry_when_tdi_green_below_red_and_price_below_hod"},{"review_id":"C02","predicted_label":"loser","confidence_0_100":65,"real_mmm_stop_hunt":true,"return_inside_asian_range":false,"clean_w_bottom":false,"second_leg_quality":"adequate","tdi_state_visible":"rsi_overbought_shark_fin","entry_timing":"late","reject_reason":"ADR% 116.8 massively exceeded; buying into already-exhausted daily range with RSI overbought at 63; Asian range 3826p is wide","proposed_filter":"reject_entry_when_adr_pct_gt_100"},{"review_id":"C03","predicted_label":"winner","confidence_0_100":62,"real_mmm_stop_hunt":true,"return_inside_asian_range":true,"clean_w_bottom":true,"second_leg_quality":"adequate","tdi_state_visible":"shark_fin_long","entry_timing":"on_time","reject_reason":null,"proposed_filter":null},{"review_id":"C04","predicted_label":"winner","confidence_0_100":68,"real_mmm_stop_hunt":true,"return_inside_asian_range":true,"clean_w_bottom":true,"second_leg_quality":"good","tdi_state_visible":"vb_squeeze_signal_cross_bullish","entry_timing":"on_time","reject_reason":null,"proposed_filter":null},{"review_id":"C05","predicted_label":"loser","confidence_0_100":60,"real_mmm_stop_hunt":true,"return_inside_asian_range":false,"clean_w_bottom":false,"second_leg_quality":"poor","tdi_state_visible":"signal_cross_bullish_weak","entry_timing":"late","reject_reason":"Choppy two-way action with spike-and-reversal; price fell from HOD back to LOD; no clean W-bottom visible; ADR 61% with declining momentum","proposed_filter":"reject_entry_when_price_spike_reversal_within_4_bars"},{"review_id":"C06","predicted_label":"winner","confidence_0_100":55,"real_mmm_stop_hunt":true,"return_inside_asian_range":true,"clean_w_bottom":true,"second_leg_quality":"adequate","tdi_state_visible":"shark_fin_long_bearish_divergence","entry_timing":"on_time","reject_reason":null,"proposed_filter":"flag_tdi_bearish_divergence_as_caution"},{"review_id":"C07","predicted_label":"winner","confidence_0_100":70,"real_mmm_stop_hunt":true,"return_inside_asian_range":true,"clean_w_bottom":true,"second_leg_quality":"good","tdi_state_visible":"rsi_overbought_mbl_cross_bullish","entry_timing":"on_time","reject_reason":null,"proposed_filter":null},{"review_id":"C08","predicted_label":"loser","confidence_0_100":75,"real_mmm_stop_hunt":true,"return_inside_asian_range":false,"clean_w_bottom":false,"second_leg_quality":"poor","tdi_state_visible":"rsi_oversold_shark_fin","entry_timing":"late","reject_reason":"Friday session with NEUTRAL weekly bias (not BUY); choppy L3 structure with flat intertwined EMAs; confluence only 80/100; 4 pushes not 5; ADR 67.8% already consumed","proposed_filter":"reject_friday_entries_with_neutral_weekly_bias"},{"review_id":"C09","predicted_label":"loser","confidence_0_100":72,"real_mmm_stop_hunt":true,"return_inside_asian_range":false,"clean_w_bottom":false,"second_leg_quality":"adequate","tdi_state_visible":"rsi_overbought_shark_fin","entry_timing":"late","reject_reason":"ADR% 125.5 massively exceeded; Asian range 6731p is double AvgAsia; buying at top of exhausted move; TDI overbought curling","proposed_filter":"reject_entry_when_adr_pct_gt_100"},{"review_id":"C10","predicted_label":"winner","confidence_0_100":66,"real_mmm_stop_hunt":true,"return_inside_asian_range":true,"clean_w_bottom":true,"second_leg_quality":"good","tdi_state_visible":"shark_fin_long","entry_timing":"on_time","reject_reason":null,"proposed_filter":null},{"review_id":"C11","predicted_label":"loser","confidence_0_100":68,"real_mmm_stop_hunt":false,"return_inside_asian_range":false,"clean_w_bottom":false,"second_leg_quality":"poor","tdi_state_visible":"signal_cross_bullish_mbl_cross","entry_timing":"late","reject_reason":"Friday session; stop hunt only 612p (below XAUUSD 200p minimum threshold); only 3 pushes; sharp bearish reversal from spike high with large red candles at right edge","proposed_filter":"reject_friday_xauusd_with_sub_1000p_stop_hunt"}]
+
+
+Return only the requested concise JSON object. Do not recommend live trading.
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-ChildItem -LiteralPath 'C:\\Users\\dennis.ndungu\\Desktop\\ClaudeMCP\\Helix_V3\\data\\mmm_training\\vision_review_packets\\XAUUSD_the_33_mw_buy_mid_week_l3_stop_hunt_ae62129df2' -Force" in C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3
+ succeeded in 367ms:
+
+
+    Directory: C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\XAUUSD_the_33_mw_buy_mid_we
+    ek_l3_stop_hunt_ae62129df2
+
+
+Mode                 LastWriteTime         Length Name                                                                              
+----                 -------------         ------ ----                                                                              
+d-----        09/06/2026     14:40                images                                                                            
+d-----        09/06/2026     17:22                reviews                                                                           
+-a----        09/06/2026     14:40           1775 answer_key.csv                                                                    
+-a----        09/06/2026     14:40           1269 blind_prompt.md                                                                   
+-a----        09/06/2026     14:40            881 labeled_comparison_prompt.md                                                      
+-a----        09/06/2026     14:40          25481 manifest.json                                                                     
+-a----        09/06/2026     14:40           1127 README.md                                                                         
+-a----        09/06/2026     14:40            349 review_matrix.csv                                                                 
+
+
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -LiteralPath 'C:\\Users\\dennis.ndungu\\Desktop\\ClaudeMCP\\Helix_V3\\data\\mmm_training\\vision_review_packets\\XAUUSD_the_33_mw_buy_mid_week_l3_stop_hunt_ae62129df2\\manifest.json'" in C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -LiteralPath 'C:\\Users\\dennis.ndungu\\Desktop\\ClaudeMCP\\Helix_V3\\data\\mmm_training\\vision_review_packets\\XAUUSD_the_33_mw_buy_mid_week_l3_stop_hunt_ae62129df2\\review_matrix.csv'" in C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3
+ succeeded in 318ms:
+review_id,predicted_label,real_mmm_stop_hunt,return_inside_asian_range,clean_w_bottom,second_leg_quality,tdi_state_visible,entry_timing,reject_reason,proposed_filter,confidence_0_100
+C01,,,,,,,,,,
+C02,,,,,,,,,,
+C03,,,,,,,,,,
+C04,,,,,,,,,,
+C05,,,,,,,,,,
+C06,,,,,,,,,,
+C07,,,,,,,,,,
+C08,,,,,,,,,,
+C09,,,,,,,,,,
+C10,,,,,,,,,,
+C11,,,,,,,,,,
+
+ succeeded in 383ms:
+{
+  "counts": {
+    "items": 11,
+    "losers": 5,
+    "winners": 6
+  },
+  "generated_at": "2026-06-09T11:40:25.109773+00:00",
+  "instructions": {
+    "answer_key": "answer_key.csv",
+    "blind_prompt": "blind_prompt.md",
+    "labeled_prompt": "labeled_comparison_prompt.md",
+    "review_matrix": "review_matrix.csv"
+  },
+  "items": [
+    {
+      "context": {
+        "advisory_confidence_score": 100.0,
+        "advisory_grade": "A",
+        "asian_range_pips": 4659.000000000015,
+        "confluence_score": 100,
+        "event_path": [
+          "ENTRY",
+          "TIME_EXIT_PROFIT"
+        ],
+        "h1_session": "STOP_HUNT",
+        "h1_trend": "NEUTRAL",
+        "h4_level": 3,
+        "h4_trend": "BUY",
+        "m_w_pattern": "W_BOTTOM",
+        "pattern_trade_type": "THE_33",
+        "push_count": 5,
+        "ratios": {
+          "asian_range_to_pair_max": 0.5823750000000019,
+          "confluence": 1.0,
+          "hunt_to_expected_level_move": 0.5162500000000136,
+          "hunt_to_pair_max": 0.027533333333334062,
+          "single_setup_theme_score": 0.6
+        },
+        "rrt_detected": true,
+        "stop_hunt_detected": true,
+        "stop_hunt_direction": "BUY",
+        "stop_hunt_pips": 413.0000000000109,
+        "tags": [
+          "historical",
+          "TIME_EXIT_PROFIT",
+          "BUY",
+          "L3",
+          "MID_WEEK"
+        ],
+        "tdi_crossed_signal": "none",
+        "tdi_divergence": "none",
+        "tdi_shark_direction": "LONG",
+        "tdi_shark_fin": true,
+        "tdi_signals": [
+          "SHARK_FIN_LONG"
+        ],
+        "tdi_vb_squeeze": false,
+        "theme_tags": [
+          "XAU_STRENGTH",
+          "USD_WEAKNESS"
+        ],
+        "weekly_phase": "MID_WEEK",
+        "weekly_trend": "BUY"
+      },
+      "direction": "BUY",
+      "exit_pips": 1118.99999999996,
+      "flashcard_id": 48267,
+      "image_path": "images/c01_fc48267_20251126T171500.png",
+      "label": "winner",
+      "max_adverse_pips": 101.00000000002183,
+      "max_favorable_pips": 1494.9999999999818,
+      "minutes_to_t1": null,
+      "outcome": "TIME_EXIT_PROFIT",
+      "review_id": "C01",
+      "snapshot_at": "2025-11-26T17:15:00+00:00",
+      "source_chart_path": "charts\\annotated\\XAUUSD_M15_annotated_20260609_144006_542261.png",
+      "symbol": "XAUUSD",
+      "t1_hit": false,
+      "timeframe": "M15"
+    },
+    {
+      "context": {
+        "advisory_confidence_score": 100.0,
+        "advisory_grade": "A",
+        "asian_range_pips": 6065.999999999985,
+        "confluence_score": 100,
+        "event_path": [
+          "ENTRY",
+          "STALE_EXIT"
+        ],
+        "h1_session": "STOP_HUNT",
+        "h1_trend": "BUY",
+        "h4_level": 3,
+        "h4_trend": "BUY",
+        "m_w_pattern": "W_BOTTOM",
+        "pattern_trade_type": "THE_33",
+        "push_count": 5,
+        "ratios": {
+          "asian_range_to_pair_max": 0.7582499999999982,
+          "confluence": 1.0,
+          "hunt_to_expected_level_move": 4.134999999999991,
+          "hunt_to_pair_max": 0.22053333333333286,
+          "single_setup_theme_score": 0.6
+        },
+        "rrt_detected": true,
+        "stop_hunt_detected": true,
+        "stop_hunt_direction": "BUY",
+        "stop_hunt_pips": 3307.9999999999927,
+        "tags": [
+          "historical",
+          "STALE_EXIT",
+          "BUY",
+          "L3",
+          "MID_WEEK"
+        ],
+        "tdi_crossed_signal": "none",
+        "tdi_divergence": "none",
+        "tdi_shark_direction": "LONG",
+        "tdi_shark_fin": true,
+        "tdi_signals": [
+          "RSI_OVERBOUGHT",
+          "SHARK_FIN_LONG"
+        ],
+        "tdi_vb_squeeze": false,
+        "theme_tags": [
+          "XAU_STRENGTH",
+          "USD_WEAKNESS"
+        ],
+        "weekly_phase": "MID_WEEK",
+        "weekly_trend": "BUY"
+      },
+      "direction": "BUY",
+      "exit_pips": -200.0,
+      "flashcard_id": 43353,
+      "image_path": "images/c02_fc43353_20251008T151500.png",
+      "label": "loser",
+      "max_adverse_pips": 1389.9999999999636,
+      "max_favorable_pips": 924.0000000000236,
+      "minutes_to_t1": null,
+      "outcome": "STALE_EXIT",
+      "review_id": "C02",
+      "snapshot_at": "2025-10-08T15:15:00+00:00",
+      "source_chart_path": "charts\\annotated\\XAUUSD_M15_annotated_20260609_144004_538326.png",
+      "symbol": "XAUUSD",
+      "t1_hit": false,
+      "timeframe": "M15"
+    },
+    {
+      "context": {
+        "advisory_confidence_score": 100.0,
+        "advisory_grade": "A",
+        "asian_range_pips": 7925.0,
+        "confluence_score": 100,
+        "event_path": [
+          "ENTRY",
+          "SL_HIT"
+        ],
+        "h1_session": "STOP_HUNT",
+        "h1_trend": "BUY",
+        "h4_level": 3,
+        "h4_trend": "BUY",
+        "m_w_pattern": "W_BOTTOM",
+        "pattern_trade_type": "THE_33",
+        "push_count": 5,
+        "ratios": {
+          "asian_range_to_pair_max": 0.990625,
+          "confluence": 1.0,
+          "hunt_to_expected_level_move": 7.509999999999991,
+          "hunt_to_pair_max": 0.40053333333333285,
+          "single_setup_theme_score": 0.6
+        },
+        "rrt_detected": true,
+        "stop_hunt_detected": true,
+        "stop_hunt_direction": "BUY",
+        "stop_hunt_pips": 6007.999999999993,
+        "tags": [
+          "historical",
+          "LOSS",
+          "BUY",
+          "L3",
+          "MID_WEEK"
+        ],
+        "tdi_crossed_signal": "none",
+        "tdi_divergence": "none",
+        "tdi_shark_direction": "LONG",
+        "tdi_shark_fin": true,
+        "tdi_signals": [
+          "SHARK_FIN_LONG"
+        ],
+        "tdi_vb_squeeze": false,
+        "theme_tags": [
+          "XAU_STRENGTH",
+          "USD_WEAKNESS"
+        ],
+        "weekly_phase": "MID_WEEK",
+        "weekly_trend": "BUY"
+      },
+      "direction": "BUY",
+      "exit_pips": -844.0000000000055,
+      "flashcard_id": 43331,
+      "image_path": "images/c03_fc43331_20251007T091500.png",
+      "label": "loser",
+      "max_adverse_pips": 1011.0000000000127,
+      "max_favorable_pips": 44.00000000000546,
+      "minutes_to_t1": null,
+      "outcome": "LOSS",
+      "review_id": "C03",
+      "snapshot_at": "2025-10-07T09:15:00+00:00",
+      "source_chart_path": "charts\\annotated\\XAUUSD_M15_annotated_20260609_144003_946057.png",
+      "symbol": "XAUUSD",
+      "t1_hit": false,
+      "timeframe": "M15"
+    },
+    {
+      "context": {
+        "advisory_confidence_score": 100.0,
+        "advisory_grade": "A",
+        "asian_range_pips": 5228.999999999996,
+        "confluence_score": 100,
+        "event_path": [
+          "ENTRY",
+          "T1_HIT",
+          "TRAIL_STOP"
+        ],
+        "h1_session": "STOP_HUNT",
+        "h1_trend": "BUY",
+        "h4_level": 3,
+        "h4_trend": "BUY",
+        "m_w_pattern": "W_BOTTOM",
+        "pattern_trade_type": "THE_33",
+        "push_count": 5,
+        "ratios": {
+          "asian_range_to_pair_max": 0.6536249999999996,
+          "confluence": 1.0,
+          "hunt_to_expected_level_move": 4.100000000000023,
+          "hunt_to_pair_max": 0.21866666666666787,
+          "single_setup_theme_score": 0.6
+        },
+        "rrt_detected": true,
+        "stop_hunt_detected": true,
+        "stop_hunt_direction": "BUY",
+        "stop_hunt_pips": 3280.000000000018,
+        "tags": [
+          "historical",
+          "TRAIL_STOP",
+          "BUY",
+          "L3",
+          "MID_WEEK"
+        ],
+        "tdi_crossed_signal": "bullish",
+        "tdi_divergence": "none",
+        "tdi_shark_direction": "SHORT",
+        "tdi_shark_fin": true,
+        "tdi_signals": [
+          "VB_SQUEEZE",
+          "SIGNAL_CROSS_BULLISH",
+          "MBL_CROSS_BULLISH",
+          "SHARK_FIN_SHORT"
+        ],
+        "tdi_vb_squeeze": true,
+        "theme_tags": [
+          "XAU_STRENGTH",
+          "USD_WEAKNESS"
+        ],
+        "weekly_phase": "MID_WEEK",
+        "weekly_trend": "BUY"
+      },
+      "direction": "BUY",
+      "exit_pips": 463.99999999998727,
+      "flashcard_id": 42968,
+      "image_path": "images/c04_fc42968_20250902T040000.png",
+      "label": "winner",
+      "max_adverse_pips": 65.0000000000091,
+      "max_favorable_pips": 1990.9999999999854,
+      "minutes_to_t1": 45.0,
+      "outcome": "TRAIL_STOP",
+      "review_id": "C04",
+      "snapshot_at": "2025-09-02T04:00:00+00:00",
+      "source_chart_path": "charts\\annotated\\XAUUSD_M15_annotated_20260609_144000_257372.png",
+      "symbol": "XAUUSD",
+      "t1_hit": true,
+      "timeframe": "M15"
+    },
+    {
+      "context": {
+        "advisory_confidence_score": 100.0,
+        "advisory_grade": "A",
+        "asian_range_pips": 5088.000000000011,
+        "confluence_score": 100,
+        "event_path": [
+          "ENTRY",
+          "T1_HIT",
+          "BREAKEVEN_AFTER_T1"
+        ],
+        "h1_session": "STOP_HUNT",
+        "h1_trend": "BUY",
+        "h4_level": 3,
+        "h4_trend": "BUY",
+        "m_w_pattern": "W_BOTTOM",
+        "pattern_trade_type": "THE_33",
+        "push_count": 5,
+        "ratios": {
+          "asian_range_to_pair_max": 0.6360000000000013,
+          "confluence": 1.0,
+          "hunt_to_expected_level_move": 2.3412499999999454,
+          "hunt_to_pair_max": 0.12486666666666375,
+          "single_setup_theme_score": 0.6
+        },
+        "rrt_detected": true,
+        "stop_hunt_detected": true,
+        "stop_hunt_direction": "BUY",
+        "stop_hunt_pips": 1872.9999999999563,
+        "tags": [
+          "historical",
+          "BREAKEVEN_AFTER_T1",
+          "BUY",
+          "L3",
+          "MID_WEEK"
+        ],
+        "tdi_crossed_signal": "bullish",
+        "tdi_divergence": "none",
+        "tdi_shark_direction": "",
+        "tdi_shark_fin": false,
+        "tdi_signals": [
+          "SIGNAL_CROSS_BULLISH"
+        ],
+        "tdi_vb_squeeze": false,
+        "theme_tags": [
+          "XAU_STRENGTH",
+          "USD_WEAKNESS"
+        ],
+        "weekly_phase": "MID_WEEK",
+        "weekly_trend": "BUY"
+      },
+      "direction": "BUY",
+      "exit_pips": 0.0,
+      "flashcard_id": 48482,
+      "image_path": "images/c05_fc48482_20251217T150000.png",
+      "label": "loser",
+      "max_adverse_pips": 27.999999999974534,
+      "max_favorable_pips": 2288.000000000011,
+      "minutes_to_t1": 60.0,
+      "outcome": "BREAKEVEN_AFTER_T1",
+      "review_id": "C05",
+      "snapshot_at": "2025-12-17T15:00:00+00:00",
+      "source_chart_path": "charts\\annotated\\XAUUSD_M15_annotated_20260609_144008_590932.png",
+      "symbol": "XAUUSD",
+      "t1_hit": true,
+      "timeframe": "M15"
+    },
+    {
+      "context": {
+        "advisory_confidence_score": 100.0,
+        "advisory_grade": "A",
+        "asian_range_pips": 4888.000000000011,
+        "confluence_score": 95,
+        "event_path": [
+          "ENTRY",
+          "T1_HIT",
+          "TARGET_2"
+        ],
+        "h1_session": "STOP_HUNT",
+        "h1_trend": "NEUTRAL",
+        "h4_level": 3,
+        "h4_trend": "BUY",
+        "m_w_pattern": "W_BOTTOM",
+        "pattern_trade_type": "THE_33",
+        "push_count": 5,
+        "ratios": {
+          "asian_range_to_pair_max": 0.6110000000000013,
+          "confluence": 0.95,
+          "hunt_to_expected_level_move": 1.8274999999999864,
+          "hunt_to_pair_max": 0.09746666666666594,
+          "single_setup_theme_score": 0.58
+        },
+        "rrt_detected": true,
+        "stop_hunt_detected": true,
+        "stop_hunt_direction": "BUY",
+        "stop_hunt_pips": 1461.999999999989,
+        "tags": [
+          "historical",
+          "TARGET_2",
+          "BUY",
+          "L3",
+          "MID_WEEK"
+        ],
+        "tdi_crossed_signal": "none",
+        "tdi_divergence": "bearish",
+        "tdi_shark_direction": "LONG",
+        "tdi_shark_fin": true,
+        "tdi_signals": [
+          "SHARK_FIN_LONG",
+          "BEARISH_DIVERGENCE"
+        ],
+        "tdi_vb_squeeze": false,
+        "theme_tags": [
+          "XAU_STRENGTH",
+          "USD_WEAKNESS"
+        ],
+        "weekly_phase": "MID_WEEK",
+        "weekly_trend": "BUY"
+      },
+      "direction": "BUY",
+      "exit_pips": 730.0000000001319,
+      "flashcard_id": 43051,
+      "image_path": "images/c06_fc43051_20250909T023000.png",
+      "label": "winner",
+      "max_adverse_pips": 8.000000000038199,
+      "max_favorable_pips": 1009.9999999999909,
+      "minutes_to_t1": 15.0,
+      "outcome": "TARGET_2",
+      "review_id": "C06",
+      "snapshot_at": "2025-09-09T02:30:00+00:00",
+      "source_chart_path": "charts\\annotated\\XAUUSD_M15_annotated_20260609_144002_759364.png",
+      "symbol": "XAUUSD",
+      "t1_hit": true,
+      "timeframe": "M15"
+    },
+    {
+      "context": {
+        "advisory_confidence_score": 100.0,
+        "advisory_grade": "A",
+        "asian_range_pips": 4557.000000000062,
+        "confluence_score": 100,
+        "event_path": [
+          "ENTRY",
+          "T1_HIT",
+          "TRAIL_STOP"
+        ],
+        "h1_session": "STOP_HUNT",
+        "h1_trend": "BUY",
+        "h4_level": 3,
+        "h4_trend": "BUY",
+        "m_w_pattern": "W_BOTTOM",
+        "pattern_trade_type": "THE_33",
+        "push_count": 5,
+        "ratios": {
+          "asian_range_to_pair_max": 0.5696250000000077,
+          "confluence": 1.0,
+          "hunt_to_expected_level_move": 6.821249999999964,
+          "hunt_to_pair_max": 0.36379999999999807,
+          "single_setup_theme_score": 0.6
+        },
+        "rrt_detected": true,
+        "stop_hunt_detected": true,
+        "stop_hunt_direction": "BUY",
+        "stop_hunt_pips": 5456.999999999971,
+        "tags": [
+          "historical",
+          "TRAIL_STOP",
+          "BUY",
+          "L3",
+          "MID_WEEK"
+        ],
+        "tdi_crossed_signal": "none",
+        "tdi_divergence": "none",
+        "tdi_shark_direction": "",
+        "tdi_shark_fin": false,
+        "tdi_signals": [
+          "RSI_OVERBOUGHT",
+          "MBL_CROSS_BULLISH"
+        ],
+        "tdi_vb_squeeze": false,
+        "theme_tags": [
+          "XAU_STRENGTH",
+          "USD_WEAKNESS"
+        ],
+        "weekly_phase": "MID_WEEK",
+        "weekly_trend": "BUY"
+      },
+      "direction": "BUY",
+      "exit_pips": 1235.0000000000364,
+      "flashcard_id": 48531,
+      "image_path": "images/c07_fc48531_20251223T010000.png",
+      "label": "winner",
+      "max_adverse_pips": 225.0,
+      "max_favorable_pips": 1478.9999999999964,
+      "minutes_to_t1": 60.0,
+      "outcome": "TRAIL_STOP",
+      "review_id": "C07",
+      "snapshot_at": "2025-12-23T01:00:00+00:00",
+      "source_chart_path": "charts\\annotated\\XAUUSD_M15_annotated_20260609_144010_906071.png",
+      "symbol": "XAUUSD",
+      "t1_hit": true,
+      "timeframe": "M15"
+    },
+    {
+      "context": {
+        "advisory_confidence_score": 95.0,
+        "advisory_grade": "A",
+        "asian_range_pips": 6842.000000000053,
+        "confluence_score": 80,
+        "event_path": [
+          "ENTRY",
+          "SL_HIT"
+        ],
+        "h1_session": "STOP_HUNT",
+        "h1_trend": "SELL",
+        "h4_level": 3,
+        "h4_trend": "SELL",
+        "m_w_pattern": "W_BOTTOM",
+        "pattern_trade_type": "THE_33",
+        "push_count": 4,
+        "ratios": {
+          "asian_range_to_pair_max": 0.8552500000000066,
+          "confluence": 0.8,
+          "hunt_to_expected_level_move": 2.8199999999999363,
+          "hunt_to_pair_max": 0.1503999999999966,
+          "single_setup_theme_score": 0.52
+        },
+        "rrt_detected": true,
+        "stop_hunt_detected": true,
+        "stop_hunt_direction": "BUY",
+        "stop_hunt_pips": 2255.999999999949,
+        "tags": [
+          "historical",
+          "LOSS",
+          "BUY",
+          "L3",
+          "MID_WEEK"
+        ],
+        "tdi_crossed_signal": "none",
+        "tdi_divergence": "none",
+        "tdi_shark_direction": "LONG",
+        "tdi_shark_fin": true,
+        "tdi_signals": [
+          "RSI_OVERSOLD",
+          "SHARK_FIN_LONG"
+        ],
+        "tdi_vb_squeeze": false,
+        "theme_tags": [
+          "XAU_STRENGTH",
+          "USD_WEAKNESS"
+        ],
+        "weekly_phase": "MID_WEEK",
+        "weekly_trend": "NEUTRAL"
+      },
+      "direction": "BUY",
+      "exit_pips": -1531.999999999971,
+      "flashcard_id": 48230,
+      "image_path": "images/c08_fc48230_20251121T090000.png",
+      "label": "loser",
+      "max_adverse_pips": 173.00000000000182,
+      "max_favorable_pips": 523.9999999999782,
+      "minutes_to_t1": null,
+      "outcome": "LOSS",
+      "review_id": "C08",
+      "snapshot_at": "2025-11-21T09:00:00+00:00",
+      "source_chart_path": "charts\\annotated\\XAUUSD_M15_annotated_20260609_144005_261008.png",
+      "symbol": "XAUUSD",
+      "t1_hit": false,
+      "timeframe": "M15"
+    },
+    {
+      "context": {
+        "advisory_confidence_score": 100.0,
+        "advisory_grade": "A",
+        "asian_range_pips": 4557.000000000062,
+        "confluence_score": 100,
+        "event_path": [
+          "ENTRY",
+          "STALE_EXIT"
+        ],
+        "h1_session": "STOP_HUNT",
+        "h1_trend": "BUY",
+        "h4_level": 3,
+        "h4_trend": "BUY",
+        "m_w_pattern": "W_BOTTOM",
+        "pattern_trade_type": "THE_33",
+        "push_count": 5,
+        "ratios": {
+          "asian_range_to_pair_max": 0.5696250000000077,
+          "confluence": 1.0,
+          "hunt_to_expected_level_move": 3.324999999999932,
+          "hunt_to_pair_max": 0.1773333333333297,
+          "single_setup_theme_score": 0.6
+        },
+        "rrt_detected": true,
+        "stop_hunt_detected": true,
+        "stop_hunt_direction": "BUY",
+        "stop_hunt_pips": 2659.9999999999454,
+        "tags": [
+          "historical",
+          "STALE_EXIT",
+          "BUY",
+          "L3",
+          "MID_WEEK"
+        ],
+        "tdi_crossed_signal": "none",
+        "tdi_divergence": "none",
+        "tdi_shark_direction": "LONG",
+        "tdi_shark_fin": true,
+        "tdi_signals": [
+          "RSI_OVERBOUGHT",
+          "SHARK_FIN_LONG"
+        ],
+        "tdi_vb_squeeze": false,
+        "theme_tags": [
+          "XAU_STRENGTH",
+          "USD_WEAKNESS"
+        ],
+        "weekly_phase": "MID_WEEK",
+        "weekly_trend": "BUY"
+      },
+      "direction": "BUY",
+      "exit_pips": -787.99999999992,
+      "flashcard_id": 48524,
+      "image_path": "images/c09_fc48524_20251222T153000.png",
+      "label": "loser",
+      "max_adverse_pips": 992.9999999999382,
+      "max_favorable_pips": 516.0000000000764,
+      "minutes_to_t1": null,
+      "outcome": "STALE_EXIT",
+      "review_id": "C09",
+      "snapshot_at": "2025-12-22T15:30:00+00:00",
+      "source_chart_path": "charts\\annotated\\XAUUSD_M15_annotated_20260609_144009_127087.png",
+      "symbol": "XAUUSD",
+      "t1_hit": false,
+      "timeframe": "M15"
+    },
+    {
+      "context": {
+        "advisory_confidence_score": 100.0,
+        "advisory_grade": "A",
+        "asian_range_pips": 7925.0,
+        "confluence_score": 100,
+        "event_path": [
+          "ENTRY",
+          "T1_HIT",
+          "TRAIL_STOP"
+        ],
+        "h1_session": "STOP_HUNT",
+        "h1_trend": "BUY",
+        "h4_level": 3,
+        "h4_trend": "BUY",
+        "m_w_pattern": "W_BOTTOM",
+        "pattern_trade_type": "THE_33",
+        "push_count": 5,
+        "ratios": {
+          "asian_range_to_pair_max": 0.990625,
+          "confluence": 1.0,
+          "hunt_to_expected_level_move": 7.509999999999991,
+          "hunt_to_pair_max": 0.40053333333333285,
+          "single_setup_theme_score": 0.6
+        },
+        "rrt_detected": true,
+        "stop_hunt_detected": true,
+        "stop_hunt_direction": "BUY",
+        "stop_hunt_pips": 6007.999999999993,
+        "tags": [
+          "historical",
+          "TRAIL_STOP",
+          "BUY",
+          "L3",
+          "MID_WEEK"
+        ],
+        "tdi_crossed_signal": "none",
+        "tdi_divergence": "none",
+        "tdi_shark_direction": "LONG",
+        "tdi_shark_fin": true,
+        "tdi_signals": [
+          "SHARK_FIN_LONG"
+        ],
+        "tdi_vb_squeeze": false,
+        "theme_tags": [
+          "XAU_STRENGTH",
+          "USD_WEAKNESS"
+        ],
+        "weekly_phase": "MID_WEEK",
+        "weekly_trend": "BUY"
+      },
+      "direction": "BUY",
+      "exit_pips": 901.9999999999982,
+      "flashcard_id": 43329,
+      "image_path": "images/c10_fc43329_20251007T061500.png",
+      "label": "winner",
+      "max_adverse_pips": 57.999999999992724,
+      "max_favorable_pips": 1194.0000000000055,
+      "minutes_to_t1": 15.0,
+      "outcome": "TRAIL_STOP",
+      "review_id": "C10",
+      "snapshot_at": "2025-10-07T06:15:00+00:00",
+      "source_chart_path": "charts\\annotated\\XAUUSD_M15_annotated_20260609_144003_372394.png",
+      "symbol": "XAUUSD",
+      "t1_hit": true,
+      "timeframe": "M15"
+    },
+    {
+      "context": {
+        "advisory_confidence_score": 100.0,
+        "advisory_grade": "A",
+        "asian_range_pips": 5040.000000000055,
+        "confluence_score": 100,
+        "event_path": [
+          "ENTRY",
+          "T1_HIT",
+          "TRAIL_STOP"
+        ],
+        "h1_session": "STOP_HUNT",
+        "h1_trend": "NEUTRAL",
+        "h4_level": 3,
+        "h4_trend": "BUY",
+        "m_w_pattern": "W_BOTTOM",
+        "pattern_trade_type": "THE_33",
+        "push_count": 3,
+        "ratios": {
+          "asian_range_to_pair_max": 0.6300000000000068,
+          "confluence": 1.0,
+          "hunt_to_expected_level_move": 0.7649999999999864,
+          "hunt_to_pair_max": 0.040799999999999274,
+          "single_setup_theme_score": 0.6
+        },
+        "rrt_detected": true,
+        "stop_hunt_detected": true,
+        "stop_hunt_direction": "BUY",
+        "stop_hunt_pips": 611.9999999999891,
+        "tags": [
+          "historical",
+          "TRAIL_STOP",
+          "BUY",
+          "L3",
+          "MID_WEEK"
+        ],
+        "tdi_crossed_signal": "bullish",
+        "tdi_divergence": "none",
+        "tdi_shark_direction": "",
+        "tdi_shark_fin": false,
+        "tdi_signals": [
+          "SIGNAL_CROSS_BULLISH",
+          "MBL_CROSS_BULLISH"
+        ],
+        "tdi_vb_squeeze": false,
+        "theme_tags": [
+          "XAU_STRENGTH",
+          "USD_WEAKNESS"
+        ],
+        "weekly_phase": "MID_WEEK",
+        "weekly_trend": "BUY"
+      },
+      "direction": "BUY",
+      "exit_pips": 1476.9999999999527,
+      "flashcard_id": 48294,
+      "image_path": "images/c11_fc48294_20251128T154500.png",
+      "label": "winner",
+      "max_adverse_pips": 1.9999999999527063,
+      "max_favorable_pips": 2642.0000000000073,
+      "minutes_to_t1": 45.0,
+      "outcome": "TRAIL_STOP",
+      "review_id": "C11",
+      "snapshot_at": "2025-11-28T15:45:00+00:00",
+      "source_chart_path": "charts\\annotated\\XAUUSD_M15_annotated_20260609_144008_131118.png",
+      "symbol": "XAUUSD",
+      "t1_hit": true,
+      "timeframe": "M15"
+    }
+  ],
+  "normalized_key": "THE_33_MW|BUY|MID_WEEK|L3|STOP_HUNT|AR_VALID|HUNT_PAIR_RANGE|PUSH3_PLUS|W_BOTTOM|RRT|TDI_CONFIRM|THE_33|CONF_75_PLUS",
+  "setup_performance": {
+    "avg_exit_pips": 233.00000000001546,
+    "avg_mae": 368.5454545454459,
+    "avg_mfe": 1282.4545454545512,
+    "baseline_split_passes": 0,
+    "direct_profit": 6,
+    "direct_profit_rate": 54.54545454545454,
+    "direction": "BUY",
+    "favorable": 6,
+    "favorable_rate": 54.54545454545454,
+    "first_snapshot": "2025-09-02T04:00:00+00:00",
+    "last_snapshot": "2025-12-23T01:00:00+00:00",
+    "normalized_key": "THE_33_MW|BUY|MID_WEEK|L3|STOP_HUNT|AR_VALID|HUNT_PAIR_RANGE|PUSH3_PLUS|W_BOTTOM|RRT|TDI_CONFIRM|THE_33|CONF_75_PLUS",
+    "primary_theme": "XAU_STRENGTH",
+    "profitable_source_ids": [
+      42968,
+      43051,
+      43329,
+      48267,
+      48294,
+      48531
+    ],
+    "raw_key": "XAUUSD|BUY|MID_WEEK|BUY|L3|BUY|STOP_HUNT|BUY|AR_4557.0|HUNT_2660.0|PUSH3_PLUS|W_BOTTOM|RRT|TDI_CONFIRM|THE_33",
+    "realistic_target_pips": 833.5954545454583,
+    "setup_family": "THE_33_MW",
+    "split_stats": {
+      "out_of_sample": {
+        "avg_exit_pips": 149.0000000000388,
+        "avg_mae": 415.3333333333042,
+        "avg_mfe": 1427.6666666666945,
+        "direct_profit": 1,
+        "direct_profit_rate": 33.33333333333333,
+        "favorable": 1,
+        "favorable_rate": 33.33333333333333,
+        "t1_hits": 2,
+        "t1_rate": 66.66666666666666,
+        "total": 3
+      },
+      "validation": {
+        "avg_exit_pips": 264.5000000000067,
+        "avg_mae": 350.9999999999991,
+        "avg_mfe": 1227.9999999999973,
+        "direct_profit": 5,
+        "direct_profit_rate": 62.5,
+        "favorable": 5,
+        "favorable_rate": 62.5,
+        "t1_hits": 4,
+        "t1_rate": 50.0,
+        "total": 8
+      }
+    },
+    "symbol": "XAUUSD",
+    "t1_hits": 6,
+    "t1_rate": 54.54545454545454,
+    "total": 11
+  },
+  "symbol": "XAUUSD"
+}
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -LiteralPath 'C:\\Users\\dennis.ndungu\\Desktop\\ClaudeMCP\\Helix_V3\\data\\mmm_training\\vision_review_packets\\XAUUSD_the_33_mw_buy_mid_week_l3_stop_hunt_ae62129df2\\answer_key.csv'" in C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3
+ succeeded in 284ms:
+review_id,label,flashcard_id,snapshot_at,outcome,exit_pips,max_favorable_pips,max_adverse_pips,t1_hit,image_path
+C01,winner,48267,2025-11-26T17:15:00+00:00,TIME_EXIT_PROFIT,1118.99999999996,1494.9999999999818,101.00000000002183,False,images/c01_fc48267_20251126T171500.png
+C02,loser,43353,2025-10-08T15:15:00+00:00,STALE_EXIT,-200.0,924.0000000000236,1389.9999999999636,False,images/c02_fc43353_20251008T151500.png
+C03,loser,43331,2025-10-07T09:15:00+00:00,LOSS,-844.0000000000055,44.00000000000546,1011.0000000000127,False,images/c03_fc43331_20251007T091500.png
+C04,winner,42968,2025-09-02T04:00:00+00:00,TRAIL_STOP,463.99999999998727,1990.9999999999854,65.0000000000091,True,images/c04_fc42968_20250902T040000.png
+C05,loser,48482,2025-12-17T15:00:00+00:00,BREAKEVEN_AFTER_T1,0.0,2288.000000000011,27.999999999974534,True,images/c05_fc48482_20251217T150000.png
+C06,winner,43051,2025-09-09T02:30:00+00:00,TARGET_2,730.0000000001319,1009.9999999999909,8.000000000038199,True,images/c06_fc43051_20250909T023000.png
+C07,winner,48531,2025-12-23T01:00:00+00:00,TRAIL_STOP,1235.0000000000364,1478.9999999999964,225.0,True,images/c07_fc48531_20251223T010000.png
+C08,loser,48230,2025-11-21T09:00:00+00:00,LOSS,-1531.999999999971,523.9999999999782,173.00000000000182,False,images/c08_fc48230_20251121T090000.png
+C09,loser,48524,2025-12-22T15:30:00+00:00,STALE_EXIT,-787.99999999992,516.0000000000764,992.9999999999382,False,images/c09_fc48524_20251222T153000.png
+C10,winner,43329,2025-10-07T06:15:00+00:00,TRAIL_STOP,901.9999999999982,1194.0000000000055,57.999999999992724,True,images/c10_fc43329_20251007T061500.png
+C11,winner,48294,2025-11-28T15:45:00+00:00,TRAIL_STOP,1476.9999999999527,2642.0000000000073,1.9999999999527063,True,images/c11_fc48294_20251128T154500.png
+
+codex
+{
+  "summary": "Winners were not defined by stop-hunt size; they either entered before daily expansion was exhausted or came from a fresh LOD/lower-range reclaim. Losers were mostly late top-side buys after HOD/ADR exhaustion, stale re-entries after the original W had already paid, or outright counter-bias breakdowns.",
+  "winner_traits": [
+    "Weekly and H4 context stayed BUY with confluence >= 95; H1 could be NEUTRAL and still work.",
+    "Most winners had TDR <= 4400p and ADR% < 85 at snapshot.",
+    "Continuation winners held above a rising 50 EMA with 5/13 EMA stacked or re-stacking upward.",
+    "Late-session winners showed a fresh lower-range reclaim: sharp bullish close back above LOD/AR-low or EMA cluster after a flush.",
+    "Small XAUUSD stop hunts still worked when reclaim quality was strong; C01 and C11 won with 413p and 612p hunts."
+  ],
+  "loser_traits": [
+    "C02 and C09 were high-range exhaustion buys: ADR% > 100, large TDR, price near HOD/AR high, TDI overbought or curling down.",
+    "C03 and C05 were late after a completed HOD run; the original W-bottom had already paid and current structure was chop/re-entry.",
+    "C08 was a structural invalidation: H1/H4 SELL, weekly NEUTRAL, confluence 80, price breaking below LOD with bearish EMA structure.",
+    "Losers often had price in the upper quarter of the visible range while TDI green/red were rolling down or below the yellow baseline."
+  ],
+  "filters_to_test": [
+    {
+      "name": "higher_tf_alignment_floor",
+      "rule": "For BUY, reject if weekly_trend != BUY or h4_trend != BUY or confluence_score < 95.",
+      "targets": ["C08"]
+    },
+    {
+      "name": "large_range_exhaustion",
+      "rule": "Reject BUY if TDR >= 5000p or ADR_pct >= 100, unless the last 4 candles include a bullish reclaim close from below LOD/AR-low back above EMA13 and EMA50.",
+      "targets": ["C02", "C08", "C09"]
+    },
+    {
+      "name": "stale_upper_quarter_buy",
+      "rule": "Reject BUY when close_position_in_day_range >= 0.75, bars_since_hod_sweep <= 12, no fresh high breakout in last 3 candles, and either EMA5 <= EMA13 or TDI_green_slope_3 <= 0.",
+      "targets": ["C02", "C03", "C09"]
+    },
+    {
+      "name": "post_hod_reentry_requires_reclaim",
+      "rule": "If price dropped >= 0.30 * asian_range from HOD after the stop-hunt run, allow BUY only when a candle within the last 4 bars closes above EMA13 and EMA50 with body >= 0.5 * ATR14 and TDI_green_slope_3 > 0.",
+      "targets": ["C05"],
+      "keeps": ["C01", "C11"]
+    },
+    {
+      "name": "below_lod_bear_stack_reject",
+      "rule": "Reject BUY if close < LOD - 0.05 * asian_range and EMA5 < EMA13 < EMA50 with EMA13_slope_5 < 0.",
+      "targets": ["C08"]
+    }
+  ],
+  "filters_to_reject": [
+    "Do not reject solely on small stop_hunt_pips; C01 and C11 were profitable with sub-1000p hunts.",
+    "Do not reject all Friday entries; C11 was a Friday winner when weekly/H4 stayed BUY.",
+    "Do not reject all RSI_OVERBOUGHT or TDI divergence; C07 and C06 still won.",
+    "Do not reject solely on asian_range_pips > 5000; C04, C10, and C11 show range size alone is not enough."
+  ],
+  "pair_specific_notes": [
+    "For XAUUSD, raw stop-hunt size is less useful than current-day exhaustion. TDR >= 5000p and ADR% >= 100 were stronger warning signals in this packet.",
+    "The main visual split is not W-bottom detection; it is whether the current BUY is fresh/reclaiming or stale after the HOD expansion.",
+    "Use EAT reporting for session buckets; loser snapshots clustered around 12:00-18:30 EAT, but late entries can still win when they reclaim LOD cleanly."
+  ],
+  "uncertain_items": [
+    "C05 hit T1 then breakeven, so it may be more of a management failure than a bad entry.",
+    "C01 was profitable without T1 and visually late; treat it as a weak winner when optimizing.",
+    "C10 winner versus C03 loser on the same large-hunt day suggests bars_since_original_W and bars_since_HOD_sweep are critical features."
+  ],
+  "next_backtest_spec": {
+    "scope": "XAUUSD only, same normalized setup signature, archived pair-study records plus this packet.",
+    "features": [
+      "TDR_pips",
+      "ADR_pct",
+      "close_position_in_day_range",
+      "close_position_in_asian_range",
+      "bars_since_hod_sweep",
+      "bars_since_lod_reclaim",
+      "bars_since_first_close_above_ema50_after_hunt",
+      "EMA5_EMA13_EMA50_stack",
+      "EMA13_slope_5",
+      "TDI_green_slope_3",
+      "TDI_green_vs_red",
+      "TDI_green_vs_yellow",
+      "last_4_bars_reclaim_body_ATR_ratio"
+    ],
+    "tests": [
+      "baseline signature",
+      "higher_tf_alignment_floor",
+      "large_range_exhaustion",
+      "stale_upper_quarter_buy",
+      "post_hod_reentry_requires_reclaim",
+      "all_filters_combined"
+    ],
+    "metrics": [
+      "favorable_rate",
+      "avg_exit_pips",
+      "t1_rate",
+      "avg_mae",
+      "validation_split_passes",
+      "out_of_sample_passes"
+    ]
+  }
+}
+tokens used
+64,884

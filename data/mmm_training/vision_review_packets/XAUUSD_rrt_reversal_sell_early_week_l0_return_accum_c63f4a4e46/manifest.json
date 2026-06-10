@@ -1,0 +1,1065 @@
+{
+  "counts": {
+    "items": 15,
+    "losers": 7,
+    "winners": 8
+  },
+  "generated_at": "2026-06-09T11:40:25.163832+00:00",
+  "instructions": {
+    "answer_key": "answer_key.csv",
+    "blind_prompt": "blind_prompt.md",
+    "labeled_prompt": "labeled_comparison_prompt.md",
+    "review_matrix": "review_matrix.csv"
+  },
+  "items": [
+    {
+      "context": {
+        "advisory_confidence_score": 30.0,
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 920.0000000000045,
+        "confluence_score": 60,
+        "event_path": [
+          "ENTRY",
+          "SL_HIT"
+        ],
+        "h1_session": "RETURN_ACCUM",
+        "h1_trend": "SELL",
+        "h4_level": 0,
+        "h4_trend": "NEUTRAL",
+        "m_w_pattern": "",
+        "pattern_trade_type": "THE_33",
+        "push_count": 4,
+        "ratios": {
+          "asian_range_to_pair_max": 0.11500000000000057,
+          "confluence": 0.6,
+          "hunt_to_expected_level_move": 0.8674999999999784,
+          "hunt_to_pair_max": 0.04626666666666551,
+          "single_setup_theme_score": 0.44
+        },
+        "rrt_detected": true,
+        "stop_hunt_detected": true,
+        "stop_hunt_direction": "SELL",
+        "stop_hunt_pips": 693.9999999999827,
+        "tags": [
+          "historical",
+          "LOSS",
+          "SELL",
+          "L0",
+          "EARLY_WEEK"
+        ],
+        "tdi_crossed_signal": "none",
+        "tdi_divergence": "none",
+        "tdi_shark_direction": "",
+        "tdi_shark_fin": false,
+        "tdi_signals": [
+          "MBL_CROSS_BULLISH"
+        ],
+        "tdi_vb_squeeze": false,
+        "theme_tags": [
+          "XAU_WEAKNESS",
+          "USD_STRENGTH"
+        ],
+        "weekly_phase": "EARLY_WEEK",
+        "weekly_trend": "SELL"
+      },
+      "direction": "SELL",
+      "exit_pips": -41.000000000008185,
+      "flashcard_id": 23471,
+      "image_path": "images/c01_fc23471_20230427T010000.png",
+      "label": "loser",
+      "max_adverse_pips": 50.99999999999909,
+      "max_favorable_pips": 38.99999999998727,
+      "minutes_to_t1": null,
+      "outcome": "LOSS",
+      "review_id": "C01",
+      "snapshot_at": "2023-04-27T01:00:00+00:00",
+      "source_chart_path": "charts\\annotated\\XAUUSD_M15_annotated_20260609_143946_587198.png",
+      "symbol": "XAUUSD",
+      "t1_hit": false,
+      "timeframe": "M15"
+    },
+    {
+      "context": {
+        "advisory_confidence_score": 30.0,
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 626.9999999999982,
+        "confluence_score": 60,
+        "event_path": [
+          "ENTRY",
+          "STALE_EXIT"
+        ],
+        "h1_session": "RETURN_ACCUM",
+        "h1_trend": "SELL",
+        "h4_level": 0,
+        "h4_trend": "NEUTRAL",
+        "m_w_pattern": "",
+        "pattern_trade_type": "THE_33",
+        "push_count": 5,
+        "ratios": {
+          "asian_range_to_pair_max": 0.07837499999999978,
+          "confluence": 0.6,
+          "hunt_to_expected_level_move": 1.553750000000008,
+          "hunt_to_pair_max": 0.08286666666666709,
+          "single_setup_theme_score": 0.44
+        },
+        "rrt_detected": true,
+        "stop_hunt_detected": true,
+        "stop_hunt_direction": "SELL",
+        "stop_hunt_pips": 1243.0000000000064,
+        "tags": [
+          "historical",
+          "STALE_EXIT",
+          "SELL",
+          "L0",
+          "EARLY_WEEK"
+        ],
+        "tdi_crossed_signal": "none",
+        "tdi_divergence": "none",
+        "tdi_shark_direction": "LONG",
+        "tdi_shark_fin": true,
+        "tdi_signals": [
+          "SHARK_FIN_LONG"
+        ],
+        "tdi_vb_squeeze": false,
+        "theme_tags": [
+          "XAU_WEAKNESS",
+          "USD_STRENGTH"
+        ],
+        "weekly_phase": "EARLY_WEEK",
+        "weekly_trend": "SELL"
+      },
+      "direction": "SELL",
+      "exit_pips": -123.00000000000182,
+      "flashcard_id": 23541,
+      "image_path": "images/c02_fc23541_20230612T061500.png",
+      "label": "loser",
+      "max_adverse_pips": 304.99999999999545,
+      "max_favorable_pips": 0.0,
+      "minutes_to_t1": null,
+      "outcome": "STALE_EXIT",
+      "review_id": "C02",
+      "snapshot_at": "2023-06-12T06:15:00+00:00",
+      "source_chart_path": "charts\\annotated\\XAUUSD_M15_annotated_20260609_143947_717507.png",
+      "symbol": "XAUUSD",
+      "t1_hit": false,
+      "timeframe": "M15"
+    },
+    {
+      "context": {
+        "advisory_confidence_score": 26.75,
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 1930.9999999999945,
+        "confluence_score": 55,
+        "event_path": [
+          "ENTRY",
+          "STALE_EXIT"
+        ],
+        "h1_session": "RETURN_ACCUM",
+        "h1_trend": "SELL",
+        "h4_level": 0,
+        "h4_trend": "NEUTRAL",
+        "m_w_pattern": "",
+        "pattern_trade_type": "THE_33",
+        "push_count": 5,
+        "ratios": {
+          "asian_range_to_pair_max": 0.2413749999999993,
+          "confluence": 0.55,
+          "hunt_to_expected_level_move": 1.3225000000000193,
+          "hunt_to_pair_max": 0.07053333333333436,
+          "single_setup_theme_score": 0.42
+        },
+        "rrt_detected": true,
+        "stop_hunt_detected": true,
+        "stop_hunt_direction": "SELL",
+        "stop_hunt_pips": 1058.0000000000155,
+        "tags": [
+          "historical",
+          "STALE_EXIT",
+          "SELL",
+          "L0",
+          "EARLY_WEEK"
+        ],
+        "tdi_crossed_signal": "bullish",
+        "tdi_divergence": "none",
+        "tdi_shark_direction": "",
+        "tdi_shark_fin": false,
+        "tdi_signals": [
+          "VB_SQUEEZE",
+          "RSI_OVERSOLD",
+          "SIGNAL_CROSS_BULLISH"
+        ],
+        "tdi_vb_squeeze": true,
+        "theme_tags": [
+          "XAU_WEAKNESS",
+          "USD_STRENGTH"
+        ],
+        "weekly_phase": "EARLY_WEEK",
+        "weekly_trend": "NEUTRAL"
+      },
+      "direction": "SELL",
+      "exit_pips": -15.000000000009095,
+      "flashcard_id": 23736,
+      "image_path": "images/c03_fc23736_20231101T054500.png",
+      "label": "loser",
+      "max_adverse_pips": 72.00000000000273,
+      "max_favorable_pips": 311.9999999999891,
+      "minutes_to_t1": null,
+      "outcome": "STALE_EXIT",
+      "review_id": "C03",
+      "snapshot_at": "2023-11-01T05:45:00+00:00",
+      "source_chart_path": "charts\\annotated\\XAUUSD_M15_annotated_20260609_143948_481664.png",
+      "symbol": "XAUUSD",
+      "t1_hit": false,
+      "timeframe": "M15"
+    },
+    {
+      "context": {
+        "advisory_confidence_score": 26.75,
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 2036.999999999989,
+        "confluence_score": 55,
+        "event_path": [
+          "ENTRY",
+          "T1_HIT",
+          "TRAIL_STOP"
+        ],
+        "h1_session": "RETURN_ACCUM",
+        "h1_trend": "SELL",
+        "h4_level": 0,
+        "h4_trend": "NEUTRAL",
+        "m_w_pattern": "",
+        "pattern_trade_type": "THE_33",
+        "push_count": 5,
+        "ratios": {
+          "asian_range_to_pair_max": 0.25462499999999866,
+          "confluence": 0.55,
+          "hunt_to_expected_level_move": 1.3225000000000193,
+          "hunt_to_pair_max": 0.07053333333333436,
+          "single_setup_theme_score": 0.42
+        },
+        "rrt_detected": true,
+        "stop_hunt_detected": true,
+        "stop_hunt_direction": "SELL",
+        "stop_hunt_pips": 1058.0000000000155,
+        "tags": [
+          "historical",
+          "TRAIL_STOP",
+          "SELL",
+          "L0",
+          "EARLY_WEEK"
+        ],
+        "tdi_crossed_signal": "none",
+        "tdi_divergence": "none",
+        "tdi_shark_direction": "LONG",
+        "tdi_shark_fin": true,
+        "tdi_signals": [
+          "SHARK_FIN_LONG"
+        ],
+        "tdi_vb_squeeze": false,
+        "theme_tags": [
+          "XAU_WEAKNESS",
+          "USD_STRENGTH"
+        ],
+        "weekly_phase": "EARLY_WEEK",
+        "weekly_trend": "NEUTRAL"
+      },
+      "direction": "SELL",
+      "exit_pips": 322.00000000000273,
+      "flashcard_id": 23737,
+      "image_path": "images/c04_fc23737_20231101T201500.png",
+      "label": "winner",
+      "max_adverse_pips": 325.0,
+      "max_favorable_pips": 905.9999999999945,
+      "minutes_to_t1": 75.0,
+      "outcome": "TRAIL_STOP",
+      "review_id": "C04",
+      "snapshot_at": "2023-11-01T20:15:00+00:00",
+      "source_chart_path": "charts\\annotated\\XAUUSD_M15_annotated_20260609_143948_669335.png",
+      "symbol": "XAUUSD",
+      "t1_hit": true,
+      "timeframe": "M15"
+    },
+    {
+      "context": {
+        "advisory_confidence_score": 33.25,
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 593.0000000000064,
+        "confluence_score": 65,
+        "event_path": [
+          "ENTRY",
+          "STALE_EXIT"
+        ],
+        "h1_session": "RETURN_ACCUM",
+        "h1_trend": "SELL",
+        "h4_level": 0,
+        "h4_trend": "NEUTRAL",
+        "m_w_pattern": "",
+        "pattern_trade_type": "THE_33",
+        "push_count": 5,
+        "ratios": {
+          "asian_range_to_pair_max": 0.0741250000000008,
+          "confluence": 0.65,
+          "hunt_to_expected_level_move": 2.214999999999975,
+          "hunt_to_pair_max": 0.118133333333332,
+          "single_setup_theme_score": 0.46
+        },
+        "rrt_detected": true,
+        "stop_hunt_detected": true,
+        "stop_hunt_direction": "SELL",
+        "stop_hunt_pips": 1771.99999999998,
+        "tags": [
+          "historical",
+          "STALE_EXIT",
+          "SELL",
+          "L0",
+          "EARLY_WEEK"
+        ],
+        "tdi_crossed_signal": "none",
+        "tdi_divergence": "bullish",
+        "tdi_shark_direction": "",
+        "tdi_shark_fin": false,
+        "tdi_signals": [
+          "RSI_OVERSOLD",
+          "BULLISH_DIVERGENCE"
+        ],
+        "tdi_vb_squeeze": false,
+        "theme_tags": [
+          "XAU_WEAKNESS",
+          "USD_STRENGTH"
+        ],
+        "weekly_phase": "EARLY_WEEK",
+        "weekly_trend": "SELL"
+      },
+      "direction": "SELL",
+      "exit_pips": -38.99999999998727,
+      "flashcard_id": 21162,
+      "image_path": "images/c05_fc21162_20220606T210000.png",
+      "label": "loser",
+      "max_adverse_pips": 81.99999999999363,
+      "max_favorable_pips": 109.9999999999909,
+      "minutes_to_t1": null,
+      "outcome": "STALE_EXIT",
+      "review_id": "C05",
+      "snapshot_at": "2022-06-06T21:00:00+00:00",
+      "source_chart_path": "charts\\annotated\\XAUUSD_M15_annotated_20260609_143945_829008.png",
+      "symbol": "XAUUSD",
+      "t1_hit": false,
+      "timeframe": "M15"
+    },
+    {
+      "context": {
+        "advisory_confidence_score": 33.25,
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 1201.9999999999982,
+        "confluence_score": 65,
+        "event_path": [
+          "ENTRY",
+          "TIME_EXIT_PROFIT"
+        ],
+        "h1_session": "RETURN_ACCUM",
+        "h1_trend": "SELL",
+        "h4_level": 0,
+        "h4_trend": "NEUTRAL",
+        "m_w_pattern": "",
+        "pattern_trade_type": "THE_33",
+        "push_count": 5,
+        "ratios": {
+          "asian_range_to_pair_max": 0.15024999999999977,
+          "confluence": 0.65,
+          "hunt_to_expected_level_move": 0.8300000000000125,
+          "hunt_to_pair_max": 0.044266666666667336,
+          "single_setup_theme_score": 0.46
+        },
+        "rrt_detected": true,
+        "stop_hunt_detected": true,
+        "stop_hunt_direction": "SELL",
+        "stop_hunt_pips": 664.00000000001,
+        "tags": [
+          "historical",
+          "TIME_EXIT_PROFIT",
+          "SELL",
+          "L0",
+          "EARLY_WEEK"
+        ],
+        "tdi_crossed_signal": "bullish",
+        "tdi_divergence": "bullish",
+        "tdi_shark_direction": "",
+        "tdi_shark_fin": false,
+        "tdi_signals": [
+          "SIGNAL_CROSS_BULLISH",
+          "BULLISH_DIVERGENCE"
+        ],
+        "tdi_vb_squeeze": false,
+        "theme_tags": [
+          "XAU_WEAKNESS",
+          "USD_STRENGTH"
+        ],
+        "weekly_phase": "EARLY_WEEK",
+        "weekly_trend": "SELL"
+      },
+      "direction": "SELL",
+      "exit_pips": 709.9999999999909,
+      "flashcard_id": 23612,
+      "image_path": "images/c06_fc23612_20230801T143000.png",
+      "label": "winner",
+      "max_adverse_pips": 229.99999999999545,
+      "max_favorable_pips": 1017.0000000000073,
+      "minutes_to_t1": null,
+      "outcome": "TIME_EXIT_PROFIT",
+      "review_id": "C06",
+      "snapshot_at": "2023-08-01T14:30:00+00:00",
+      "source_chart_path": "charts\\annotated\\XAUUSD_M15_annotated_20260609_143947_900863.png",
+      "symbol": "XAUUSD",
+      "t1_hit": false,
+      "timeframe": "M15"
+    },
+    {
+      "context": {
+        "advisory_confidence_score": 30.0,
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 2946.99999999998,
+        "confluence_score": 60,
+        "event_path": [
+          "ENTRY",
+          "T1_HIT",
+          "TRAIL_STOP"
+        ],
+        "h1_session": "RETURN_ACCUM",
+        "h1_trend": "SELL",
+        "h4_level": 0,
+        "h4_trend": "NEUTRAL",
+        "m_w_pattern": "",
+        "pattern_trade_type": "THE_33",
+        "push_count": 5,
+        "ratios": {
+          "asian_range_to_pair_max": 0.3683749999999975,
+          "confluence": 0.6,
+          "hunt_to_expected_level_move": 0.4787500000000193,
+          "hunt_to_pair_max": 0.025533333333334365,
+          "single_setup_theme_score": 0.44
+        },
+        "rrt_detected": true,
+        "stop_hunt_detected": true,
+        "stop_hunt_direction": "SELL",
+        "stop_hunt_pips": 383.00000000001546,
+        "tags": [
+          "historical",
+          "TRAIL_STOP",
+          "SELL",
+          "L0",
+          "EARLY_WEEK"
+        ],
+        "tdi_crossed_signal": "none",
+        "tdi_divergence": "none",
+        "tdi_shark_direction": "",
+        "tdi_shark_fin": false,
+        "tdi_signals": [
+          "MBL_CROSS_BULLISH"
+        ],
+        "tdi_vb_squeeze": false,
+        "theme_tags": [
+          "XAU_WEAKNESS",
+          "USD_STRENGTH"
+        ],
+        "weekly_phase": "EARLY_WEEK",
+        "weekly_trend": "SELL"
+      },
+      "direction": "SELL",
+      "exit_pips": 500.9999999999991,
+      "flashcard_id": 23489,
+      "image_path": "images/c07_fc23489_20230517T100000.png",
+      "label": "winner",
+      "max_adverse_pips": 62.99999999998818,
+      "max_favorable_pips": 610.0000000000136,
+      "minutes_to_t1": 75.0,
+      "outcome": "TRAIL_STOP",
+      "review_id": "C07",
+      "snapshot_at": "2023-05-17T10:00:00+00:00",
+      "source_chart_path": "charts\\annotated\\XAUUSD_M15_annotated_20260609_143947_366304.png",
+      "symbol": "XAUUSD",
+      "t1_hit": true,
+      "timeframe": "M15"
+    },
+    {
+      "context": {
+        "advisory_confidence_score": 33.25,
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 1011.9999999999891,
+        "confluence_score": 65,
+        "event_path": [
+          "ENTRY",
+          "TIME_EXIT_PROFIT"
+        ],
+        "h1_session": "RETURN_ACCUM",
+        "h1_trend": "SELL",
+        "h4_level": 0,
+        "h4_trend": "NEUTRAL",
+        "m_w_pattern": "",
+        "pattern_trade_type": "THE_33",
+        "push_count": 5,
+        "ratios": {
+          "asian_range_to_pair_max": 0.12649999999999864,
+          "confluence": 0.65,
+          "hunt_to_expected_level_move": 0.4712499999999977,
+          "hunt_to_pair_max": 0.025133333333333212,
+          "single_setup_theme_score": 0.46
+        },
+        "rrt_detected": true,
+        "stop_hunt_detected": true,
+        "stop_hunt_direction": "SELL",
+        "stop_hunt_pips": 376.9999999999982,
+        "tags": [
+          "historical",
+          "TIME_EXIT_PROFIT",
+          "SELL",
+          "L0",
+          "EARLY_WEEK"
+        ],
+        "tdi_crossed_signal": "none",
+        "tdi_divergence": "bullish",
+        "tdi_shark_direction": "",
+        "tdi_shark_fin": false,
+        "tdi_signals": [
+          "RSI_OVERSOLD",
+          "BULLISH_DIVERGENCE"
+        ],
+        "tdi_vb_squeeze": false,
+        "theme_tags": [
+          "XAU_WEAKNESS",
+          "USD_STRENGTH"
+        ],
+        "weekly_phase": "EARLY_WEEK",
+        "weekly_trend": "SELL"
+      },
+      "direction": "SELL",
+      "exit_pips": 722.0000000000027,
+      "flashcard_id": 23486,
+      "image_path": "images/c08_fc23486_20230516T183000.png",
+      "label": "winner",
+      "max_adverse_pips": 101.99999999999818,
+      "max_favorable_pips": 1214.00000000001,
+      "minutes_to_t1": null,
+      "outcome": "TIME_EXIT_PROFIT",
+      "review_id": "C08",
+      "snapshot_at": "2023-05-16T18:30:00+00:00",
+      "source_chart_path": "charts\\annotated\\XAUUSD_M15_annotated_20260609_143947_141917.png",
+      "symbol": "XAUUSD",
+      "t1_hit": false,
+      "timeframe": "M15"
+    },
+    {
+      "context": {
+        "advisory_confidence_score": 33.25,
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 1011.9999999999891,
+        "confluence_score": 65,
+        "event_path": [
+          "ENTRY",
+          "TIME_EXIT_PROFIT"
+        ],
+        "h1_session": "RETURN_ACCUM",
+        "h1_trend": "SELL",
+        "h4_level": 0,
+        "h4_trend": "NEUTRAL",
+        "m_w_pattern": "",
+        "pattern_trade_type": "THE_33",
+        "push_count": 5,
+        "ratios": {
+          "asian_range_to_pair_max": 0.12649999999999864,
+          "confluence": 0.65,
+          "hunt_to_expected_level_move": 0.4712499999999977,
+          "hunt_to_pair_max": 0.025133333333333212,
+          "single_setup_theme_score": 0.46
+        },
+        "rrt_detected": true,
+        "stop_hunt_detected": true,
+        "stop_hunt_direction": "SELL",
+        "stop_hunt_pips": 376.9999999999982,
+        "tags": [
+          "historical",
+          "TIME_EXIT_PROFIT",
+          "SELL",
+          "L0",
+          "EARLY_WEEK"
+        ],
+        "tdi_crossed_signal": "none",
+        "tdi_divergence": "none",
+        "tdi_shark_direction": "LONG",
+        "tdi_shark_fin": true,
+        "tdi_signals": [
+          "SHARK_FIN_LONG"
+        ],
+        "tdi_vb_squeeze": false,
+        "theme_tags": [
+          "XAU_WEAKNESS",
+          "USD_STRENGTH"
+        ],
+        "weekly_phase": "EARLY_WEEK",
+        "weekly_trend": "SELL"
+      },
+      "direction": "SELL",
+      "exit_pips": 199.0000000000009,
+      "flashcard_id": 23484,
+      "image_path": "images/c09_fc23484_20230516T110000.png",
+      "label": "winner",
+      "max_adverse_pips": 8.999999999991815,
+      "max_favorable_pips": 280.99999999999454,
+      "minutes_to_t1": null,
+      "outcome": "TIME_EXIT_PROFIT",
+      "review_id": "C09",
+      "snapshot_at": "2023-05-16T11:00:00+00:00",
+      "source_chart_path": "charts\\annotated\\XAUUSD_M15_annotated_20260609_143946_953861.png",
+      "symbol": "XAUUSD",
+      "t1_hit": false,
+      "timeframe": "M15"
+    },
+    {
+      "context": {
+        "advisory_confidence_score": 26.75,
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 1287.0000000000118,
+        "confluence_score": 55,
+        "event_path": [
+          "ENTRY",
+          "T1_HIT",
+          "TARGET_2"
+        ],
+        "h1_session": "RETURN_ACCUM",
+        "h1_trend": "NEUTRAL",
+        "h4_level": 0,
+        "h4_trend": "NEUTRAL",
+        "m_w_pattern": "",
+        "pattern_trade_type": "THE_33",
+        "push_count": 5,
+        "ratios": {
+          "asian_range_to_pair_max": 0.1608750000000015,
+          "confluence": 0.55,
+          "hunt_to_expected_level_move": 0.8674999999999784,
+          "hunt_to_pair_max": 0.04626666666666551,
+          "single_setup_theme_score": 0.42
+        },
+        "rrt_detected": true,
+        "stop_hunt_detected": true,
+        "stop_hunt_direction": "SELL",
+        "stop_hunt_pips": 693.9999999999827,
+        "tags": [
+          "historical",
+          "TARGET_2",
+          "SELL",
+          "L0",
+          "EARLY_WEEK"
+        ],
+        "tdi_crossed_signal": "none",
+        "tdi_divergence": "none",
+        "tdi_shark_direction": "LONG",
+        "tdi_shark_fin": true,
+        "tdi_signals": [
+          "SHARK_FIN_LONG"
+        ],
+        "tdi_vb_squeeze": false,
+        "theme_tags": [
+          "XAU_WEAKNESS",
+          "USD_STRENGTH"
+        ],
+        "weekly_phase": "EARLY_WEEK",
+        "weekly_trend": "SELL"
+      },
+      "direction": "SELL",
+      "exit_pips": 149.99999999997726,
+      "flashcard_id": 23474,
+      "image_path": "images/c10_fc23474_20230427T140000.png",
+      "label": "winner",
+      "max_adverse_pips": 52.99999999999727,
+      "max_favorable_pips": 197.00000000000273,
+      "minutes_to_t1": 15.0,
+      "outcome": "TARGET_2",
+      "review_id": "C10",
+      "snapshot_at": "2023-04-27T14:00:00+00:00",
+      "source_chart_path": "charts\\annotated\\XAUUSD_M15_annotated_20260609_143946_768389.png",
+      "symbol": "XAUUSD",
+      "t1_hit": true,
+      "timeframe": "M15"
+    },
+    {
+      "context": {
+        "advisory_confidence_score": 30.0,
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 1893.0000000000064,
+        "confluence_score": 60,
+        "event_path": [
+          "ENTRY",
+          "STALE_EXIT"
+        ],
+        "h1_session": "RETURN_ACCUM",
+        "h1_trend": "SELL",
+        "h4_level": 0,
+        "h4_trend": "NEUTRAL",
+        "m_w_pattern": "",
+        "pattern_trade_type": "THE_33",
+        "push_count": 5,
+        "ratios": {
+          "asian_range_to_pair_max": 0.2366250000000008,
+          "confluence": 0.6,
+          "hunt_to_expected_level_move": 1.1799999999999784,
+          "hunt_to_pair_max": 0.06293333333333218,
+          "single_setup_theme_score": 0.44
+        },
+        "rrt_detected": true,
+        "stop_hunt_detected": true,
+        "stop_hunt_direction": "SELL",
+        "stop_hunt_pips": 943.9999999999827,
+        "tags": [
+          "historical",
+          "STALE_EXIT",
+          "SELL",
+          "L0",
+          "EARLY_WEEK"
+        ],
+        "tdi_crossed_signal": "none",
+        "tdi_divergence": "none",
+        "tdi_shark_direction": "LONG",
+        "tdi_shark_fin": true,
+        "tdi_signals": [
+          "SHARK_FIN_LONG"
+        ],
+        "tdi_vb_squeeze": false,
+        "theme_tags": [
+          "XAU_WEAKNESS",
+          "USD_STRENGTH"
+        ],
+        "weekly_phase": "EARLY_WEEK",
+        "weekly_trend": "SELL"
+      },
+      "direction": "SELL",
+      "exit_pips": -7.999999999992724,
+      "flashcard_id": 23617,
+      "image_path": "images/c11_fc23617_20230803T104500.png",
+      "label": "loser",
+      "max_adverse_pips": 153.99999999999636,
+      "max_favorable_pips": 215.0000000000091,
+      "minutes_to_t1": null,
+      "outcome": "STALE_EXIT",
+      "review_id": "C11",
+      "snapshot_at": "2023-08-03T10:45:00+00:00",
+      "source_chart_path": "charts\\annotated\\XAUUSD_M15_annotated_20260609_143948_126741.png",
+      "symbol": "XAUUSD",
+      "t1_hit": false,
+      "timeframe": "M15"
+    },
+    {
+      "context": {
+        "advisory_confidence_score": 26.75,
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 1698.0000000000018,
+        "confluence_score": 55,
+        "event_path": [
+          "ENTRY",
+          "T1_HIT",
+          "TRAIL_STOP"
+        ],
+        "h1_session": "RETURN_ACCUM",
+        "h1_trend": "NEUTRAL",
+        "h4_level": 0,
+        "h4_trend": "NEUTRAL",
+        "m_w_pattern": "",
+        "pattern_trade_type": "THE_33",
+        "push_count": 5,
+        "ratios": {
+          "asian_range_to_pair_max": 0.21225000000000022,
+          "confluence": 0.55,
+          "hunt_to_expected_level_move": 0.9937500000000057,
+          "hunt_to_pair_max": 0.053000000000000304,
+          "single_setup_theme_score": 0.42
+        },
+        "rrt_detected": true,
+        "stop_hunt_detected": true,
+        "stop_hunt_direction": "SELL",
+        "stop_hunt_pips": 795.0000000000045,
+        "tags": [
+          "historical",
+          "TRAIL_STOP",
+          "SELL",
+          "L0",
+          "EARLY_WEEK"
+        ],
+        "tdi_crossed_signal": "none",
+        "tdi_divergence": "none",
+        "tdi_shark_direction": "LONG",
+        "tdi_shark_fin": true,
+        "tdi_signals": [
+          "SHARK_FIN_LONG"
+        ],
+        "tdi_vb_squeeze": false,
+        "theme_tags": [
+          "XAU_WEAKNESS",
+          "USD_STRENGTH"
+        ],
+        "weekly_phase": "EARLY_WEEK",
+        "weekly_trend": "SELL"
+      },
+      "direction": "SELL",
+      "exit_pips": 1064.9999999999864,
+      "flashcard_id": 23500,
+      "image_path": "images/c12_fc23500_20230524T180000.png",
+      "label": "winner",
+      "max_adverse_pips": 151.99999999999818,
+      "max_favorable_pips": 1233.9999999999918,
+      "minutes_to_t1": 60.0,
+      "outcome": "TRAIL_STOP",
+      "review_id": "C12",
+      "snapshot_at": "2023-05-24T18:00:00+00:00",
+      "source_chart_path": "charts\\annotated\\XAUUSD_M15_annotated_20260609_143947_541928.png",
+      "symbol": "XAUUSD",
+      "t1_hit": true,
+      "timeframe": "M15"
+    },
+    {
+      "context": {
+        "advisory_confidence_score": 26.75,
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 659.0000000000146,
+        "confluence_score": 55,
+        "event_path": [
+          "ENTRY",
+          "TIME_EXIT_PROFIT"
+        ],
+        "h1_session": "RETURN_ACCUM",
+        "h1_trend": "SELL",
+        "h4_level": 0,
+        "h4_trend": "NEUTRAL",
+        "m_w_pattern": "",
+        "pattern_trade_type": "THE_33",
+        "push_count": 5,
+        "ratios": {
+          "asian_range_to_pair_max": 0.08237500000000182,
+          "confluence": 0.55,
+          "hunt_to_expected_level_move": 3.078749999999985,
+          "hunt_to_pair_max": 0.1641999999999992,
+          "single_setup_theme_score": 0.42
+        },
+        "rrt_detected": true,
+        "stop_hunt_detected": true,
+        "stop_hunt_direction": "SELL",
+        "stop_hunt_pips": 2462.999999999988,
+        "tags": [
+          "historical",
+          "TIME_EXIT_PROFIT",
+          "SELL",
+          "L0",
+          "EARLY_WEEK"
+        ],
+        "tdi_crossed_signal": "none",
+        "tdi_divergence": "bullish",
+        "tdi_shark_direction": "",
+        "tdi_shark_fin": false,
+        "tdi_signals": [
+          "VB_SQUEEZE",
+          "BULLISH_DIVERGENCE"
+        ],
+        "tdi_vb_squeeze": true,
+        "theme_tags": [
+          "XAU_WEAKNESS",
+          "USD_STRENGTH"
+        ],
+        "weekly_phase": "EARLY_WEEK",
+        "weekly_trend": "NEUTRAL"
+      },
+      "direction": "SELL",
+      "exit_pips": 332.9999999999927,
+      "flashcard_id": 23449,
+      "image_path": "images/c13_fc23449_20230327T083000.png",
+      "label": "winner",
+      "max_adverse_pips": 45.00000000000455,
+      "max_favorable_pips": 669.9999999999818,
+      "minutes_to_t1": null,
+      "outcome": "TIME_EXIT_PROFIT",
+      "review_id": "C13",
+      "snapshot_at": "2023-03-27T08:30:00+00:00",
+      "source_chart_path": "charts\\annotated\\XAUUSD_M15_annotated_20260609_143946_410363.png",
+      "symbol": "XAUUSD",
+      "t1_hit": false,
+      "timeframe": "M15"
+    },
+    {
+      "context": {
+        "advisory_confidence_score": 26.75,
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 840.0000000000091,
+        "confluence_score": 55,
+        "event_path": [
+          "ENTRY",
+          "SL_HIT"
+        ],
+        "h1_session": "RETURN_ACCUM",
+        "h1_trend": "NEUTRAL",
+        "h4_level": 0,
+        "h4_trend": "NEUTRAL",
+        "m_w_pattern": "",
+        "pattern_trade_type": "THE_33",
+        "push_count": 5,
+        "ratios": {
+          "asian_range_to_pair_max": 0.10500000000000113,
+          "confluence": 0.55,
+          "hunt_to_expected_level_move": 0.7412499999999795,
+          "hunt_to_pair_max": 0.03953333333333224,
+          "single_setup_theme_score": 0.42
+        },
+        "rrt_detected": true,
+        "stop_hunt_detected": true,
+        "stop_hunt_direction": "SELL",
+        "stop_hunt_pips": 592.9999999999836,
+        "tags": [
+          "historical",
+          "LOSS",
+          "SELL",
+          "L0",
+          "EARLY_WEEK"
+        ],
+        "tdi_crossed_signal": "bullish",
+        "tdi_divergence": "none",
+        "tdi_shark_direction": "",
+        "tdi_shark_fin": false,
+        "tdi_signals": [
+          "VB_SQUEEZE",
+          "SIGNAL_CROSS_BULLISH"
+        ],
+        "tdi_vb_squeeze": true,
+        "theme_tags": [
+          "XAU_WEAKNESS",
+          "USD_STRENGTH"
+        ],
+        "weekly_phase": "EARLY_WEEK",
+        "weekly_trend": "SELL"
+      },
+      "direction": "SELL",
+      "exit_pips": -357.9999999999927,
+      "flashcard_id": 23365,
+      "image_path": "images/c14_fc23365_20230209T123000.png",
+      "label": "loser",
+      "max_adverse_pips": 191.00000000000819,
+      "max_favorable_pips": 0.0,
+      "minutes_to_t1": null,
+      "outcome": "LOSS",
+      "review_id": "C14",
+      "snapshot_at": "2023-02-09T12:30:00+00:00",
+      "source_chart_path": "charts\\annotated\\XAUUSD_M15_annotated_20260609_143946_197534.png",
+      "symbol": "XAUUSD",
+      "t1_hit": false,
+      "timeframe": "M15"
+    },
+    {
+      "context": {
+        "advisory_confidence_score": 30.0,
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 501.9999999999982,
+        "confluence_score": 60,
+        "event_path": [
+          "ENTRY",
+          "STALE_EXIT"
+        ],
+        "h1_session": "RETURN_ACCUM",
+        "h1_trend": "SELL",
+        "h4_level": 0,
+        "h4_trend": "NEUTRAL",
+        "m_w_pattern": "",
+        "pattern_trade_type": "THE_33",
+        "push_count": 5,
+        "ratios": {
+          "asian_range_to_pair_max": 0.06274999999999978,
+          "confluence": 0.6,
+          "hunt_to_expected_level_move": 1.9724999999999966,
+          "hunt_to_pair_max": 0.10519999999999982,
+          "single_setup_theme_score": 0.44
+        },
+        "rrt_detected": true,
+        "stop_hunt_detected": true,
+        "stop_hunt_direction": "SELL",
+        "stop_hunt_pips": 1577.9999999999973,
+        "tags": [
+          "historical",
+          "STALE_EXIT",
+          "SELL",
+          "L0",
+          "EARLY_WEEK"
+        ],
+        "tdi_crossed_signal": "none",
+        "tdi_divergence": "none",
+        "tdi_shark_direction": "LONG",
+        "tdi_shark_fin": true,
+        "tdi_signals": [
+          "SHARK_FIN_LONG"
+        ],
+        "tdi_vb_squeeze": false,
+        "theme_tags": [
+          "XAU_WEAKNESS",
+          "USD_STRENGTH"
+        ],
+        "weekly_phase": "EARLY_WEEK",
+        "weekly_trend": "SELL"
+      },
+      "direction": "SELL",
+      "exit_pips": -44.99999999998181,
+      "flashcard_id": 23618,
+      "image_path": "images/c15_fc23618_20230804T110000.png",
+      "label": "loser",
+      "max_adverse_pips": 84.9999999999909,
+      "max_favorable_pips": 120.00000000000455,
+      "minutes_to_t1": null,
+      "outcome": "STALE_EXIT",
+      "review_id": "C15",
+      "snapshot_at": "2023-08-04T11:00:00+00:00",
+      "source_chart_path": "charts\\annotated\\XAUUSD_M15_annotated_20260609_143948_302482.png",
+      "symbol": "XAUUSD",
+      "t1_hit": false,
+      "timeframe": "M15"
+    }
+  ],
+  "normalized_key": "RRT_REVERSAL|SELL|EARLY_WEEK|L0|RETURN_ACCUM|AR_TIGHT|HUNT_PAIR_RANGE|PUSH3_PLUS|NO_MW|RRT|TDI_CONFLICT|THE_33|CONF_50_74",
+  "setup_performance": {
+    "avg_exit_pips": 224.86666666666528,
+    "avg_mae": 127.93333333333067,
+    "avg_mfe": 461.66666666666515,
+    "baseline_split_passes": 0,
+    "direct_profit": 8,
+    "direct_profit_rate": 53.333333333333336,
+    "direction": "SELL",
+    "favorable": 8,
+    "favorable_rate": 53.333333333333336,
+    "first_snapshot": "2022-06-06T21:00:00+00:00",
+    "last_snapshot": "2023-11-01T20:15:00+00:00",
+    "normalized_key": "RRT_REVERSAL|SELL|EARLY_WEEK|L0|RETURN_ACCUM|AR_TIGHT|HUNT_PAIR_RANGE|PUSH3_PLUS|NO_MW|RRT|TDI_CONFLICT|THE_33|CONF_50_74",
+    "primary_theme": "XAU_WEAKNESS",
+    "profitable_source_ids": [
+      23449,
+      23474,
+      23484,
+      23486,
+      23489,
+      23500,
+      23612,
+      23737
+    ],
+    "raw_key": "XAUUSD|SELL|EARLY_WEEK|NEUTRAL|L0|NEUTRAL|RETURN_ACCUM|SELL|AR_1931.0|HUNT_1058.0|PUSH3_PLUS|NO_MW|RRT|TDI_CONFLICT|THE_33",
+    "realistic_target_pips": 224.86666666666528,
+    "setup_family": "RRT_REVERSAL",
+    "split_stats": {
+      "train": {
+        "avg_exit_pips": 224.86666666666528,
+        "avg_mae": 127.93333333333067,
+        "avg_mfe": 461.66666666666515,
+        "direct_profit": 8,
+        "direct_profit_rate": 53.333333333333336,
+        "favorable": 8,
+        "favorable_rate": 53.333333333333336,
+        "t1_hits": 4,
+        "t1_rate": 26.666666666666668,
+        "total": 15
+      }
+    },
+    "symbol": "XAUUSD",
+    "t1_hits": 4,
+    "t1_rate": 26.666666666666668,
+    "total": 15
+  },
+  "symbol": "XAUUSD"
+}

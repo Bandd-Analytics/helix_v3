@@ -1,0 +1,381 @@
+[
+  {
+    "review_id": "C01",
+    "predicted_label": "loser",
+    "confidence_0_100": 66,
+    "real_mmm_stop_hunt": true,
+    "return_inside_asian_range": true,
+    "clean_w_bottom": true,
+    "second_leg_quality": "strong but already extended into HOD",
+    "tdi_state_visible": "bullish and rising, near upper band",
+    "entry_timing": "late breakout at or near HOD after multiple pushes",
+    "reject_reason": "Buy is being taken into session high/previous high after the move has already expanded.",
+    "proposed_filter": "Reject BUY entries that trigger at HOD/AR high after the second leg has already traveled most of the available range."
+  },
+  {
+    "review_id": "C02",
+    "predicted_label": "loser",
+    "confidence_0_100": 72,
+    "real_mmm_stop_hunt": true,
+    "return_inside_asian_range": false,
+    "clean_w_bottom": false,
+    "second_leg_quality": "weak",
+    "tdi_state_visible": "oversold with only an early curl",
+    "entry_timing": "too early at LOD before a clean reclaim",
+    "reject_reason": "Price is still heavy below the averages and has not cleanly reclaimed the Asian range.",
+    "proposed_filter": "Require a close back inside Asian range plus a higher-low W before accepting LOD reversal buys."
+  },
+  {
+    "review_id": "C03",
+    "predicted_label": "winner",
+    "confidence_0_100": 62,
+    "real_mmm_stop_hunt": true,
+    "return_inside_asian_range": true,
+    "clean_w_bottom": true,
+    "second_leg_quality": "good",
+    "tdi_state_visible": "bullish above midline",
+    "entry_timing": "acceptable continuation after reclaim and hold",
+    "reject_reason": null,
+    "proposed_filter": "Keep when stop hunt reclaims the range, holds above the 50/200 area, and TDI remains constructive."
+  },
+  {
+    "review_id": "C04",
+    "predicted_label": "winner",
+    "confidence_0_100": 68,
+    "real_mmm_stop_hunt": true,
+    "return_inside_asian_range": true,
+    "clean_w_bottom": true,
+    "second_leg_quality": "strong",
+    "tdi_state_visible": "strong bullish expansion",
+    "entry_timing": "slightly late but supported by clean reversal structure",
+    "reject_reason": null,
+    "proposed_filter": "Keep strong LOD sweep reversals when the second leg breaks back through weekly open structure with TDI expansion."
+  },
+  {
+    "review_id": "C05",
+    "predicted_label": "loser",
+    "confidence_0_100": 70,
+    "real_mmm_stop_hunt": true,
+    "return_inside_asian_range": true,
+    "clean_w_bottom": false,
+    "second_leg_quality": "choppy",
+    "tdi_state_visible": "mixed and under midline",
+    "entry_timing": "unclear inside a volatile range",
+    "reject_reason": "No clean W-bottom; price is reacting inside chop after a violent range spike.",
+    "proposed_filter": "Reject BUYs when the second leg is vertical-whipsaw volatility rather than a structured higher-low reclaim."
+  },
+  {
+    "review_id": "C06",
+    "predicted_label": "winner",
+    "confidence_0_100": 58,
+    "real_mmm_stop_hunt": true,
+    "return_inside_asian_range": true,
+    "clean_w_bottom": false,
+    "second_leg_quality": "improving from oversold",
+    "tdi_state_visible": "oversold bullish turn",
+    "entry_timing": "early but improving after LOD reclaim",
+    "reject_reason": null,
+    "proposed_filter": "Accept only after the live stop hunt closes back above LOD/AR low and TDI curls up from the lower band."
+  },
+  {
+    "review_id": "C07",
+    "predicted_label": "winner",
+    "confidence_0_100": 71,
+    "real_mmm_stop_hunt": true,
+    "return_inside_asian_range": true,
+    "clean_w_bottom": true,
+    "second_leg_quality": "clean and controlled",
+    "tdi_state_visible": "bullish above 50, flattening slightly",
+    "entry_timing": "good pullback entry after reclaim",
+    "reject_reason": null,
+    "proposed_filter": "Keep when the W-bottom retakes the white average and later pulls back into support instead of chasing HOD."
+  },
+  {
+    "review_id": "C08",
+    "predicted_label": "loser",
+    "confidence_0_100": 64,
+    "real_mmm_stop_hunt": true,
+    "return_inside_asian_range": true,
+    "clean_w_bottom": false,
+    "second_leg_quality": "moderate but stalling",
+    "tdi_state_visible": "neutral below/near midline",
+    "entry_timing": "late after first HOD push",
+    "reject_reason": "The buy arrives after the initial recovery has already stalled near the upper range.",
+    "proposed_filter": "Reject if the reclaim cannot produce a fresh higher low before price reaches HOD resistance."
+  },
+  {
+    "review_id": "C09",
+    "predicted_label": "loser",
+    "confidence_0_100": 59,
+    "real_mmm_stop_hunt": true,
+    "return_inside_asian_range": true,
+    "clean_w_bottom": false,
+    "second_leg_quality": "extended trend continuation",
+    "tdi_state_visible": "bullish but rolling after overextension",
+    "entry_timing": "late near HOD after broad expansion",
+    "reject_reason": "The visual setup is more of a mature continuation near highs than a clean W-bottom reversal.",
+    "proposed_filter": "Reject BUYs with very large stop-hunt distance when entry is already near HOD and no fresh W retest is visible."
+  },
+  {
+    "review_id": "C10",
+    "predicted_label": "winner",
+    "confidence_0_100": 66,
+    "real_mmm_stop_hunt": true,
+    "return_inside_asian_range": true,
+    "clean_w_bottom": true,
+    "second_leg_quality": "strong",
+    "tdi_state_visible": "bullish above midline",
+    "entry_timing": "good continuation after clean reclaim",
+    "reject_reason": null,
+    "proposed_filter": "Keep clean live stop-hunt reversals where price reclaims weekly open structure and the 13/50 remain supportive."
+  },
+  {
+    "review_id": "C11",
+    "predicted_label": "loser",
+    "confidence_0_100": 67,
+    "real_mmm_stop_hunt": true,
+    "return_inside_asian_range": true,
+    "clean_w_bottom": false,
+    "second_leg_quality": "messy and oversized",
+    "tdi_state_visible": "recovering but not cleanly bullish",
+    "entry_timing": "late after a large spike-and-dump sequence",
+    "reject_reason": "The stop distance is very large and the buy follows unstable high-range volatility rather than a clean bottom.",
+    "proposed_filter": "Reject oversized stop-hunt setups where the Asian high spike immediately collapses back to AR low."
+  },
+  {
+    "review_id": "C12",
+    "predicted_label": "winner",
+    "confidence_0_100": 63,
+    "real_mmm_stop_hunt": true,
+    "return_inside_asian_range": true,
+    "clean_w_bottom": true,
+    "second_leg_quality": "steady",
+    "tdi_state_visible": "bullish recovery above midline",
+    "entry_timing": "acceptable after base reclaim, not a vertical chase",
+    "reject_reason": null,
+    "proposed_filter": "Keep when the W-bottom forms below range, price grinds back through AR low/mid, and TDI trends upward rather than spiking."
+  }
+]
+OpenAI Codex v0.137.0
+--------
+workdir: C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019ea2db-1a95-7161-8215-9b0117a01446
+--------
+user
+You are running an account-backed MMM vision packet review.
+Packet directory: C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\EURJPY_the_33_mw_buy_early_week_l3_true_trend_a6c634d982
+
+Inspect only the chart images listed below. Do not read `answer_key.csv`, `manifest.json`, or outcome labels.
+
+Local chart images:
+- C01: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\EURJPY_the_33_mw_buy_early_week_l3_true_trend_a6c634d982\images\c01_fc6208_20241014T110000.png`
+- C02: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\EURJPY_the_33_mw_buy_early_week_l3_true_trend_a6c634d982\images\c02_fc6365_20250915T083000.png`
+- C03: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\EURJPY_the_33_mw_buy_early_week_l3_true_trend_a6c634d982\images\c03_fc1804_20240408T111500.png`
+- C04: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\EURJPY_the_33_mw_buy_early_week_l3_true_trend_a6c634d982\images\c04_fc6470_20260216T080000.png`
+- C05: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\EURJPY_the_33_mw_buy_early_week_l3_true_trend_a6c634d982\images\c05_fc6097_20240513T083000.png`
+- C06: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\EURJPY_the_33_mw_buy_early_week_l3_true_trend_a6c634d982\images\c06_fc6366_20250915T100000.png`
+- C07: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\EURJPY_the_33_mw_buy_early_week_l3_true_trend_a6c634d982\images\c07_fc6385_20250922T120000.png`
+- C08: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\EURJPY_the_33_mw_buy_early_week_l3_true_trend_a6c634d982\images\c08_fc6207_20241014T093000.png`
+- C09: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\EURJPY_the_33_mw_buy_early_week_l3_true_trend_a6c634d982\images\c09_fc6354_20250901T083000.png`
+- C10: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\EURJPY_the_33_mw_buy_early_week_l3_true_trend_a6c634d982\images\c10_fc6057_20240408T110000.png`
+- C11: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\EURJPY_the_33_mw_buy_early_week_l3_true_trend_a6c634d982\images\c11_fc6045_20240318T083000.png`
+- C12: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\EURJPY_the_33_mw_buy_early_week_l3_true_trend_a6c634d982\images\c12_fc5942_20231218T080000.png`
+
+You are reviewing MMM trading flashcards blind. Do not use `answer_key.csv`.
+
+Task: inspect each chart image and predict whether the setup was likely a winner or loser.
+
+Pair: EURJPY
+Shared setup signature: THE_33_MW|BUY|EARLY_WEEK|L3|TRUE_TREND|AR_VALID|HUNT_PAIR_RANGE|PUSH3_PLUS|W_BOTTOM|NO_RRT|TDI_NONE|THE_33|CONF_75_PLUS
+
+Images:
+- C01: `images/c01_fc6208_20241014T110000.png`
+- C02: `images/c02_fc6365_20250915T083000.png`
+- C03: `images/c03_fc1804_20240408T111500.png`
+- C04: `images/c04_fc6470_20260216T080000.png`
+- C05: `images/c05_fc6097_20240513T083000.png`
+- C06: `images/c06_fc6366_20250915T100000.png`
+- C07: `images/c07_fc6385_20250922T120000.png`
+- C08: `images/c08_fc6207_20241014T093000.png`
+- C09: `images/c09_fc6354_20250901T083000.png`
+- C10: `images/c10_fc6057_20240408T110000.png`
+- C11: `images/c11_fc6045_20240318T083000.png`
+- C12: `images/c12_fc5942_20231218T080000.png`
+
+For each image, return a JSON array. Each object must contain:
+`review_id`, `predicted_label`, `confidence_0_100`, `real_mmm_stop_hunt`, `return_inside_asian_range`, `clean_w_bottom`, `second_leg_quality`, `tdi_state_visible`, `entry_timing`, `reject_reason`, and `proposed_filter`.
+
+Use only visual evidence from the chart. Be conservative: if the entry is unclear, label it loser.
+
+
+Return only the requested JSON array. Do not include markdown fences or prose.
+
+codex
+I’ll use only the chart screenshots and keep this as a blind visual verdict. I’m not reading any packet metadata or outcome files.
+codex
+[
+  {
+    "review_id": "C01",
+    "predicted_label": "loser",
+    "confidence_0_100": 66,
+    "real_mmm_stop_hunt": true,
+    "return_inside_asian_range": true,
+    "clean_w_bottom": true,
+    "second_leg_quality": "strong but already extended into HOD",
+    "tdi_state_visible": "bullish and rising, near upper band",
+    "entry_timing": "late breakout at or near HOD after multiple pushes",
+    "reject_reason": "Buy is being taken into session high/previous high after the move has already expanded.",
+    "proposed_filter": "Reject BUY entries that trigger at HOD/AR high after the second leg has already traveled most of the available range."
+  },
+  {
+    "review_id": "C02",
+    "predicted_label": "loser",
+    "confidence_0_100": 72,
+    "real_mmm_stop_hunt": true,
+    "return_inside_asian_range": false,
+    "clean_w_bottom": false,
+    "second_leg_quality": "weak",
+    "tdi_state_visible": "oversold with only an early curl",
+    "entry_timing": "too early at LOD before a clean reclaim",
+    "reject_reason": "Price is still heavy below the averages and has not cleanly reclaimed the Asian range.",
+    "proposed_filter": "Require a close back inside Asian range plus a higher-low W before accepting LOD reversal buys."
+  },
+  {
+    "review_id": "C03",
+    "predicted_label": "winner",
+    "confidence_0_100": 62,
+    "real_mmm_stop_hunt": true,
+    "return_inside_asian_range": true,
+    "clean_w_bottom": true,
+    "second_leg_quality": "good",
+    "tdi_state_visible": "bullish above midline",
+    "entry_timing": "acceptable continuation after reclaim and hold",
+    "reject_reason": null,
+    "proposed_filter": "Keep when stop hunt reclaims the range, holds above the 50/200 area, and TDI remains constructive."
+  },
+  {
+    "review_id": "C04",
+    "predicted_label": "winner",
+    "confidence_0_100": 68,
+    "real_mmm_stop_hunt": true,
+    "return_inside_asian_range": true,
+    "clean_w_bottom": true,
+    "second_leg_quality": "strong",
+    "tdi_state_visible": "strong bullish expansion",
+    "entry_timing": "slightly late but supported by clean reversal structure",
+    "reject_reason": null,
+    "proposed_filter": "Keep strong LOD sweep reversals when the second leg breaks back through weekly open structure with TDI expansion."
+  },
+  {
+    "review_id": "C05",
+    "predicted_label": "loser",
+    "confidence_0_100": 70,
+    "real_mmm_stop_hunt": true,
+    "return_inside_asian_range": true,
+    "clean_w_bottom": false,
+    "second_leg_quality": "choppy",
+    "tdi_state_visible": "mixed and under midline",
+    "entry_timing": "unclear inside a volatile range",
+    "reject_reason": "No clean W-bottom; price is reacting inside chop after a violent range spike.",
+    "proposed_filter": "Reject BUYs when the second leg is vertical-whipsaw volatility rather than a structured higher-low reclaim."
+  },
+  {
+    "review_id": "C06",
+    "predicted_label": "winner",
+    "confidence_0_100": 58,
+    "real_mmm_stop_hunt": true,
+    "return_inside_asian_range": true,
+    "clean_w_bottom": false,
+    "second_leg_quality": "improving from oversold",
+    "tdi_state_visible": "oversold bullish turn",
+    "entry_timing": "early but improving after LOD reclaim",
+    "reject_reason": null,
+    "proposed_filter": "Accept only after the live stop hunt closes back above LOD/AR low and TDI curls up from the lower band."
+  },
+  {
+    "review_id": "C07",
+    "predicted_label": "winner",
+    "confidence_0_100": 71,
+    "real_mmm_stop_hunt": true,
+    "return_inside_asian_range": true,
+    "clean_w_bottom": true,
+    "second_leg_quality": "clean and controlled",
+    "tdi_state_visible": "bullish above 50, flattening slightly",
+    "entry_timing": "good pullback entry after reclaim",
+    "reject_reason": null,
+    "proposed_filter": "Keep when the W-bottom retakes the white average and later pulls back into support instead of chasing HOD."
+  },
+  {
+    "review_id": "C08",
+    "predicted_label": "loser",
+    "confidence_0_100": 64,
+    "real_mmm_stop_hunt": true,
+    "return_inside_asian_range": true,
+    "clean_w_bottom": false,
+    "second_leg_quality": "moderate but stalling",
+    "tdi_state_visible": "neutral below/near midline",
+    "entry_timing": "late after first HOD push",
+    "reject_reason": "The buy arrives after the initial recovery has already stalled near the upper range.",
+    "proposed_filter": "Reject if the reclaim cannot produce a fresh higher low before price reaches HOD resistance."
+  },
+  {
+    "review_id": "C09",
+    "predicted_label": "loser",
+    "confidence_0_100": 59,
+    "real_mmm_stop_hunt": true,
+    "return_inside_asian_range": true,
+    "clean_w_bottom": false,
+    "second_leg_quality": "extended trend continuation",
+    "tdi_state_visible": "bullish but rolling after overextension",
+    "entry_timing": "late near HOD after broad expansion",
+    "reject_reason": "The visual setup is more of a mature continuation near highs than a clean W-bottom reversal.",
+    "proposed_filter": "Reject BUYs with very large stop-hunt distance when entry is already near HOD and no fresh W retest is visible."
+  },
+  {
+    "review_id": "C10",
+    "predicted_label": "winner",
+    "confidence_0_100": 66,
+    "real_mmm_stop_hunt": true,
+    "return_inside_asian_range": true,
+    "clean_w_bottom": true,
+    "second_leg_quality": "strong",
+    "tdi_state_visible": "bullish above midline",
+    "entry_timing": "good continuation after clean reclaim",
+    "reject_reason": null,
+    "proposed_filter": "Keep clean live stop-hunt reversals where price reclaims weekly open structure and the 13/50 remain supportive."
+  },
+  {
+    "review_id": "C11",
+    "predicted_label": "loser",
+    "confidence_0_100": 67,
+    "real_mmm_stop_hunt": true,
+    "return_inside_asian_range": true,
+    "clean_w_bottom": false,
+    "second_leg_quality": "messy and oversized",
+    "tdi_state_visible": "recovering but not cleanly bullish",
+    "entry_timing": "late after a large spike-and-dump sequence",
+    "reject_reason": "The stop distance is very large and the buy follows unstable high-range volatility rather than a clean bottom.",
+    "proposed_filter": "Reject oversized stop-hunt setups where the Asian high spike immediately collapses back to AR low."
+  },
+  {
+    "review_id": "C12",
+    "predicted_label": "winner",
+    "confidence_0_100": 63,
+    "real_mmm_stop_hunt": true,
+    "return_inside_asian_range": true,
+    "clean_w_bottom": true,
+    "second_leg_quality": "steady",
+    "tdi_state_visible": "bullish recovery above midline",
+    "entry_timing": "acceptable after base reclaim, not a vertical chase",
+    "reject_reason": null,
+    "proposed_filter": "Keep when the W-bottom forms below range, price grinds back through AR low/mid, and TDI trends upward rather than spiking."
+  }
+]
+tokens used
+43,498

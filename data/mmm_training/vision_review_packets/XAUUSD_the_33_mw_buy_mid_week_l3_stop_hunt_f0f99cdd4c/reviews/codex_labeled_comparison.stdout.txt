@@ -1,0 +1,403 @@
+{
+  "summary": "Winners split into two valid branches: early floor-reversal buys near the stop-hunt/LOD extreme, and continuation buys after a real reclaim with EMA alignment. Losers were mainly weekly-neutral, stale repeat attempts, or chased moves after the stop hunt had already paid out without a fresh base.",
+  "winner_traits": [
+    "Weekly bias was BUY on all winners; the only Weekly NEUTRAL sample was a loser.",
+    "Profitable reversals could look ugly if taken close to the liquidity floor: near current LOD, ADR low, previous LOD, or weekly-open liquidity with TDI curling up.",
+    "Best continuation winners showed price holding above EMA50 with EMA5 > EMA13 and widening, often after reclaiming Asian range or current LOD.",
+    "High ADR% and large stop-hunt pips did not disqualify XAUUSD winners; C01, C03, C04, and C09 all won despite visually extended conditions.",
+    "First or second same-hunt attempts performed better than later repeat signals from the same daily sweep."
+  ],
+  "loser_traits": [
+    "Weekly NEUTRAL plus very large Asian range/ADR expansion was unfavorable.",
+    "Late repeat buys after the same stop hunt degraded: C06 lost after C01 and C04 had already fired on the same XAUUSD day.",
+    "Weak crash rebounds failed when price was below EMA50, had no higher-low retest, and TDI was still below or near the 50 line.",
+    "Straight-line rallies into HOD without a pullback/base were risky, especially when TDI had already rolled over from the upper band.",
+    "Large stop hunt alone was not enough; C02 and C07 had large hunts but lacked clean reclaim/base quality."
+  ],
+  "filters_to_test": [
+    {
+      "name": "weekly_buy_required",
+      "rule": "For BUY setups, reject if weekly_bias != BUY.",
+      "thresholds": "weekly_bias must equal BUY"
+    },
+    {
+      "name": "same_hunt_attempt_decay",
+      "rule": "For same symbol+direction+EAT date, group signals sharing a stop-hunt low within 0.15 * asian_range_pips. Reject signal_index >= 3 unless a new LOD is made by at least 0.25 * asian_range_pips or price closes above prior HOD.",
+      "thresholds": "same_hunt_low_tolerance <= 15% Asian range; reject third+ attempt"
+    },
+    {
+      "name": "early_floor_reversal_branch",
+      "rule": "Accept a messy reversal only if close is within 0.25 * current_day_range of current LOD, the stop-hunt low occurred within the last 8 M15 candles, and TDI green slope is positive for 2 candles.",
+      "thresholds": "distance_from_LOD <= 25% TDR; candles_since_low <= 8; TDI green slope > 0 for 2 bars"
+    },
+    {
+      "name": "confirmed_reclaim_branch",
+      "rule": "Accept continuation only after at least 2 consecutive closes above EMA13, EMA5 > EMA13, EMA13 slope positive, and either close > EMA50 or close back inside Asian range.",
+      "thresholds": "2 closes above EMA13; EMA5 > EMA13; EMA13 slope > 0"
+    },
+    {
+      "name": "hod_chase_requires_pullback",
+      "rule": "If close is in the top 15% of current day range and distance from stop-hunt low is greater than 0.75 * current_day_range, require at least one pullback candle touching EMA13 or EMA50 followed by a bullish close above EMA13.",
+      "thresholds": "range_position >= 85%; distance_from_hunt_low >= 75% TDR; pullback touch required"
+    },
+    {
+      "name": "weak_crash_rebound_reject",
+      "rule": "Reject if close < EMA50, close is more than 0.35 * current_day_range above LOD, no higher-low retest exists within last 12 candles, and TDI green <= red.",
+      "thresholds": "close < EMA50; distance_from_LOD > 35% TDR; no HL retest in 12 bars; TDI green <= red"
+    }
+  ],
+  "filters_to_reject": [
+    "Do not reject solely because price has not returned inside Asian range; C01 and C04 were winners.",
+    "Do not reject solely on ADR% > 100; several XAUUSD winners were above 100% ADR.",
+    "Do not reject solely on stop_hunt_pips > 1500; both winners and losers had large hunts.",
+    "Do not require a textbook clean W-bottom; profitable XAUUSD floor reversals can be visually messy.",
+    "Do not reject all HOD-area buys; C03, C09, and C10 were profitable despite HOD proximity."
+  ],
+  "pair_specific_notes": [
+    "Use normalized thresholds for XAUUSD; raw pip size is too volatile across sessions.",
+    "XAUUSD can continue after extreme ADR expansion, so ADR should be contextual rather than a hard cap.",
+    "Weekly BUY appears important for this signature, but entry quality still depends on whether the signal is early at the floor or confirmed after reclaim.",
+    "Repeated same-day THE_33 buy signals should be treated as decaying unless a fresh liquidity event occurs."
+  ],
+  "uncertain_items": [
+    "C01 and C04 won despite weak visual W structure, so the model should preserve an early-floor exception.",
+    "C05 and C10 conflict visually: both are HOD-area buys, but C05 lost and C10 won, so HOD rejection must be conditional on pullback/base quality.",
+    "C07 had high max favorable pips but closed stale negative, so some failures may be trade-management exits rather than pure entry-filter failures."
+  ],
+  "next_backtest_spec": {
+    "scope": "XAUUSD only, exact signature THE_33_MW|BUY|MID_WEEK|L3|STOP_HUNT|AR_VALID|HUNT_PAIR_RANGE|PUSH3_PLUS|W_BOTTOM|NO_RRT|TDI_NONE|THE_33|CONF_75_PLUS",
+    "labels": "winner if exit_pips > 0 or t1_hit true; loser if exit_pips <= 0",
+    "features": [
+      "weekly_bias",
+      "EAT date and same-day signal index",
+      "same-hunt group by LOD proximity",
+      "asian_range_pips",
+      "current_day_range_pips",
+      "ADR_percent",
+      "stop_hunt_pips",
+      "close_position_in_day_range",
+      "distance_from_LOD",
+      "distance_from_stop_hunt_low",
+      "candles_since_stop_hunt_low",
+      "return_inside_asian_range",
+      "EMA5/EMA13/EMA50 order and slopes",
+      "TDI green/red levels, cross, and 2-bar slopes",
+      "higher_low_retest within 12 candles",
+      "pullback touch of EMA13 or EMA50 after HOD break"
+    ],
+    "tests": "Run single-filter and combined-branch ablations, report N, win rate, avg exit pips, avg MFE, avg MAE, and rejected-winner count with walk-forward split by snapshot_at."
+  }
+}
+OpenAI Codex v0.137.0
+--------
+workdir: C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019eaccc-02d5-7772-9cd5-df2503eabbb7
+--------
+user
+Use the Read tool to inspect the local chart images when needed.
+Packet directory: C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\XAUUSD_the_33_mw_buy_mid_week_l3_stop_hunt_f0f99cdd4c
+
+You are now allowed to use `answer_key.csv` after completing the blind review.
+
+Compare winners against losers for this exact same MMM setup signature.
+
+Pair: XAUUSD
+Shared setup signature: THE_33_MW|BUY|MID_WEEK|L3|STOP_HUNT|AR_VALID|HUNT_PAIR_RANGE|PUSH3_PLUS|W_BOTTOM|NO_RRT|TDI_NONE|THE_33|CONF_75_PLUS
+
+Goal: identify the visual/structural filters that separate profitable examples from failed examples.
+
+Return a concise JSON object with:
+`summary`, `winner_traits`, `loser_traits`, `filters_to_test`, `filters_to_reject`, `pair_specific_notes`, `uncertain_items`, and `next_backtest_spec`.
+
+Each `filters_to_test` item must be deterministic enough for Codex to encode. Include measurable thresholds where possible, such as candles, pips, ratios, relative position to Asian range, or TDI state.
+
+Do not recommend live trading. These are research filters only.
+
+
+Local chart images:
+- C01: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\XAUUSD_the_33_mw_buy_mid_week_l3_stop_hunt_f0f99cdd4c\images\c01_fc43004_20250904T081500.png`
+- C02: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\XAUUSD_the_33_mw_buy_mid_week_l3_stop_hunt_f0f99cdd4c\images\c02_fc48567_20251229T071500.png`
+- C03: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\XAUUSD_the_33_mw_buy_mid_week_l3_stop_hunt_f0f99cdd4c\images\c03_fc48529_20251222T214500.png`
+- C04: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\XAUUSD_the_33_mw_buy_mid_week_l3_stop_hunt_f0f99cdd4c\images\c04_fc43005_20250904T094500.png`
+- C05: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\XAUUSD_the_33_mw_buy_mid_week_l3_stop_hunt_f0f99cdd4c\images\c05_fc48289_20251128T081500.png`
+- C06: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\XAUUSD_the_33_mw_buy_mid_week_l3_stop_hunt_f0f99cdd4c\images\c06_fc43006_20250904T111500.png`
+- C07: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\XAUUSD_the_33_mw_buy_mid_week_l3_stop_hunt_f0f99cdd4c\images\c07_fc48771_20260127T081500.png`
+- C08: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\XAUUSD_the_33_mw_buy_mid_week_l3_stop_hunt_f0f99cdd4c\images\c08_fc42984_20250903T024500.png`
+- C09: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\XAUUSD_the_33_mw_buy_mid_week_l3_stop_hunt_f0f99cdd4c\images\c09_fc48525_20251222T170000.png`
+- C10: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\XAUUSD_the_33_mw_buy_mid_week_l3_stop_hunt_f0f99cdd4c\images\c10_fc48266_20251126T154500.png`
+- C11: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\XAUUSD_the_33_mw_buy_mid_week_l3_stop_hunt_f0f99cdd4c\images\c11_fc48632_20260107T110000.png`
+
+Answer key:
+review_id,label,flashcard_id,snapshot_at,outcome,exit_pips,max_favorable_pips,max_adverse_pips,t1_hit,image_path
+C01,winner,43004,2025-09-04T08:15:00+00:00,TIME_EXIT_PROFIT,1214.9999999999636,1427.9999999999745,676.0000000000218,False,images/c01_fc43004_20250904T081500.png
+C02,loser,48567,2025-12-29T07:15:00+00:00,LOSS,-4180.000000000018,527.9999999999745,4292.000000000007,False,images/c02_fc48567_20251229T071500.png
+C03,winner,48529,2025-12-22T21:45:00+00:00,OPEN_PROFIT,998.0000000000473,1568.000000000029,177.99999999997453,False,images/c03_fc48529_20251222T214500.png
+C04,winner,43005,2025-09-04T09:45:00+00:00,TIME_EXIT_PROFIT,263.99999999998727,951.9999999999982,334.00000000001455,False,images/c04_fc43005_20250904T094500.png
+C05,loser,48289,2025-11-28T08:15:00+00:00,STALE_EXIT,-1042.0000000000073,377.99999999997453,1150.0,False,images/c05_fc48289_20251128T081500.png
+C06,loser,43006,2025-09-04T11:15:00+00:00,STALE_EXIT,-475.0,174.00000000002365,671.99999999998,False,images/c06_fc43006_20250904T111500.png
+C07,loser,48771,2026-01-27T08:15:00+00:00,STALE_EXIT,-483.9999999999236,1848.0000000000473,707.9999999999927,False,images/c07_fc48771_20260127T081500.png
+C08,winner,42984,2025-09-03T02:45:00+00:00,TARGET_2,1044.999999999959,1648.0000000000018,207.99999999999272,True,images/c08_fc42984_20250903T024500.png
+C09,winner,48525,2025-12-22T17:00:00+00:00,TIME_EXIT_PROFIT,2071.9999999999345,2617.999999999938,396.00000000000364,False,images/c09_fc48525_20251222T170000.png
+C10,winner,48266,2025-11-26T15:45:00+00:00,TIME_EXIT_PROFIT,1382.0000000000618,1511.999999999989,1678.9999999999964,False,images/c10_fc48266_20251126T154500.png
+C11,loser,48632,2026-01-07T11:00:00+00:00,LOSS,-647.0000000000255,139.00000000003274,696.0000000000036,False,images/c11_fc48632_20260107T110000.png
+
+
+Blind Codex review:
+[
+  {
+    "review_id": "C01",
+    "predicted_label": "loser",
+    "confidence_0_100": 70,
+    "real_mmm_stop_hunt": true,
+    "return_inside_asian_range": false,
+    "clean_w_bottom": false,
+    "second_leg_quality": "weak; bounce is shallow after a heavy sell leg",
+    "tdi_state_visible": "oversold recovery, still below/near midline",
+    "entry_timing": "late after breakdown, not confirmed back inside range",
+    "reject_reason": "Buy appears after a strong impulsive drop below prior structure with only weak reclaim evidence.",
+    "proposed_filter": "Require bullish close back inside Asian range and TDI green/red cross above the lower band before accepting."
+  },
+  {
+    "review_id": "C02",
+    "predicted_label": "loser",
+    "confidence_0_100": 63,
+    "real_mmm_stop_hunt": true,
+    "return_inside_asian_range": true,
+    "clean_w_bottom": false,
+    "second_leg_quality": "messy; deep spike and recovery but no clean base",
+    "tdi_state_visible": "recovering from oversold but below midline",
+    "entry_timing": "early during post-flush recovery",
+    "reject_reason": "Large rejection wick is favorable, but structure is volatile and the right edge has not built a stable W-bottom.",
+    "proposed_filter": "Require two closes above the 50 EMA or a higher-low retest after the stop-hunt low."
+  },
+  {
+    "review_id": "C03",
+    "predicted_label": "winner",
+    "confidence_0_100": 82,
+    "real_mmm_stop_hunt": true,
+    "return_inside_asian_range": true,
+    "clean_w_bottom": true,
+    "second_leg_quality": "strong; clear higher-low continuation after base",
+    "tdi_state_visible": "constructive, above lower band and curling upward",
+    "entry_timing": "acceptable continuation after confirmed expansion",
+    "reject_reason": "",
+    "proposed_filter": "Keep when stop hunt is followed by sustained 5/13 EMA separation and price holds above the 50 EMA."
+  },
+  {
+    "review_id": "C04",
+    "predicted_label": "winner",
+    "confidence_0_100": 61,
+    "real_mmm_stop_hunt": true,
+    "return_inside_asian_range": true,
+    "clean_w_bottom": true,
+    "second_leg_quality": "moderate; second push is forming after reclaimed range",
+    "tdi_state_visible": "oversold recovery with bullish curl",
+    "entry_timing": "slightly late but after reclaim",
+    "reject_reason": "",
+    "proposed_filter": "Prefer entries after the first pullback holds above the reclaimed prior LOD area."
+  },
+  {
+    "review_id": "C05",
+    "predicted_label": "winner",
+    "confidence_0_100": 86,
+    "real_mmm_stop_hunt": true,
+    "return_inside_asian_range": true,
+    "clean_w_bottom": true,
+    "second_leg_quality": "excellent; tight base then explosive markup through HOD",
+    "tdi_state_visible": "strong bullish expansion above midline",
+    "entry_timing": "good; early in expansion after stop hunt",
+    "reject_reason": "",
+    "proposed_filter": "Prioritize this pattern when stop hunt is followed by compression at LOD and immediate 5/13/50 EMA alignment."
+  },
+  {
+    "review_id": "C06",
+    "predicted_label": "winner",
+    "confidence_0_100": 68,
+    "real_mmm_stop_hunt": true,
+    "return_inside_asian_range": true,
+    "clean_w_bottom": true,
+    "second_leg_quality": "good; strong reclaim from the low and higher candles into range",
+    "tdi_state_visible": "bullish recovery from oversold",
+    "entry_timing": "reasonable after reclaim, though not early",
+    "reject_reason": "",
+    "proposed_filter": "Require the post-hunt rally to close back above the 13 EMA before classifying as valid."
+  },
+  {
+    "review_id": "C07",
+    "predicted_label": "winner",
+    "confidence_0_100": 73,
+    "real_mmm_stop_hunt": true,
+    "return_inside_asian_range": true,
+    "clean_w_bottom": true,
+    "second_leg_quality": "solid; sharp sweep into weekly open low then strong reclaim",
+    "tdi_state_visible": "bullish recovery from deeply oversold",
+    "entry_timing": "good after LOD rejection and reclaim",
+    "reject_reason": "",
+    "proposed_filter": "Favor setups where the stop hunt sweeps below weekly/open liquidity and price reclaims LOD quickly."
+  },
+  {
+    "review_id": "C08",
+    "predicted_label": "winner",
+    "confidence_0_100": 80,
+    "real_mmm_stop_hunt": true,
+    "return_inside_asian_range": true,
+    "clean_w_bottom": true,
+    "second_leg_quality": "strong; base, reclaim, and sustained push to HOD",
+    "tdi_state_visible": "bullish expansion above midline, later cooling",
+    "entry_timing": "good if taken near L3/reclaim, late if taken at HOD",
+    "reject_reason": "",
+    "proposed_filter": "Accept only before HOD extension; reject fresh buys once price is pinned at HOD with TDI rolling over."
+  },
+  {
+    "review_id": "C09",
+    "predicted_label": "winner",
+    "confidence_0_100": 84,
+    "real_mmm_stop_hunt": true,
+    "return_inside_asian_range": true,
+    "clean_w_bottom": true,
+    "second_leg_quality": "excellent; clear accumulation low into persistent markup",
+    "tdi_state_visible": "strong bullish drive then controlled pullback",
+    "entry_timing": "good during early expansion after L3",
+    "reject_reason": "",
+    "proposed_filter": "Keep when L3 forms below range and price reclaims the 50 EMA with widening 5/13 EMAs."
+  },
+  {
+    "review_id": "C10",
+    "predicted_label": "loser",
+    "confidence_0_100": 72,
+    "real_mmm_stop_hunt": true,
+    "return_inside_asian_range": false,
+    "clean_w_bottom": false,
+    "second_leg_quality": "poor; rally stalls near HOD and reverses sharply",
+    "tdi_state_visible": "bearish rollover from upper band",
+    "entry_timing": "late into HOD resistance",
+    "reject_reason": "Buy is occurring after an extended rally into HOD with TDI rolling over and no clean second-leg base.",
+    "proposed_filter": "Reject buys within HOD/ADR resistance unless there is a fresh pullback, higher low, and TDI reset."
+  },
+  {
+    "review_id": "C11",
+    "predicted_label": "loser",
+    "confidence_0_100": 69,
+    "real_mmm_stop_hunt": true,
+    "return_inside_asian_range": true,
+    "clean_w_bottom": false,
+    "second_leg_quality": "mixed; strong rebound but after a very impulsive selloff",
+    "tdi_state_visible": "rebounding from oversold but still fragile",
+    "entry_timing": "early into recovery, before clean trend confirmation",
+    "reject_reason": "The drop into LOD is violent and the buy signal lacks a clean W-bottom or sustained reclaim above the 50 EMA.",
+    "proposed_filter": "Require a higher-low retest after the first rebound from LOD before accepting post-crash buys."
+  }
+]
+
+Blind Claude review:
+[{"review_id":"C01","predicted_label":"loser","confidence_0_100":78,"real_mmm_stop_hunt":false,"return_inside_asian_range":false,"clean_w_bottom":false,"second_leg_quality":"poor","tdi_state_visible":"bearish_divergence","entry_timing":"late","reject_reason":"Entry into freefall from L3 peak; RSI 39 oversold with no reversal structure; ADR% 120 suggests exhaustion; price well below Asian range crashing to ADR Low","proposed_filter":"reject_if_rsi_below_40_at_entry"},{"review_id":"C02","predicted_label":"loser","confidence_0_100":72,"real_mmm_stop_hunt":false,"return_inside_asian_range":false,"clean_w_bottom":false,"second_leg_quality":"poor","tdi_state_visible":"neutral_flat","entry_timing":"late","reject_reason":"Friday-to-Monday session; weekly NEUTRAL not BUY; price declining from L3 peak with no W-bottom reversal visible; RSI 49 flat; Asian range 7718p massively extended","proposed_filter":"reject_if_weekly_neutral_and_adr_pct_gt_90"},{"review_id":"C03","predicted_label":"winner","confidence_0_100":82,"real_mmm_stop_hunt":true,"return_inside_asian_range":true,"clean_w_bottom":true,"second_leg_quality":"good","tdi_state_visible":"bullish_cross","entry_timing":"on_time","reject_reason":"none","proposed_filter":"none"},{"review_id":"C04","predicted_label":"loser","confidence_0_100":80,"real_mmm_stop_hunt":false,"return_inside_asian_range":false,"clean_w_bottom":false,"second_leg_quality":"poor","tdi_state_visible":"bearish_trend","entry_timing":"late","reject_reason":"Same session as C01 90 min later; price still declining from L3 peak; RSI 46 with no bullish structure; ADR% 120 blown; buying into continued selling","proposed_filter":"reject_if_adr_pct_gt_100_and_price_below_asian_low"},{"review_id":"C05","predicted_label":"winner","confidence_0_100":80,"real_mmm_stop_hunt":true,"return_inside_asian_range":true,"clean_w_bottom":true,"second_leg_quality":"good","tdi_state_visible":"bullish_cross","entry_timing":"on_time","reject_reason":"none","proposed_filter":"none"},{"review_id":"C06","predicted_label":"loser","confidence_0_100":70,"real_mmm_stop_hunt":false,"return_inside_asian_range":false,"clean_w_bottom":false,"second_leg_quality":"weak","tdi_state_visible":"neutral_recovery","entry_timing":"late","reject_reason":"Third BUY attempt same day (C01/C04/C06); ADR% 120 extended; weak bounce from LOD; RSI 52 recovering but no impulsive structure; EMA 50 far above price","proposed_filter":"reject_if_third_same_day_attempt"},{"review_id":"C07","predicted_label":"loser","confidence_0_100":68,"real_mmm_stop_hunt":true,"return_inside_asian_range":false,"clean_w_bottom":false,"second_leg_quality":"weak","tdi_state_visible":"bearish_trend","entry_timing":"early","reject_reason":"Violent drop from L3 peak to WK OPEN L; stop hunt 1796p visible but no W-bottom recovery; price sitting at LOD with no bullish structure; TDI still declining","proposed_filter":"reject_if_hunt_gt_1500p_no_w_recovery"},{"review_id":"C08","predicted_label":"winner","confidence_0_100":85,"real_mmm_stop_hunt":true,"return_inside_asian_range":true,"clean_w_bottom":true,"second_leg_quality":"strong","tdi_state_visible":"bullish_impulse","entry_timing":"on_time","reject_reason":"none","proposed_filter":"none"},{"review_id":"C09","predicted_label":"winner","confidence_0_100":84,"real_mmm_stop_hunt":true,"return_inside_asian_range":true,"clean_w_bottom":true,"second_leg_quality":"strong","tdi_state_visible":"bullish_impulse","entry_timing":"on_time","reject_reason":"none","proposed_filter":"none"},{"review_id":"C10","predicted_label":"winner","confidence_0_100":60,"real_mmm_stop_hunt":true,"return_inside_asian_range":true,"clean_w_bottom":true,"second_leg_quality":"moderate","tdi_state_visible":"neutral_flat","entry_timing":"on_time","reject_reason":"none","proposed_filter":"flag_if_multiple_red_arrows_post_entry"},{"review_id":"C11","predicted_label":"loser","confidence_0_100":74,"real_mmm_stop_hunt":true,"return_inside_asian_range":false,"clean_w_bottom":false,"second_leg_quality":"poor","tdi_state_visible":"bearish_trend","entry_timing":"late","reject_reason":"Price crashed from L3 peak; stop hunt 495p but no W-bottom recovery visible; RSI 50/48 neutral-bearish; entry at bottom of heavy selloff with EMA 50 rolling over hard; ADR% 68.6 still has room to extend lower","proposed_filter":"reject_if_ema50_slope_negative_at_entry"}]
+
+
+Return only the requested concise JSON object. Do not recommend live trading.
+
+codex
+I’ll inspect the packet artifacts briefly so the filters tie back to encoded fields where possible, then I’ll return only the requested JSON in the final.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-ChildItem -LiteralPath 'C:\\Users\\dennis.ndungu\\Desktop\\ClaudeMCP\\Helix_V3\\data\\mmm_training\\vision_review_packets\\XAUUSD_the_33_mw_buy_mid_week_l3_stop_hunt_f0f99cdd4c' -Force | Select-Object Name,Length,Mode" in C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3
+ declined in 0ms:
+`"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-ChildItem -LiteralPath 'C:\\Users\\dennis.ndungu\\Desktop\\ClaudeMCP\\Helix_V3\\data\\mmm_training\\vision_review_packets\\XAUUSD_the_33_mw_buy_mid_week_l3_stop_hunt_f0f99cdd4c' -Force | Select-Object Name,Length,Mode"` rejected: blocked by policy
+2026-06-09T14:32:53.764967Z ERROR codex_core::tools::router: error=`"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-ChildItem -LiteralPath 'C:\\Users\\dennis.ndungu\\Desktop\\ClaudeMCP\\Helix_V3\\data\\mmm_training\\vision_review_packets\\XAUUSD_the_33_mw_buy_mid_week_l3_stop_hunt_f0f99cdd4c' -Force | Select-Object Name,Length,Mode"` rejected: blocked by policy
+codex
+{
+  "summary": "Winners split into two valid branches: early floor-reversal buys near the stop-hunt/LOD extreme, and continuation buys after a real reclaim with EMA alignment. Losers were mainly weekly-neutral, stale repeat attempts, or chased moves after the stop hunt had already paid out without a fresh base.",
+  "winner_traits": [
+    "Weekly bias was BUY on all winners; the only Weekly NEUTRAL sample was a loser.",
+    "Profitable reversals could look ugly if taken close to the liquidity floor: near current LOD, ADR low, previous LOD, or weekly-open liquidity with TDI curling up.",
+    "Best continuation winners showed price holding above EMA50 with EMA5 > EMA13 and widening, often after reclaiming Asian range or current LOD.",
+    "High ADR% and large stop-hunt pips did not disqualify XAUUSD winners; C01, C03, C04, and C09 all won despite visually extended conditions.",
+    "First or second same-hunt attempts performed better than later repeat signals from the same daily sweep."
+  ],
+  "loser_traits": [
+    "Weekly NEUTRAL plus very large Asian range/ADR expansion was unfavorable.",
+    "Late repeat buys after the same stop hunt degraded: C06 lost after C01 and C04 had already fired on the same XAUUSD day.",
+    "Weak crash rebounds failed when price was below EMA50, had no higher-low retest, and TDI was still below or near the 50 line.",
+    "Straight-line rallies into HOD without a pullback/base were risky, especially when TDI had already rolled over from the upper band.",
+    "Large stop hunt alone was not enough; C02 and C07 had large hunts but lacked clean reclaim/base quality."
+  ],
+  "filters_to_test": [
+    {
+      "name": "weekly_buy_required",
+      "rule": "For BUY setups, reject if weekly_bias != BUY.",
+      "thresholds": "weekly_bias must equal BUY"
+    },
+    {
+      "name": "same_hunt_attempt_decay",
+      "rule": "For same symbol+direction+EAT date, group signals sharing a stop-hunt low within 0.15 * asian_range_pips. Reject signal_index >= 3 unless a new LOD is made by at least 0.25 * asian_range_pips or price closes above prior HOD.",
+      "thresholds": "same_hunt_low_tolerance <= 15% Asian range; reject third+ attempt"
+    },
+    {
+      "name": "early_floor_reversal_branch",
+      "rule": "Accept a messy reversal only if close is within 0.25 * current_day_range of current LOD, the stop-hunt low occurred within the last 8 M15 candles, and TDI green slope is positive for 2 candles.",
+      "thresholds": "distance_from_LOD <= 25% TDR; candles_since_low <= 8; TDI green slope > 0 for 2 bars"
+    },
+    {
+      "name": "confirmed_reclaim_branch",
+      "rule": "Accept continuation only after at least 2 consecutive closes above EMA13, EMA5 > EMA13, EMA13 slope positive, and either close > EMA50 or close back inside Asian range.",
+      "thresholds": "2 closes above EMA13; EMA5 > EMA13; EMA13 slope > 0"
+    },
+    {
+      "name": "hod_chase_requires_pullback",
+      "rule": "If close is in the top 15% of current day range and distance from stop-hunt low is greater than 0.75 * current_day_range, require at least one pullback candle touching EMA13 or EMA50 followed by a bullish close above EMA13.",
+      "thresholds": "range_position >= 85%; distance_from_hunt_low >= 75% TDR; pullback touch required"
+    },
+    {
+      "name": "weak_crash_rebound_reject",
+      "rule": "Reject if close < EMA50, close is more than 0.35 * current_day_range above LOD, no higher-low retest exists within last 12 candles, and TDI green <= red.",
+      "thresholds": "close < EMA50; distance_from_LOD > 35% TDR; no HL retest in 12 bars; TDI green <= red"
+    }
+  ],
+  "filters_to_reject": [
+    "Do not reject solely because price has not returned inside Asian range; C01 and C04 were winners.",
+    "Do not reject solely on ADR% > 100; several XAUUSD winners were above 100% ADR.",
+    "Do not reject solely on stop_hunt_pips > 1500; both winners and losers had large hunts.",
+    "Do not require a textbook clean W-bottom; profitable XAUUSD floor reversals can be visually messy.",
+    "Do not reject all HOD-area buys; C03, C09, and C10 were profitable despite HOD proximity."
+  ],
+  "pair_specific_notes": [
+    "Use normalized thresholds for XAUUSD; raw pip size is too volatile across sessions.",
+    "XAUUSD can continue after extreme ADR expansion, so ADR should be contextual rather than a hard cap.",
+    "Weekly BUY appears important for this signature, but entry quality still depends on whether the signal is early at the floor or confirmed after reclaim.",
+    "Repeated same-day THE_33 buy signals should be treated as decaying unless a fresh liquidity event occurs."
+  ],
+  "uncertain_items": [
+    "C01 and C04 won despite weak visual W structure, so the model should preserve an early-floor exception.",
+    "C05 and C10 conflict visually: both are HOD-area buys, but C05 lost and C10 won, so HOD rejection must be conditional on pullback/base quality.",
+    "C07 had high max favorable pips but closed stale negative, so some failures may be trade-management exits rather than pure entry-filter failures."
+  ],
+  "next_backtest_spec": {
+    "scope": "XAUUSD only, exact signature THE_33_MW|BUY|MID_WEEK|L3|STOP_HUNT|AR_VALID|HUNT_PAIR_RANGE|PUSH3_PLUS|W_BOTTOM|NO_RRT|TDI_NONE|THE_33|CONF_75_PLUS",
+    "labels": "winner if exit_pips > 0 or t1_hit true; loser if exit_pips <= 0",
+    "features": [
+      "weekly_bias",
+      "EAT date and same-day signal index",
+      "same-hunt group by LOD proximity",
+      "asian_range_pips",
+      "current_day_range_pips",
+      "ADR_percent",
+      "stop_hunt_pips",
+      "close_position_in_day_range",
+      "distance_from_LOD",
+      "distance_from_stop_hunt_low",
+      "candles_since_stop_hunt_low",
+      "return_inside_asian_range",
+      "EMA5/EMA13/EMA50 order and slopes",
+      "TDI green/red levels, cross, and 2-bar slopes",
+      "higher_low_retest within 12 candles",
+      "pullback touch of EMA13 or EMA50 after HOD break"
+    ],
+    "tests": "Run single-filter and combined-branch ablations, report N, win rate, avg exit pips, avg MFE, avg MAE, and rejected-winner count with walk-forward split by snapshot_at."
+  }
+}
+tokens used
+51,611

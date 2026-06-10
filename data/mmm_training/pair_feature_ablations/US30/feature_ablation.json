@@ -1,0 +1,29 @@
+{
+  "generated_at": "2026-06-09T15:36:29.742667+00:00",
+  "min_total": 10,
+  "scanner_baseline": {
+    "avg_exit_pips": 10.9,
+    "favorable_rate": 85.0,
+    "required_split_passes": 2,
+    "split_min_total": 3
+  },
+  "setups": [],
+  "split_windows": [
+    {
+      "end": "2024-12-10 00:00:00+00:00",
+      "name": "train",
+      "start": "2021-06-08 00:00:00+00:00"
+    },
+    {
+      "end": "2025-12-10 00:00:00+00:00",
+      "name": "validation",
+      "start": "2024-12-10 00:00:00+00:00"
+    },
+    {
+      "end": "2026-06-09 00:00:00+00:00",
+      "name": "out_of_sample",
+      "start": "2025-12-10 00:00:00+00:00"
+    }
+  ],
+  "symbol": "US30"
+}

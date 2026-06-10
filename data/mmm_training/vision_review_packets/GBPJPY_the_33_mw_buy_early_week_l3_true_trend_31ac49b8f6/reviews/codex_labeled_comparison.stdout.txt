@@ -1,0 +1,1056 @@
+{
+  "summary": "Winners were mostly moderate-hunt reclaim or fresh momentum-breakout buys; losers clustered around oversized hunts, stale HOD/top entries, and choppy range recovery with bearish TDI. TDI conflict alone is not enough to reject this signature.",
+  "winner_traits": [
+    "Best winners had stop_hunt_pips <= 60 or hunt_to_expected_level_move <= 0.60: C03, C05, C07, C08, C10, C11.",
+    "Clean reclaim from LOD/AR-low with room back through the Asian range worked well: C05, C07, C10, C11.",
+    "Fresh breakout can still win even with shark-fin/overbought labels when there is strong price expansion and no bearish signal/MBL cross: C03, C08, C10.",
+    "Oversized hunts only survived in this packet when weekly_trend was BUY, asian_range_pips was small, and VB squeeze was present: C04, C06."
+  ],
+  "loser_traits": [
+    "Extreme hunt size without the weekly/VB/small-range exception failed: C01, C09, C13.",
+    "Late buys near HOD after a full expansion plus bearish TDI rollover were dangerous: C12, C13.",
+    "Range-bound recoveries with weak second leg and bearish MBL/signal state failed: C01, C02.",
+    "Large adverse losers often had little immediate upside: C09 MFE 1.8p, C13 MFE 8.4p, C02 MFE 6.3p."
+  ],
+  "filters_to_test": [
+    {
+      "name": "moderate_hunt_primary_allow",
+      "rule": "For GBPJPY BUY setups, prefer stop_hunt_pips <= 60 OR hunt_to_expected_level_move <= 0.60.",
+      "expected_effect": "Keeps C03,C05,C07,C08,C10,C11; needs top-exhaustion guard for C12."
+    },
+    {
+      "name": "extreme_hunt_reject_with_exception",
+      "rule": "Reject if stop_hunt_pips >= 90 OR hunt_to_expected_level_move >= 0.90, unless weekly_trend == BUY AND tdi_vb_squeeze == true AND asian_range_pips <= 30.",
+      "expected_effect": "Rejects C01,C09,C13; preserves C04,C06."
+    },
+    {
+      "name": "stale_hod_exhaustion_reject",
+      "rule": "Reject BUY if close is within 10 pips of current HOD or range_pos >= 0.85, price has travelled >= 1.5 * asian_range_pips from hunt low, and TDI contains SIGNAL_CROSS_BEARISH or MBL_CROSS_BEARISH.",
+      "expected_effect": "Targets C12,C13 without rejecting fresh shark-fin winners C03,C08."
+    },
+    {
+      "name": "fresh_reclaim_required",
+      "rule": "After BUY stop hunt, require within 8 M15 candles: one close back above AR_L, then one close above AR_mid or EMA50, with no close back below AR_L before entry.",
+      "expected_effect": "Separates clean W/reclaim winners from C01,C02 style chop."
+    },
+    {
+      "name": "momentum_breakout_exception",
+      "rule": "Allow entries above AR_H/HOD only if bars_since_first_AR_H_break <= 6, last swing-low-to-close impulse >= 0.6 * asian_range_pips, and TDI does not contain SIGNAL_CROSS_BEARISH or MBL_CROSS_BEARISH.",
+      "expected_effect": "Preserves C03,C08,C10 while rejecting stale HOD failures."
+    }
+  ],
+  "filters_to_reject": [
+    "Reject all TDI shark-fin or overbought signals: contradicted by winners C03,C04,C05,C06,C08,C10.",
+    "Reject all bearish signal crosses: contradicted by winners C07 and C11.",
+    "Reject all weekly SELL buys: contradicted by C03,C05,C07,C08,C10,C11.",
+    "Reject all HOD/AR-high breakouts: contradicted by fresh breakout winners C03,C08,C10.",
+    "Use advisory_grade == AVOID as a reject filter: all packet examples were AVOID."
+  ],
+  "pair_specific_notes": [
+    "GBPJPY tolerates 33-60p hunts well when reclaim is clean; >90p hunts need stricter context.",
+    "Use both absolute pips and range-normalized ratios because GBPJPY volatility shifts by session.",
+    "C12 had +28.5p MFE but closed as a loser, so some failures may be exit-management failures rather than pure entry failures."
+  ],
+  "uncertain_items": [
+    "Sample is small and includes same-session duplicates: C04/C06 and C05/C07.",
+    "The oversized-hunt exception may be overfit until tested on more GBPJPY weeks.",
+    "Clean W-bottom and second-leg quality need objective swing/close definitions before promotion."
+  ],
+  "next_backtest_spec": {
+    "scope": "All GBPJPY samples matching this exact setup signature, then adjacent THE_33_MW BUY early-week L3 signatures.",
+    "features_to_add": [
+      "range_pos = (entry_close - asian_low) / asian_range",
+      "distance_to_hod_pips",
+      "distance_from_hunt_low_pips",
+      "bars_since_stop_hunt_low",
+      "bars_since_first_ar_high_break",
+      "close_above_ar_mid_within_8_bars",
+      "tdi_bearish_signal_count",
+      "ema50_reclaim_before_entry"
+    ],
+    "ablations": [
+      "moderate_hunt_primary_allow",
+      "extreme_hunt_reject_with_exception",
+      "stale_hod_exhaustion_reject",
+      "fresh_reclaim_required",
+      "momentum_breakout_exception",
+      "combined_rule_set"
+    ],
+    "metrics": [
+      "sample_count",
+      "favorable_rate",
+      "avg_exit_pips",
+      "avg_mfe_pips",
+      "avg_mae_pips",
+      "t1_hit_rate",
+      "rejected_winner_count",
+      "accepted_loser_count"
+    ]
+  }
+}
+OpenAI Codex v0.137.0
+--------
+workdir: C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019ea2c7-d1a6-73c1-9fbc-4c7afca0716b
+--------
+user
+Use the Read tool to inspect the local chart images when needed.
+Packet directory: C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\GBPJPY_the_33_mw_buy_early_week_l3_true_trend_31ac49b8f6
+
+You are now allowed to use `answer_key.csv` after completing the blind review.
+
+Compare winners against losers for this exact same MMM setup signature.
+
+Pair: GBPJPY
+Shared setup signature: THE_33_MW|BUY|EARLY_WEEK|L3|TRUE_TREND|AR_VALID|HUNT_PAIR_RANGE|PUSH3_PLUS|W_BOTTOM|RRT|TDI_CONFLICT|THE_33|CONF_75_PLUS
+
+Goal: identify the visual/structural filters that separate profitable examples from failed examples.
+
+Return a concise JSON object with:
+`summary`, `winner_traits`, `loser_traits`, `filters_to_test`, `filters_to_reject`, `pair_specific_notes`, `uncertain_items`, and `next_backtest_spec`.
+
+Each `filters_to_test` item must be deterministic enough for Codex to encode. Include measurable thresholds where possible, such as candles, pips, ratios, relative position to Asian range, or TDI state.
+
+Do not recommend live trading. These are research filters only.
+
+
+Local chart images:
+- C01: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\GBPJPY_the_33_mw_buy_early_week_l3_true_trend_31ac49b8f6\images\c01_fc4540_20240219T081500.png`
+- C02: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\GBPJPY_the_33_mw_buy_early_week_l3_true_trend_31ac49b8f6\images\c02_fc718_20240122T120000.png`
+- C03: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\GBPJPY_the_33_mw_buy_early_week_l3_true_trend_31ac49b8f6\images\c03_fc4559_20240226T124500.png`
+- C04: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\GBPJPY_the_33_mw_buy_early_week_l3_true_trend_31ac49b8f6\images\c04_fc648_20230925T110000.png`
+- C05: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\GBPJPY_the_33_mw_buy_early_week_l3_true_trend_31ac49b8f6\images\c05_fc4881_20251208T081500.png`
+- C06: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\GBPJPY_the_33_mw_buy_early_week_l3_true_trend_31ac49b8f6\images\c06_fc4412_20230925T111500.png`
+- C07: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\GBPJPY_the_33_mw_buy_early_week_l3_true_trend_31ac49b8f6\images\c07_fc513_20251208T080000.png`
+- C08: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\GBPJPY_the_33_mw_buy_early_week_l3_true_trend_31ac49b8f6\images\c08_fc4486_20231113T094500.png`
+- C09: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\GBPJPY_the_33_mw_buy_early_week_l3_true_trend_31ac49b8f6\images\c09_fc4616_20240422T121500.png`
+- C10: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\GBPJPY_the_33_mw_buy_early_week_l3_true_trend_31ac49b8f6\images\c10_fc4874_20251117T110000.png`
+- C11: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\GBPJPY_the_33_mw_buy_early_week_l3_true_trend_31ac49b8f6\images\c11_fc4690_20241014T094500.png`
+- C12: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\GBPJPY_the_33_mw_buy_early_week_l3_true_trend_31ac49b8f6\images\c12_fc4889_20251222T111500.png`
+- C13: `C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\GBPJPY_the_33_mw_buy_early_week_l3_true_trend_31ac49b8f6\images\c13_fc4772_20250818T080000.png`
+
+Answer key:
+review_id,label,flashcard_id,snapshot_at,outcome,exit_pips,max_favorable_pips,max_adverse_pips,t1_hit,image_path
+C01,loser,4540,2024-02-19T08:15:00+00:00,TIME_EXIT_LOSS,-12.20000000000141,9.600000000000364,29.000000000002046,False,images/c01_fc4540_20240219T081500.png
+C02,loser,718,2024-01-22T12:00:00+00:00,TIME_EXIT_LOSS,-17.599999999998772,6.299999999998818,23.799999999999955,False,images/c02_fc718_20240122T120000.png
+C03,winner,4559,2024-02-26T12:45:00+00:00,TIME_EXIT_PROFIT,11.599999999998545,33.899999999999864,6.800000000001205,False,images/c03_fc4559_20240226T124500.png
+C04,winner,648,2023-09-25T11:00:00+00:00,TIME_EXIT_PROFIT,13.100000000000023,32.30000000000075,22.59999999999991,False,images/c04_fc648_20230925T110000.png
+C05,winner,4881,2025-12-08T08:15:00+00:00,TIME_EXIT_PROFIT,16.0000000000025,18.500000000000227,14.099999999999113,False,images/c05_fc4881_20251208T081500.png
+C06,winner,4412,2023-09-25T11:15:00+00:00,TRAIL_STOP,17.499999999998295,38.30000000000098,16.59999999999968,True,images/c06_fc4412_20230925T111500.png
+C07,winner,513,2025-12-08T08:00:00+00:00,TIME_EXIT_PROFIT,21.60000000000082,27.700000000001523,4.200000000000159,False,images/c07_fc513_20251208T080000.png
+C08,winner,4486,2023-11-13T09:45:00+00:00,TIME_EXIT_PROFIT,17.600000000001614,25.499999999999545,7.099999999999795,False,images/c08_fc4486_20231113T094500.png
+C09,loser,4616,2024-04-22T12:15:00+00:00,LOSS,-23.500000000001364,1.8000000000000682,28.49999999999966,False,images/c09_fc4616_20240422T121500.png
+C10,winner,4874,2025-11-17T11:00:00+00:00,TIME_EXIT_PROFIT,45.599999999998886,58.099999999998886,5.400000000000205,False,images/c10_fc4874_20251117T110000.png
+C11,winner,4690,2024-10-14T09:45:00+00:00,TIME_EXIT_PROFIT,29.599999999999227,35.40000000000134,6.700000000000728,False,images/c11_fc4690_20241014T094500.png
+C12,loser,4889,2025-12-22T11:15:00+00:00,STALE_EXIT,-12.90000000000191,28.49999999999966,46.20000000000175,False,images/c12_fc4889_20251222T111500.png
+C13,loser,4772,2025-08-18T08:00:00+00:00,TIME_EXIT_LOSS,-21.999999999999886,8.400000000000318,51.09999999999957,False,images/c13_fc4772_20250818T080000.png
+
+
+Blind Codex review:
+[
+  {
+    "review_id": "C01",
+    "predicted_label": "loser",
+    "confidence_0_100": 62,
+    "real_mmm_stop_hunt": false,
+    "return_inside_asian_range": true,
+    "clean_w_bottom": false,
+    "second_leg_quality": "weak_late_recovery",
+    "tdi_state_visible": "signal_cross_bearish_near_midline",
+    "entry_timing": "late_after_hod_rejection_and_inside_range_chop",
+    "reject_reason": "Buy is triggered after a strong HOD rejection with bearish TDI and no fresh clean W-bottom reclaim.",
+    "proposed_filter": "Reject buys when price has already rejected HOD and TDI is crossing bearish unless a fresh Asian-low stop hunt reclaim forms."
+  },
+  {
+    "review_id": "C02",
+    "predicted_label": "loser",
+    "confidence_0_100": 58,
+    "real_mmm_stop_hunt": false,
+    "return_inside_asian_range": true,
+    "clean_w_bottom": false,
+    "second_leg_quality": "range_bound",
+    "tdi_state_visible": "mbl_cross_bearish_flat_midline",
+    "entry_timing": "mid_range_after_hod_spike",
+    "reject_reason": "Price is boxed inside the Asian range after a HOD probe, with flat/bearish TDI and no decisive second leg.",
+    "proposed_filter": "Require a clear low-side sweep and impulsive reclaim before accepting THE_33 buys inside a flat Asian range."
+  },
+  {
+    "review_id": "C03",
+    "predicted_label": "loser",
+    "confidence_0_100": 70,
+    "real_mmm_stop_hunt": false,
+    "return_inside_asian_range": false,
+    "clean_w_bottom": false,
+    "second_leg_quality": "overextended_vertical_breakout",
+    "tdi_state_visible": "shark_fin_short_overbought",
+    "entry_timing": "very_late_at_hod_after_vertical_run",
+    "reject_reason": "The buy appears after a vertical move into HOD with overbought/shark-fin TDI, leaving poor reward-to-risk.",
+    "proposed_filter": "Reject buys within the upper quartile of ADR/Asian range when TDI is overbought or shark-fin short."
+  },
+  {
+    "review_id": "C04",
+    "predicted_label": "loser",
+    "confidence_0_100": 64,
+    "real_mmm_stop_hunt": false,
+    "return_inside_asian_range": true,
+    "clean_w_bottom": false,
+    "second_leg_quality": "choppy_failed_follow_through",
+    "tdi_state_visible": "vb_squeeze_and_shark_fin_short",
+    "entry_timing": "late_mid_range_under_falling_200",
+    "reject_reason": "The market is compressed under a falling long MA with no clean W-bottom displacement.",
+    "proposed_filter": "Reject buys under a clearly falling 200 MA unless price sweeps AR low and closes back above the 50/200 cluster."
+  },
+  {
+    "review_id": "C05",
+    "predicted_label": "winner",
+    "confidence_0_100": 57,
+    "real_mmm_stop_hunt": true,
+    "return_inside_asian_range": true,
+    "clean_w_bottom": true,
+    "second_leg_quality": "moderate_reclaim_from_lod",
+    "tdi_state_visible": "shark_fin_short_but_turning_up",
+    "entry_timing": "early_after_lod_reclaim_with_room_to_hod",
+    "reject_reason": null,
+    "proposed_filter": "Allow if stop-hunt low is reclaimed and price is still below HOD with room across the Asian range."
+  },
+  {
+    "review_id": "C06",
+    "predicted_label": "loser",
+    "confidence_0_100": 63,
+    "real_mmm_stop_hunt": false,
+    "return_inside_asian_range": true,
+    "clean_w_bottom": false,
+    "second_leg_quality": "weak_choppy",
+    "tdi_state_visible": "mbl_cross_bearish",
+    "entry_timing": "late_near_range_mid_after_failed_push",
+    "reject_reason": "This is mostly range chop below/around the long averages, with bearish TDI and no strong second leg.",
+    "proposed_filter": "Reject buys when the latest candle remains trapped below AR mid/MA cluster and TDI signal is bearish."
+  },
+  {
+    "review_id": "C07",
+    "predicted_label": "winner",
+    "confidence_0_100": 60,
+    "real_mmm_stop_hunt": true,
+    "return_inside_asian_range": true,
+    "clean_w_bottom": true,
+    "second_leg_quality": "decent_reclaim_from_lod",
+    "tdi_state_visible": "signal_cross_bearish_but_recovering",
+    "entry_timing": "reasonable_after_lod_reclaim_before_hod",
+    "reject_reason": null,
+    "proposed_filter": "Keep when LOD sweep reclaims the range and price has not yet exhausted into HOD."
+  },
+  {
+    "review_id": "C08",
+    "predicted_label": "loser",
+    "confidence_0_100": 76,
+    "real_mmm_stop_hunt": false,
+    "return_inside_asian_range": false,
+    "clean_w_bottom": false,
+    "second_leg_quality": "overextended_trend_continuation",
+    "tdi_state_visible": "rsi_overbought_and_shark_fin_short",
+    "entry_timing": "very_late_at_hod_after_clean_run",
+    "reject_reason": "The chart is already extended above HOD/Asian high with overbought TDI, not a low-risk W-bottom entry.",
+    "proposed_filter": "Reject buys above HOD/AR high unless there is a later pullback and continuation confirmation."
+  },
+  {
+    "review_id": "C09",
+    "predicted_label": "loser",
+    "confidence_0_100": 68,
+    "real_mmm_stop_hunt": false,
+    "return_inside_asian_range": false,
+    "clean_w_bottom": false,
+    "second_leg_quality": "failed_range_high_push",
+    "tdi_state_visible": "signal_cross_bearish_rolling_down",
+    "entry_timing": "late_after_hod_failure",
+    "reject_reason": "The buy is against a larger down leg and follows a weak HOD/Asian-range rejection with TDI rolling over.",
+    "proposed_filter": "Reject buys when the larger structure is bearish and price fails to hold above Asian high after the first push."
+  },
+  {
+    "review_id": "C10",
+    "predicted_label": "loser",
+    "confidence_0_100": 66,
+    "real_mmm_stop_hunt": true,
+    "return_inside_asian_range": true,
+    "clean_w_bottom": false,
+    "second_leg_quality": "sideways_then_exhaustion",
+    "tdi_state_visible": "shark_fin_short_after_overbought_push",
+    "entry_timing": "late_after_stop_hunt_already_played_out",
+    "reject_reason": "The low sweep worked earlier, but current entry is after consolidation and a spike into HOD with TDI exhaustion.",
+    "proposed_filter": "Expire stop-hunt buy permission after the first range-to-HOD leg or when TDI prints shark-fin short."
+  },
+  {
+    "review_id": "C11",
+    "predicted_label": "winner",
+    "confidence_0_100": 55,
+    "real_mmm_stop_hunt": true,
+    "return_inside_asian_range": true,
+    "clean_w_bottom": true,
+    "second_leg_quality": "controlled_reclaim_and_hold",
+    "tdi_state_visible": "signal_cross_bearish_but_above_recovery_zone",
+    "entry_timing": "acceptable_after_lod_reclaim_and_higher_low",
+    "reject_reason": null,
+    "proposed_filter": "Allow buys when a live stop hunt reclaims LOD and holds above the MA cluster with a higher low."
+  },
+  {
+    "review_id": "C12",
+    "predicted_label": "loser",
+    "confidence_0_100": 72,
+    "real_mmm_stop_hunt": true,
+    "return_inside_asian_range": false,
+    "clean_w_bottom": false,
+    "second_leg_quality": "overextended_after_full_trend_day",
+    "tdi_state_visible": "rsi_overbought_and_signal_cross_bearish",
+    "entry_timing": "very_late_at_hod_after_full_expansion",
+    "reject_reason": "The stop-hunt happened far earlier; current buy is at HOD after a full trend expansion and TDI overbought rollover.",
+    "proposed_filter": "Reject THE_33 buys once price has travelled from stop-hunt low to HOD without a fresh pullback setup."
+  },
+  {
+    "review_id": "C13",
+    "predicted_label": "winner",
+    "confidence_0_100": 52,
+    "real_mmm_stop_hunt": true,
+    "return_inside_asian_range": true,
+    "clean_w_bottom": true,
+    "second_leg_quality": "strong_reclaim_but_late_near_high",
+    "tdi_state_visible": "signal_and_mbl_cross_bearish_flat_near_upper_band",
+    "entry_timing": "late_but_holding_high_after_reclaim",
+    "reject_reason": null,
+    "proposed_filter": "Prefer these only when high consolidation holds above weekly open and avoids a sharp TDI rollover below the 50 line."
+  }
+]
+
+Blind Claude review:
+All charts viewed. Here are the three blind review JSONs. Save each to its respective `reviews/claude_blind.md`.
+
+---
+
+## Packet 1: EURJPY_the_33_mw_buy_early_week_l3_true_trend_a6c634d982
+
+Save to `data/mmm_training/vision_review_packets/EURJPY_the_33_mw_buy_early_week_l3_true_trend_a6c634d982/reviews/claude_blind.md`:
+
+```
+[
+  {"review_id": "C01", "predicted_label": "loser", "confidence_0_100": 55, "real_mmm_stop_hunt": true, "return_inside_asian_range": true, "clean_w_bottom": false, "second_leg_quality": "weak", "tdi_state_visible": "below_50", "entry_timing": "late", "reject_reason": "TDI bearish, choppy recovery", "proposed_filter": "tdi_rsi_gte_50"},
+  {"review_id": "C02", "predicted_label": "loser", "confidence_0_100": 60, "real_mmm_stop_hunt": true, "return_inside_asian_range": true, "clean_w_bottom": false, "second_leg_quality": "weak", "tdi_state_visible": "below_50", "entry_timing": "acceptable", "reject_reason": "weak momentum, price stalling near AR low", "proposed_filter": "tdi_rsi_gte_50"},
+  {"review_id": "C03", "predicted_label": "loser", "confidence_0_100": 45, "real_mmm_stop_hunt": true, "return_inside_asian_range": true, "clean_w_bottom": true, "second_leg_quality": "moderate", "tdi_state_visible": "near_50", "entry_timing": "acceptable", "reject_reason": "choppy recovery, no clear breakout", "proposed_filter": "none"},
+  {"review_id": "C04", "predicted_label": "winner", "confidence_0_100": 55, "real_mmm_stop_hunt": true, "return_inside_asian_range": true, "clean_w_bottom": true, "second_leg_quality": "moderate", "tdi_state_visible": "above_50", "entry_timing": "acceptable", "reject_reason": "none", "proposed_filter": "tdi_rsi_gte_50"},
+  {"review_id": "C05", "predicted_label": "loser", "confidence_0_100": 50, "real_mmm_stop_hunt": true, "return_inside_asian_range": true, "clean_w_bottom": false, "second_leg_quality": "weak", "tdi_state_visible": "below_50", "entry_timing": "late", "reject_reason": "weak recovery, TDI bearish", "proposed_filter": "tdi_rsi_gte_50"},
+  {"review_id": "C06", "predicted_label": "loser", "confidence_0_100": 65, "real_mmm_stop_hunt": true, "return_inside_asian_range": true, "clean_w_bottom": false, "second_leg_quality": "weak", "tdi_state_visible": "below_50", "entry_timing": "late", "reject_reason": "heavy selling, TDI well below 50", "proposed_filter": "tdi_rsi_gte_45"},
+  {"review_id": "C07", "predicted_label": "winner", "confidence_0_100": 55, "real_mmm_stop_hunt": true, "return_inside_asian_range": true, "clean_w_bottom": true, "second_leg_quality": "moderate", "tdi_state_visible": "near_50", "entry_timing": "acceptable", "reject_reason": "none", "proposed_filter": "none"},
+  {"review_id": "C08", "predicted_label": "winner", "confidence_0_100": 60, "real_mmm_stop_hunt": true, "return_inside_asian_range": true, "clean_w_bottom": true, "second_leg_quality": "good", "tdi_state_visible": "above_50", "entry_timing": "good", "reject_reason": "none", "proposed_filter": "tdi_rsi_gte_50"},
+  {"review_id": "C09", "predicted_label": "winner", "confidence_0_100": 70, "real_mmm_stop_hunt": true, "return_inside_asian_range": false, "clean_w_bottom": true, "second_leg_quality": "strong", "tdi_state_visible": "above_50", "entry_timing": "good", "reject_reason": "none", "proposed_filter": "clean_break_above_ar_high"},
+  {"review_id": "C10", "predicted_label": "loser", "confidence_0_100": 50, "real_mmm_stop_hunt": true, "return_inside_asian_range": true, "clean_w_bottom": false, "second_leg_quality": "weak", "tdi_state_visible": "near_50", "entry_timing": "late", "reject_reason": "choppy price action, no clean direction", "proposed_filter": "none"},
+  {"review_id": "C11", "predicted_label": "winner", "confidence_0_100": 65, "real_mmm_stop_hunt": true, "return_inside_asian_range": false, "clean_w_bottom": true, "second_leg_quality": "good", "tdi_state_visible": "above_50", "entry_timing": "good", "reject_reason": "none", "proposed_filter": "tdi_rsi_gte_50"},
+  {"review_id": "C12", "predicted_label": "winner", "confidence_0_100": 60, "real_mmm_stop_hunt": true, "return_inside_asian_range": true, "clean_w_bottom": true, "second_leg_quality": "moderate", "tdi_state_visible": "above_50", "entry_timing": "acceptable", "reject_reason": "none", "proposed_filter": "none"}
+]
+```
+
+---
+
+## Packet 2: GBPJPY_the_33_mw_buy_early_week_l3_true_trend_31ac49b8f6
+
+Save to `data/mmm_training/vision_review_packets/GBPJPY_the_33_mw_buy_early_week_l3_true_trend_31ac49b8f6/reviews/claude_blind.md`:
+
+```
+[
+  {"review_id": "C01", "predicted_label": "loser", "confidence_0_100": 65, "real_mmm_stop_hunt": true, "return_inside_asian_range": true, "clean_w_bottom": false, "second_leg_quality": "weak", "tdi_state_visible": "bearish_cross_shark_fin_short", "entry_timing": "late", "reject_reason": "115p extreme hunt, TDI signal cross bearish + shark fin short, weekly SELL against BUY", "proposed_filter": "stop_hunt_le_90"},
+  {"review_id": "C02", "predicted_label": "loser", "confidence_0_100": 60, "real_mmm_stop_hunt": true, "return_inside_asian_range": true, "clean_w_bottom": false, "second_leg_quality": "weak", "tdi_state_visible": "mbl_cross_bearish", "entry_timing": "late", "reject_reason": "68p hunt, large 48p asian range, MBL bearish cross, choppy near LOD", "proposed_filter": "asian_range_le_40"},
+  {"review_id": "C03", "predicted_label": "winner", "confidence_0_100": 65, "real_mmm_stop_hunt": true, "return_inside_asian_range": false, "clean_w_bottom": true, "second_leg_quality": "good", "tdi_state_visible": "shark_fin_short", "entry_timing": "good", "reject_reason": "none", "proposed_filter": "hunt_to_ar_ratio_le_2_0"},
+  {"review_id": "C04", "predicted_label": "winner", "confidence_0_100": 50, "real_mmm_stop_hunt": true, "return_inside_asian_range": true, "clean_w_bottom": true, "second_leg_quality": "moderate", "tdi_state_visible": "vb_squeeze_shark_fin_short", "entry_timing": "acceptable", "reject_reason": "none", "proposed_filter": "weekly_aligned"},
+  {"review_id": "C05", "predicted_label": "winner", "confidence_0_100": 55, "real_mmm_stop_hunt": true, "return_inside_asian_range": true, "clean_w_bottom": true, "second_leg_quality": "moderate", "tdi_state_visible": "shark_fin_short", "entry_timing": "acceptable", "reject_reason": "none", "proposed_filter": "hunt_le_50"},
+  {"review_id": "C06", "predicted_label": "winner", "confidence_0_100": 45, "real_mmm_stop_hunt": true, "return_inside_asian_range": true, "clean_w_bottom": true, "second_leg_quality": "moderate", "tdi_state_visible": "vb_squeeze_mbl_bearish_shark_fin", "entry_timing": "acceptable", "reject_reason": "none", "proposed_filter": "weekly_aligned"},
+  {"review_id": "C07", "predicted_label": "loser", "confidence_0_100": 60, "real_mmm_stop_hunt": true, "return_inside_asian_range": true, "clean_w_bottom": false, "second_leg_quality": "weak", "tdi_state_visible": "signal_cross_bearish_shark_fin_short", "entry_timing": "late", "reject_reason": "price dropping from HOD with red arrows, late entry near LOD, bearish TDI cross", "proposed_filter": "tdi_rsi_gte_50"},
+  {"review_id": "C08", "predicted_label": "winner", "confidence_0_100": 75, "real_mmm_stop_hunt": true, "return_inside_asian_range": false, "clean_w_bottom": true, "second_leg_quality": "strong", "tdi_state_visible": "rsi_overbought_shark_fin_short", "entry_timing": "good", "reject_reason": "none", "proposed_filter": "strong_momentum_breakout"},
+  {"review_id": "C09", "predicted_label": "loser", "confidence_0_100": 70, "real_mmm_stop_hunt": true, "return_inside_asian_range": true, "clean_w_bottom": false, "second_leg_quality": "weak", "tdi_state_visible": "signal_cross_bearish", "entry_timing": "late", "reject_reason": "113p extreme hunt, bearish TDI, 69p large asian range, choppy near LOD with red arrows", "proposed_filter": "stop_hunt_le_90"},
+  {"review_id": "C10", "predicted_label": "winner", "confidence_0_100": 65, "real_mmm_stop_hunt": true, "return_inside_asian_range": false, "clean_w_bottom": true, "second_leg_quality": "good", "tdi_state_visible": "shark_fin_short", "entry_timing": "good", "reject_reason": "none", "proposed_filter": "hunt_to_ar_ratio_le_2_0"},
+  {"review_id": "C11", "predicted_label": "winner", "confidence_0_100": 50, "real_mmm_stop_hunt": true, "return_inside_asian_range": true, "clean_w_bottom": true, "second_leg_quality": "moderate", "tdi_state_visible": "signal_cross_bearish", "entry_timing": "acceptable", "reject_reason": "none", "proposed_filter": "hunt_le_50"},
+  {"review_id": "C12", "predicted_label": "loser", "confidence_0_100": 60, "real_mmm_stop_hunt": true, "return_inside_asian_range": true, "clean_w_bottom": false, "second_leg_quality": "weak", "tdi_state_visible": "rsi_overbought_signal_cross_bearish_hook_shark_fin", "entry_timing": "late", "reject_reason": "multiple bearish TDI signals, choppy near LOD, stale exit risk", "proposed_filter": "tdi_bearish_count_le_2"},
+  {"review_id": "C13", "predicted_label": "loser", "confidence_0_100": 55, "real_mmm_stop_hunt": true, "return_inside_asian_range": true, "clean_w_bottom": false, "second_leg_quality": "weak", "tdi_state_visible": "signal_cross_bearish_mbl_cross_bearish", "entry_timing": "late", "reject_reason": "98p extreme hunt, double bearish TDI cross, large 67p asian range", "proposed_filter": "stop_hunt_le_90"}
+]
+```
+
+---
+
+## Packet 3: GBPJPY_the_33_mw_buy_early_week_l3_true_trend_7d853c76a8
+
+Save to `data/mmm_training/vision_review_packets/GBPJPY_the_33_mw_buy_early_week_l3_true_trend_7d853c76a8/reviews/claude_blind.md`:
+
+```
+[
+  {"review_id": "C01", "predicted_label": "winner", "confidence_0_100": 55, "real_mmm_stop_hunt": true, "return_inside_asian_range": true, "clean_w_bottom": true, "second_leg_quality": "moderate", "tdi_state_visible": "flat_50", "entry_timing": "acceptable", "reject_reason": "none", "proposed_filter": "none"},
+  {"review_id": "C02", "predicted_label": "loser", "confidence_0_100": 55, "real_mmm_stop_hunt": true, "return_inside_asian_range": true, "clean_w_bottom": false, "second_leg_quality": "weak", "tdi_state_visible": "below_50", "entry_timing": "late", "reject_reason": "RSI 44, choppy near LOD, messy recovery with mixed arrows", "proposed_filter": "tdi_rsi_gte_50"},
+  {"review_id": "C03", "predicted_label": "loser", "confidence_0_100": 65, "real_mmm_stop_hunt": true, "return_inside_asian_range": true, "clean_w_bottom": false, "second_leg_quality": "weak", "tdi_state_visible": "below_50", "entry_timing": "late", "reject_reason": "115p extreme hunt, RSI 44, price near LOD with weak recovery", "proposed_filter": "stop_hunt_le_90"},
+  {"review_id": "C04", "predicted_label": "loser", "confidence_0_100": 70, "real_mmm_stop_hunt": true, "return_inside_asian_range": true, "clean_w_bottom": false, "second_leg_quality": "weak", "tdi_state_visible": "below_50", "entry_timing": "late", "reject_reason": "115p extreme hunt, RSI 43, same session as C03, red arrows near LOD", "proposed_filter": "stop_hunt_le_90"},
+  {"review_id": "C05", "predicted_label": "winner", "confidence_0_100": 60, "real_mmm_stop_hunt": true, "return_inside_asian_range": false, "clean_w_bottom": true, "second_leg_quality": "good", "tdi_state_visible": "above_50", "entry_timing": "good", "reject_reason": "none", "proposed_filter": "tdi_rsi_gt_signal"},
+  {"review_id": "C06", "predicted_label": "loser", "confidence_0_100": 50, "real_mmm_stop_hunt": true, "return_inside_asian_range": true, "clean_w_bottom": false, "second_leg_quality": "moderate", "tdi_state_visible": "near_50", "entry_timing": "acceptable", "reject_reason": "choppy price near LOD, late-session indecision", "proposed_filter": "none"},
+  {"review_id": "C07", "predicted_label": "winner", "confidence_0_100": 55, "real_mmm_stop_hunt": true, "return_inside_asian_range": true, "clean_w_bottom": true, "second_leg_quality": "moderate", "tdi_state_visible": "above_50", "entry_timing": "acceptable", "reject_reason": "none", "proposed_filter": "tdi_rsi_gt_signal"},
+  {"review_id": "C08", "predicted_label": "loser", "confidence_0_100": 55, "real_mmm_stop_hunt": true, "return_inside_asian_range": true, "clean_w_bottom": false, "second_leg_quality": "weak", "tdi_state_visible": "near_50", "entry_timing": "late", "reject_reason": "choppy near LOD, weak recovery despite mixed arrows", "proposed_filter": "none"},
+  {"review_id": "C09", "predicted_label": "winner", "confidence_0_100": 65, "real_mmm_stop_hunt": true, "return_inside_asian_range": false, "clean_w_bottom": true, "second_leg_quality": "good", "tdi_state_visible": "above_50", "entry_timing": "good", "reject_reason": "none", "proposed_filter": "tdi_rsi_gte_55"},
+  {"review_id": "C10", "predicted_label": "winner", "confidence_0_100": 50, "real_mmm_stop_hunt": true, "return_inside_asian_range": true, "clean_w_bottom": true, "second_leg_quality": "moderate", "tdi_state_visible": "near_50", "entry_timing": "acceptable", "reject_reason": "none", "proposed_filter": "none"}
+]
+```
+
+---
+
+## Summary
+
+All 3 packets visually reviewed blind (35 charts total):
+
+| Packet | Charts | Predicted Winners | Predicted Losers |
+|---|---:|---:|---:|
+| EURJPY true_trend a6c634d9 | 12 | 6 | 6 |
+| GBPJPY true_trend 31ac49b8 (RRT/TDI_CONFLICT) | 13 | 7 | 6 |
+| GBPJPY true_trend 7d853c76 (NO_RRT/TDI_NONE) | 10 | 5 | 5 |
+
+Key visual patterns driving predictions:
+- **Extreme hunts (>90p)** strongly predicted losers across all GBPJPY packets
+- **TDI RSI below 50** or **bearish crosses** correlated with loser predictions
+- **Clean price recovery above AR High** with green arrows predicted winners
+- **Choppy price near LOD** with mixed/red arrows predicted losers
+- **Large Asian ranges (>45p)** reduced confidence in all setups
+
+To score these against answer keys and generate comparison summaries, run:
+```powershell
+.venv\Scripts\python.exe -m helix_v3.training.vision_account_review_runner --providers claude --stages blind
+```
+
+
+Return only the requested concise JSON object. Do not recommend live trading.
+
+codex
+I’ll compare the labeled winners and losers from the packet first, then use the chart structure and the blind notes only as supporting evidence. The key is to turn visual differences into filters that can be encoded and backtested, not to overfit one screenshot.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -LiteralPath 'C:\\Users\\dennis.ndungu\\Desktop\\ClaudeMCP\\Helix_V3\\data\\mmm_training\\vision_review_packets\\GBPJPY_the_33_mw_buy_early_week_l3_true_trend_31ac49b8f6\\answer_key.csv'" in C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3
+ succeeded in 311ms:
+review_id,label,flashcard_id,snapshot_at,outcome,exit_pips,max_favorable_pips,max_adverse_pips,t1_hit,image_path
+C01,loser,4540,2024-02-19T08:15:00+00:00,TIME_EXIT_LOSS,-12.20000000000141,9.600000000000364,29.000000000002046,False,images/c01_fc4540_20240219T081500.png
+C02,loser,718,2024-01-22T12:00:00+00:00,TIME_EXIT_LOSS,-17.599999999998772,6.299999999998818,23.799999999999955,False,images/c02_fc718_20240122T120000.png
+C03,winner,4559,2024-02-26T12:45:00+00:00,TIME_EXIT_PROFIT,11.599999999998545,33.899999999999864,6.800000000001205,False,images/c03_fc4559_20240226T124500.png
+C04,winner,648,2023-09-25T11:00:00+00:00,TIME_EXIT_PROFIT,13.100000000000023,32.30000000000075,22.59999999999991,False,images/c04_fc648_20230925T110000.png
+C05,winner,4881,2025-12-08T08:15:00+00:00,TIME_EXIT_PROFIT,16.0000000000025,18.500000000000227,14.099999999999113,False,images/c05_fc4881_20251208T081500.png
+C06,winner,4412,2023-09-25T11:15:00+00:00,TRAIL_STOP,17.499999999998295,38.30000000000098,16.59999999999968,True,images/c06_fc4412_20230925T111500.png
+C07,winner,513,2025-12-08T08:00:00+00:00,TIME_EXIT_PROFIT,21.60000000000082,27.700000000001523,4.200000000000159,False,images/c07_fc513_20251208T080000.png
+C08,winner,4486,2023-11-13T09:45:00+00:00,TIME_EXIT_PROFIT,17.600000000001614,25.499999999999545,7.099999999999795,False,images/c08_fc4486_20231113T094500.png
+C09,loser,4616,2024-04-22T12:15:00+00:00,LOSS,-23.500000000001364,1.8000000000000682,28.49999999999966,False,images/c09_fc4616_20240422T121500.png
+C10,winner,4874,2025-11-17T11:00:00+00:00,TIME_EXIT_PROFIT,45.599999999998886,58.099999999998886,5.400000000000205,False,images/c10_fc4874_20251117T110000.png
+C11,winner,4690,2024-10-14T09:45:00+00:00,TIME_EXIT_PROFIT,29.599999999999227,35.40000000000134,6.700000000000728,False,images/c11_fc4690_20241014T094500.png
+C12,loser,4889,2025-12-22T11:15:00+00:00,STALE_EXIT,-12.90000000000191,28.49999999999966,46.20000000000175,False,images/c12_fc4889_20251222T111500.png
+C13,loser,4772,2025-08-18T08:00:00+00:00,TIME_EXIT_LOSS,-21.999999999999886,8.400000000000318,51.09999999999957,False,images/c13_fc4772_20250818T080000.png
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-ChildItem -LiteralPath 'C:\\Users\\dennis.ndungu\\Desktop\\ClaudeMCP\\Helix_V3\\data\\mmm_training\\vision_review_packets\\GBPJPY_the_33_mw_buy_early_week_l3_true_trend_31ac49b8f6' -Force" in C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3
+ succeeded in 293ms:
+
+
+    Directory: C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3\data\mmm_training\vision_review_packets\GBPJPY_the_33_mw_
+    buy_early_week_l3_true_trend_31ac49b8f6
+
+
+Mode                 LastWriteTime         Length Name                                                                    
+----                 -------------         ------ ----                                                                    
+d-----        07/06/2026     18:15                images                                                                  
+d-----        07/06/2026     18:51                reviews                                                                 
+-a----        07/06/2026     18:15           2148 answer_key.csv                                                          
+-a----        07/06/2026     18:15           1355 blind_prompt.md                                                         
+-a----        07/06/2026     18:15            885 labeled_comparison_prompt.md                                            
+-a----        07/06/2026     18:15          30453 manifest.json                                                           
+-a----        07/06/2026     18:15           1129 README.md                                                               
+-a----        07/06/2026     18:15            379 review_matrix.csv                                                       
+
+
+
+codex
+I’ve verified the local answer key matches the pasted labels. Next I’m checking the packet metadata so the proposed filters use fields that likely already exist or can be derived from the current research pipeline.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -LiteralPath 'C:\\Users\\dennis.ndungu\\Desktop\\ClaudeMCP\\Helix_V3\\data\\mmm_training\\vision_review_packets\\GBPJPY_the_33_mw_buy_early_week_l3_true_trend_31ac49b8f6\\README.md'" in C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -LiteralPath 'C:\\Users\\dennis.ndungu\\Desktop\\ClaudeMCP\\Helix_V3\\data\\mmm_training\\vision_review_packets\\GBPJPY_the_33_mw_buy_early_week_l3_true_trend_31ac49b8f6\\review_matrix.csv'" in C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3
+ succeeded in 257ms:
+# GBPJPY Vision Review Packet
+
+Generated: 2026-06-07T15:15:17.452679+00:00
+
+Purpose: isolate visual differences between winning and losing versions of the same MMM setup signature.
+
+## Setup
+
+- Pair: `GBPJPY`
+- Signature: `THE_33_MW|BUY|EARLY_WEEK|L3|TRUE_TREND|AR_VALID|HUNT_PAIR_RANGE|PUSH3_PLUS|W_BOTTOM|RRT|TDI_CONFLICT|THE_33|CONF_75_PLUS`
+- Total replay samples: 14
+- Favorable rate: 64.3%
+- Average exit: +6.2 pips
+- Winners in packet: 8
+- Losers in packet: 5
+
+## Review Flow
+
+1. Open `blind_prompt.md` and attach the images from `images/`.
+2. Ask ChatGPT Pro and Claude Max to classify each chart without `answer_key.csv`.
+3. Then open `labeled_comparison_prompt.md` with `answer_key.csv` and ask for winner-vs-loser visual filters.
+4. Convert agreed filters into deterministic replay rules before any promotion.
+
+## Files
+
+- `manifest.json`: full packet metadata.
+- `answer_key.csv`: outcome labels; hide during blind review.
+- `review_matrix.csv`: fillable model-review table.
+- `blind_prompt.md`: first-pass model prompt.
+- `labeled_comparison_prompt.md`: second-pass explanation prompt.
+
+ succeeded in 253ms:
+review_id,predicted_label,real_mmm_stop_hunt,return_inside_asian_range,clean_w_bottom,second_leg_quality,tdi_state_visible,entry_timing,reject_reason,proposed_filter,confidence_0_100
+C01,,,,,,,,,,
+C02,,,,,,,,,,
+C03,,,,,,,,,,
+C04,,,,,,,,,,
+C05,,,,,,,,,,
+C06,,,,,,,,,,
+C07,,,,,,,,,,
+C08,,,,,,,,,,
+C09,,,,,,,,,,
+C10,,,,,,,,,,
+C11,,,,,,,,,,
+C12,,,,,,,,,,
+C13,,,,,,,,,,
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -LiteralPath 'C:\\Users\\dennis.ndungu\\Desktop\\ClaudeMCP\\Helix_V3\\data\\mmm_training\\vision_review_packets\\GBPJPY_the_33_mw_buy_early_week_l3_true_trend_31ac49b8f6\\manifest.json' -TotalCount 120" in C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3
+ succeeded in 265ms:
+{
+  "counts": {
+    "items": 13,
+    "losers": 5,
+    "winners": 8
+  },
+  "generated_at": "2026-06-07T15:15:17.452679+00:00",
+  "instructions": {
+    "answer_key": "answer_key.csv",
+    "blind_prompt": "blind_prompt.md",
+    "labeled_prompt": "labeled_comparison_prompt.md",
+    "review_matrix": "review_matrix.csv"
+  },
+  "items": [
+    {
+      "context": {
+        "advisory_confidence_score": 59.75,
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 26.39999999999816,
+        "confluence_score": 75,
+        "event_path": [
+          "ENTRY",
+          "STALE_TIGHTEN",
+          "TIME_EXIT_LOSS"
+        ],
+        "h1_session": "TRUE_TREND",
+        "h1_trend": "BUY",
+        "h4_level": 3,
+        "h4_trend": "BUY",
+        "m_w_pattern": "W_BOTTOM",
+        "pattern_trade_type": "THE_33",
+        "push_count": 5,
+        "ratios": {
+          "asian_range_to_pair_max": 0.5279999999999632,
+          "confluence": 0.75,
+          "hunt_to_expected_level_move": 1.1500000000000057,
+          "hunt_to_pair_max": 0.884615384615389,
+          "single_setup_theme_score": 0.5
+        },
+        "rrt_detected": true,
+        "stop_hunt_detected": true,
+        "stop_hunt_direction": "BUY",
+        "stop_hunt_pips": 115.00000000000057,
+        "tags": [
+          "historical",
+          "TIME_EXIT_LOSS",
+          "BUY",
+          "L3",
+          "EARLY_WEEK"
+        ],
+        "tdi_crossed_signal": "bearish",
+        "tdi_divergence": "none",
+        "tdi_shark_direction": "SHORT",
+        "tdi_shark_fin": true,
+        "tdi_signals": [
+          "SIGNAL_CROSS_BEARISH",
+          "SHARK_FIN_SHORT"
+        ],
+        "tdi_vb_squeeze": false,
+        "theme_tags": [
+          "GBP_STRENGTH",
+          "JPY_WEAKNESS"
+        ],
+        "weekly_phase": "EARLY_WEEK",
+        "weekly_trend": "SELL"
+      },
+      "direction": "BUY",
+      "exit_pips": -12.20000000000141,
+      "flashcard_id": 4540,
+      "image_path": "images/c01_fc4540_20240219T081500.png",
+      "label": "loser",
+      "max_adverse_pips": 29.000000000002046,
+      "max_favorable_pips": 9.600000000000364,
+      "minutes_to_t1": null,
+      "outcome": "TIME_EXIT_LOSS",
+      "review_id": "C01",
+      "snapshot_at": "2024-02-19T08:15:00+00:00",
+      "source_chart_path": "charts\\annotated\\GBPJPY_M15_annotated_20260607_154227_528434.png",
+      "symbol": "GBPJPY",
+      "t1_hit": false,
+      "timeframe": "M15"
+    },
+    {
+      "context": {
+        "advisory_confidence_score": 63.0,
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 48.30000000000041,
+        "confluence_score": 80,
+        "event_path": [
+          "ENTRY",
+          "STALE_TIGHTEN",
+          "TIME_EXIT_LOSS"
+        ],
+        "h1_session": "TRUE_TREND",
+        "h1_trend": "BUY",
+        "h4_level": 3,
+        "h4_trend": "BUY",
+        "m_w_pattern": "W_BOTTOM",
+        "pattern_trade_type": "THE_33",
+        "push_count": 5,
+        "ratios": {
+          "asian_range_to_pair_max": 0.9660000000000082,
+          "confluence": 0.8,
+          "hunt_to_expected_level_move": 0.6839999999999975,
+          "hunt_to_pair_max": 0.5261538461538442,
+          "single_setup_theme_score": 0.52
+        },
+        "rrt_detected": true,
+        "stop_hunt_detected": true,
+        "stop_hunt_direction": "BUY",
+        "stop_hunt_pips": 68.39999999999975,
+        "tags": [
+          "historical",
+          "TIME_EXIT_LOSS",
+          "BUY",
+          "L3",
+          "EARLY_WEEK"
+        ],
+        "tdi_crossed_signal": "none",
+        "tdi_divergence": "none",
+
+codex
+The manifest includes the encoded scanner context: Asian range pips, stop-hunt pips, TDI signal tags, weekly trend, advisory grade, and replay path. That’s enough to avoid proposing filters that depend only on subjective screenshot reading.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$m = Get-Content -Raw -LiteralPath '"'C:\\Users\\dennis.ndungu\\Desktop\\ClaudeMCP\\Helix_V3\\data\\mmm_training\\vision_review_packets\\GBPJPY_the_33_mw_buy_early_week_l3_true_trend_31ac49b8f6\\manifest.json' | ConvertFrom-Json; "'$m.items | ForEach-Object { [pscustomobject]@{id=$_.review_id; label=$_.label; exit=[math]::Round($_.exit_pips,1); mfe=[math]::Round($_.max_favorable_pips,1); mae=[math]::Round($_.max_adverse_pips,1); t1=$_.t1_hit; ar=[math]::Round($_.context.asian_range_pips,1); hunt=[math]::Round($_.context.stop_hunt_pips,1); huntExpected=[math]::Round($_.context.ratios.hunt_to_expected_level_move,2); arPairMax=[math]::Round($_.context.ratios.asian_range_to_pair_max,2); weekly=$_.context.weekly_trend; conf=$_.context.confluence_score; adv=[math]::Round($_.context.advisory_confidence_score,1); grade=$_.context.advisory_grade; tdi=($_.context.tdi_signals -join '"'|'); event=("'$_.context.event_path -join '"'>') } } | Format-Table -AutoSize" in C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3
+ declined in 0ms:
+`"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$m = Get-Content -Raw -LiteralPath '"'C:\\Users\\dennis.ndungu\\Desktop\\ClaudeMCP\\Helix_V3\\data\\mmm_training\\vision_review_packets\\GBPJPY_the_33_mw_buy_early_week_l3_true_trend_31ac49b8f6\\manifest.json' | ConvertFrom-Json; "'$m.items | ForEach-Object { [pscustomobject]@{id=$_.review_id; label=$_.label; exit=[math]::Round($_.exit_pips,1); mfe=[math]::Round($_.max_favorable_pips,1); mae=[math]::Round($_.max_adverse_pips,1); t1=$_.t1_hit; ar=[math]::Round($_.context.asian_range_pips,1); hunt=[math]::Round($_.context.stop_hunt_pips,1); huntExpected=[math]::Round($_.context.ratios.hunt_to_expected_level_move,2); arPairMax=[math]::Round($_.context.ratios.asian_range_to_pair_max,2); weekly=$_.context.weekly_trend; conf=$_.context.confluence_score; adv=[math]::Round($_.context.advisory_confidence_score,1); grade=$_.context.advisory_grade; tdi=($_.context.tdi_signals -join '"'|'); event=("'$_.context.event_path -join '"'>') } } | Format-Table -AutoSize"` rejected: blocked by policy
+2026-06-07T15:52:15.985347Z ERROR codex_core::tools::router: error=`"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$m = Get-Content -Raw -LiteralPath '"'C:\\Users\\dennis.ndungu\\Desktop\\ClaudeMCP\\Helix_V3\\data\\mmm_training\\vision_review_packets\\GBPJPY_the_33_mw_buy_early_week_l3_true_trend_31ac49b8f6\\manifest.json' | ConvertFrom-Json; "'$m.items | ForEach-Object { [pscustomobject]@{id=$_.review_id; label=$_.label; exit=[math]::Round($_.exit_pips,1); mfe=[math]::Round($_.max_favorable_pips,1); mae=[math]::Round($_.max_adverse_pips,1); t1=$_.t1_hit; ar=[math]::Round($_.context.asian_range_pips,1); hunt=[math]::Round($_.context.stop_hunt_pips,1); huntExpected=[math]::Round($_.context.ratios.hunt_to_expected_level_move,2); arPairMax=[math]::Round($_.context.ratios.asian_range_to_pair_max,2); weekly=$_.context.weekly_trend; conf=$_.context.confluence_score; adv=[math]::Round($_.context.advisory_confidence_score,1); grade=$_.context.advisory_grade; tdi=($_.context.tdi_signals -join '"'|'); event=("'$_.context.event_path -join '"'>') } } | Format-Table -AutoSize"` rejected: blocked by policy
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path = '"'C:\\Users\\dennis.ndungu\\Desktop\\ClaudeMCP\\Helix_V3\\data\\mmm_training\\vision_review_packets\\GBPJPY_the_33_mw_buy_early_week_l3_true_trend_31ac49b8f6\\manifest.json'
+"'$m = Get-Content -Raw -LiteralPath $path | ConvertFrom-Json
+$m.items | Select-Object review_id,label,exit_pips,max_favorable_pips,max_adverse_pips,t1_hit,@{Name='"'asian_range_pips';Expression={"'$_.context.asian_range_pips}},@{Name='"'stop_hunt_pips';Expression={"'$_.context.stop_hunt_pips}},@{Name='"'tdi_signals';Expression={"'$_.context.tdi_signals -join '"','}},@{Name='weekly_trend';Expression={"'$_.context.weekly_trend}},@{Name='"'advisory_grade';Expression={"'$_.context.advisory_grade}},@{Name='"'event_path';Expression={"'$_.context.event_path -join '"','}} | Format-Table -AutoSize" in C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3
+ declined in 0ms:
+`"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path = '"'C:\\Users\\dennis.ndungu\\Desktop\\ClaudeMCP\\Helix_V3\\data\\mmm_training\\vision_review_packets\\GBPJPY_the_33_mw_buy_early_week_l3_true_trend_31ac49b8f6\\manifest.json'
+"'$m = Get-Content -Raw -LiteralPath $path | ConvertFrom-Json
+$m.items | Select-Object review_id,label,exit_pips,max_favorable_pips,max_adverse_pips,t1_hit,@{Name='"'asian_range_pips';Expression={"'$_.context.asian_range_pips}},@{Name='"'stop_hunt_pips';Expression={"'$_.context.stop_hunt_pips}},@{Name='"'tdi_signals';Expression={"'$_.context.tdi_signals -join '"','}},@{Name='weekly_trend';Expression={"'$_.context.weekly_trend}},@{Name='"'advisory_grade';Expression={"'$_.context.advisory_grade}},@{Name='"'event_path';Expression={"'$_.context.event_path -join '"','}} | Format-Table -AutoSize"` rejected: blocked by policy
+2026-06-07T15:52:33.267570Z ERROR codex_core::tools::router: error=`"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$path = '"'C:\\Users\\dennis.ndungu\\Desktop\\ClaudeMCP\\Helix_V3\\data\\mmm_training\\vision_review_packets\\GBPJPY_the_33_mw_buy_early_week_l3_true_trend_31ac49b8f6\\manifest.json'
+"'$m = Get-Content -Raw -LiteralPath $path | ConvertFrom-Json
+$m.items | Select-Object review_id,label,exit_pips,max_favorable_pips,max_adverse_pips,t1_hit,@{Name='"'asian_range_pips';Expression={"'$_.context.asian_range_pips}},@{Name='"'stop_hunt_pips';Expression={"'$_.context.stop_hunt_pips}},@{Name='"'tdi_signals';Expression={"'$_.context.tdi_signals -join '"','}},@{Name='weekly_trend';Expression={"'$_.context.weekly_trend}},@{Name='"'advisory_grade';Expression={"'$_.context.advisory_grade}},@{Name='"'event_path';Expression={"'$_.context.event_path -join '"','}} | Format-Table -AutoSize"` rejected: blocked by policy
+codex
+One structured PowerShell projection was blocked by the local policy wrapper, so I’m falling back to a plain text grep over the manifest. Same data, just less pretty.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg '\"review_id\"|\"label\"|\"exit_pips\"|\"max_favorable_pips\"|\"max_adverse_pips\"|\"asian_range_pips\"|\"stop_hunt_pips\"|\"tdi_signals\"|\"weekly_trend\"|\"event_path\"|\"advisory_grade\"|\"ratios\"|\"hunt_to_expected_level_move\"|\"asian_range_to_pair_max\"' 'C:\\Users\\dennis.ndungu\\Desktop\\ClaudeMCP\\Helix_V3\\data\\mmm_training\\vision_review_packets\\GBPJPY_the_33_mw_buy_early_week_l3_true_trend_31ac49b8f6\\manifest.json'" in C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3
+ succeeded in 232ms:
+    "labeled_prompt": "labeled_comparison_prompt.md",
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 26.39999999999816,
+        "event_path": [
+        "ratios": {
+          "asian_range_to_pair_max": 0.5279999999999632,
+          "hunt_to_expected_level_move": 1.1500000000000057,
+        "stop_hunt_pips": 115.00000000000057,
+        "tdi_signals": [
+        "weekly_trend": "SELL"
+      "exit_pips": -12.20000000000141,
+      "label": "loser",
+      "max_adverse_pips": 29.000000000002046,
+      "max_favorable_pips": 9.600000000000364,
+      "review_id": "C01",
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 48.30000000000041,
+        "event_path": [
+        "ratios": {
+          "asian_range_to_pair_max": 0.9660000000000082,
+          "hunt_to_expected_level_move": 0.6839999999999975,
+        "stop_hunt_pips": 68.39999999999975,
+        "tdi_signals": [
+        "weekly_trend": "SELL"
+      "exit_pips": -17.599999999998772,
+      "label": "loser",
+      "max_adverse_pips": 23.799999999999955,
+      "max_favorable_pips": 6.299999999998818,
+      "review_id": "C02",
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 35.20000000000039,
+        "event_path": [
+        "ratios": {
+          "asian_range_to_pair_max": 0.7040000000000077,
+          "hunt_to_expected_level_move": 0.45599999999998886,
+        "stop_hunt_pips": 45.599999999998886,
+        "tdi_signals": [
+        "weekly_trend": "SELL"
+      "exit_pips": 11.599999999998545,
+      "label": "winner",
+      "max_adverse_pips": 6.800000000001205,
+      "max_favorable_pips": 33.899999999999864,
+      "review_id": "C03",
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 26.900000000000546,
+        "event_path": [
+        "ratios": {
+          "asian_range_to_pair_max": 0.5380000000000109,
+          "hunt_to_expected_level_move": 1.0439999999999827,
+        "stop_hunt_pips": 104.39999999999827,
+        "tdi_signals": [
+        "weekly_trend": "BUY"
+      "exit_pips": 13.100000000000023,
+      "label": "winner",
+      "max_adverse_pips": 22.59999999999991,
+      "max_favorable_pips": 32.30000000000075,
+      "review_id": "C04",
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 38.700000000000045,
+        "event_path": [
+        "ratios": {
+          "asian_range_to_pair_max": 0.7740000000000009,
+          "hunt_to_expected_level_move": 0.3849999999999909,
+        "stop_hunt_pips": 38.49999999999909,
+        "tdi_signals": [
+        "weekly_trend": "SELL"
+      "exit_pips": 16.0000000000025,
+      "label": "winner",
+      "max_adverse_pips": 14.099999999999113,
+      "max_favorable_pips": 18.500000000000227,
+      "review_id": "C05",
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 26.900000000000546,
+        "event_path": [
+        "ratios": {
+          "asian_range_to_pair_max": 0.5380000000000109,
+          "hunt_to_expected_level_move": 1.0439999999999827,
+        "stop_hunt_pips": 104.39999999999827,
+        "tdi_signals": [
+        "weekly_trend": "BUY"
+      "exit_pips": 17.499999999998295,
+      "label": "winner",
+      "max_adverse_pips": 16.59999999999968,
+      "max_favorable_pips": 38.30000000000098,
+      "review_id": "C06",
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 38.700000000000045,
+        "event_path": [
+        "ratios": {
+          "asian_range_to_pair_max": 0.7740000000000009,
+          "hunt_to_expected_level_move": 0.3849999999999909,
+        "stop_hunt_pips": 38.49999999999909,
+        "tdi_signals": [
+        "weekly_trend": "SELL"
+      "exit_pips": 21.60000000000082,
+      "label": "winner",
+      "max_adverse_pips": 4.200000000000159,
+      "max_favorable_pips": 27.700000000001523,
+      "review_id": "C07",
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 38.30000000000098,
+        "event_path": [
+        "ratios": {
+          "asian_range_to_pair_max": 0.7660000000000196,
+          "hunt_to_expected_level_move": 0.5769999999999982,
+        "stop_hunt_pips": 57.69999999999982,
+        "tdi_signals": [
+        "weekly_trend": "SELL"
+      "exit_pips": 17.600000000001614,
+      "label": "winner",
+      "max_adverse_pips": 7.099999999999795,
+      "max_favorable_pips": 25.499999999999545,
+      "review_id": "C08",
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 40.399999999999636,
+        "event_path": [
+        "ratios": {
+          "asian_range_to_pair_max": 0.8079999999999927,
+          "hunt_to_expected_level_move": 1.1270000000000095,
+        "stop_hunt_pips": 112.70000000000095,
+        "tdi_signals": [
+        "weekly_trend": "BUY"
+      "exit_pips": -23.500000000001364,
+      "label": "loser",
+      "max_adverse_pips": 28.49999999999966,
+      "max_favorable_pips": 1.8000000000000682,
+      "review_id": "C09",
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 40.500000000000114,
+        "event_path": [
+        "ratios": {
+          "asian_range_to_pair_max": 0.8100000000000023,
+          "hunt_to_expected_level_move": 0.5320000000000107,
+        "stop_hunt_pips": 53.20000000000107,
+        "tdi_signals": [
+        "weekly_trend": "SELL"
+      "exit_pips": 45.599999999998886,
+      "label": "winner",
+      "max_adverse_pips": 5.400000000000205,
+      "max_favorable_pips": 58.099999999998886,
+      "review_id": "C10",
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 44.70000000000027,
+        "event_path": [
+        "ratios": {
+          "asian_range_to_pair_max": 0.8940000000000055,
+          "hunt_to_expected_level_move": 0.3340000000000032,
+        "stop_hunt_pips": 33.40000000000032,
+        "tdi_signals": [
+        "weekly_trend": "SELL"
+      "exit_pips": 29.599999999999227,
+      "label": "winner",
+      "max_adverse_pips": 6.700000000000728,
+      "max_favorable_pips": 35.40000000000134,
+      "review_id": "C11",
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 40.500000000000114,
+        "event_path": [
+        "ratios": {
+          "asian_range_to_pair_max": 0.8100000000000023,
+          "hunt_to_expected_level_move": 0.42799999999999727,
+        "stop_hunt_pips": 42.79999999999973,
+        "tdi_signals": [
+        "weekly_trend": "SELL"
+      "exit_pips": -12.90000000000191,
+      "label": "loser",
+      "max_adverse_pips": 46.20000000000175,
+      "max_favorable_pips": 28.49999999999966,
+      "review_id": "C12",
+        "advisory_grade": "AVOID",
+        "asian_range_pips": 42.99999999999784,
+        "event_path": [
+        "ratios": {
+          "asian_range_to_pair_max": 0.8599999999999568,
+          "hunt_to_expected_level_move": 0.9819999999999993,
+        "stop_hunt_pips": 98.19999999999993,
+        "tdi_signals": [
+        "weekly_trend": "SELL"
+      "exit_pips": -21.999999999999886,
+      "label": "loser",
+      "max_adverse_pips": 51.09999999999957,
+      "max_favorable_pips": 8.400000000000318,
+      "review_id": "C13",
+    "avg_exit_pips": 6.235714285714015,
+        "avg_exit_pips": -12.90000000000191,
+        "avg_exit_pips": 4.333333333332866,
+        "avg_exit_pips": 15.30000000000058,
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg '\"review_id\"|\"label\"|\"tdi_crossed_signal\"|\"tdi_shark_fin\"|\"tdi_shark_direction\"|\"tdi_vb_squeeze\"|SIGNAL_CROSS|MBL_CROSS|SHARK_FIN|RSI_OVERBOUGHT|VB_SQUEEZE' 'C:\\Users\\dennis.ndungu\\Desktop\\ClaudeMCP\\Helix_V3\\data\\mmm_training\\vision_review_packets\\GBPJPY_the_33_mw_buy_early_week_l3_true_trend_31ac49b8f6\\manifest.json'" in C:\Users\dennis.ndungu\Desktop\ClaudeMCP\Helix_V3
+ succeeded in 237ms:
+    "labeled_prompt": "labeled_comparison_prompt.md",
+        "tdi_crossed_signal": "bearish",
+        "tdi_shark_direction": "SHORT",
+        "tdi_shark_fin": true,
+          "SIGNAL_CROSS_BEARISH",
+          "SHARK_FIN_SHORT"
+        "tdi_vb_squeeze": false,
+      "label": "loser",
+      "review_id": "C01",
+        "tdi_crossed_signal": "none",
+        "tdi_shark_direction": "",
+        "tdi_shark_fin": false,
+          "MBL_CROSS_BEARISH"
+        "tdi_vb_squeeze": false,
+      "label": "loser",
+      "review_id": "C02",
+        "tdi_crossed_signal": "none",
+        "tdi_shark_direction": "SHORT",
+        "tdi_shark_fin": true,
+          "SHARK_FIN_SHORT"
+        "tdi_vb_squeeze": false,
+      "label": "winner",
+      "review_id": "C03",
+        "tdi_crossed_signal": "none",
+        "tdi_shark_direction": "SHORT",
+        "tdi_shark_fin": true,
+          "VB_SQUEEZE",
+          "SHARK_FIN_SHORT"
+        "tdi_vb_squeeze": true,
+      "label": "winner",
+      "review_id": "C04",
+        "tdi_crossed_signal": "none",
+        "tdi_shark_direction": "SHORT",
+        "tdi_shark_fin": true,
+          "SHARK_FIN_SHORT"
+        "tdi_vb_squeeze": false,
+      "label": "winner",
+      "review_id": "C05",
+        "tdi_crossed_signal": "none",
+        "tdi_shark_direction": "SHORT",
+        "tdi_shark_fin": true,
+          "VB_SQUEEZE",
+          "MBL_CROSS_BEARISH",
+          "SHARK_FIN_SHORT"
+        "tdi_vb_squeeze": true,
+      "label": "winner",
+      "review_id": "C06",
+        "tdi_crossed_signal": "bearish",
+        "tdi_shark_direction": "SHORT",
+        "tdi_shark_fin": true,
+          "SIGNAL_CROSS_BEARISH",
+          "SHARK_FIN_SHORT"
+        "tdi_vb_squeeze": false,
+      "label": "winner",
+      "review_id": "C07",
+        "tdi_crossed_signal": "none",
+        "tdi_shark_direction": "SHORT",
+        "tdi_shark_fin": true,
+          "RSI_OVERBOUGHT",
+          "SHARK_FIN_SHORT"
+        "tdi_vb_squeeze": false,
+      "label": "winner",
+      "review_id": "C08",
+        "tdi_crossed_signal": "bearish",
+        "tdi_shark_direction": "",
+        "tdi_shark_fin": false,
+          "SIGNAL_CROSS_BEARISH"
+        "tdi_vb_squeeze": false,
+      "label": "loser",
+      "review_id": "C09",
+        "tdi_crossed_signal": "none",
+        "tdi_shark_direction": "SHORT",
+        "tdi_shark_fin": true,
+          "SHARK_FIN_SHORT"
+        "tdi_vb_squeeze": false,
+      "label": "winner",
+      "review_id": "C10",
+        "tdi_crossed_signal": "bearish",
+        "tdi_shark_direction": "",
+        "tdi_shark_fin": false,
+          "SIGNAL_CROSS_BEARISH"
+        "tdi_vb_squeeze": false,
+      "label": "winner",
+      "review_id": "C11",
+        "tdi_crossed_signal": "bearish",
+        "tdi_shark_direction": "SHORT",
+        "tdi_shark_fin": true,
+          "RSI_OVERBOUGHT",
+          "SIGNAL_CROSS_BEARISH",
+          "SHARK_FIN_SHORT"
+        "tdi_vb_squeeze": false,
+      "label": "loser",
+      "review_id": "C12",
+        "tdi_crossed_signal": "bearish",
+        "tdi_shark_direction": "",
+        "tdi_shark_fin": false,
+          "SIGNAL_CROSS_BEARISH",
+          "MBL_CROSS_BEARISH"
+        "tdi_vb_squeeze": false,
+      "label": "loser",
+      "review_id": "C13",
+
+codex
+I’m doing one visual pass over the confusing cases now: winners that looked visually “late” in blind review and losers that initially looked acceptable. Those are the cases most likely to produce useful reject/allow rules.
+codex
+{
+  "summary": "Winners were mostly moderate-hunt reclaim or fresh momentum-breakout buys; losers clustered around oversized hunts, stale HOD/top entries, and choppy range recovery with bearish TDI. TDI conflict alone is not enough to reject this signature.",
+  "winner_traits": [
+    "Best winners had stop_hunt_pips <= 60 or hunt_to_expected_level_move <= 0.60: C03, C05, C07, C08, C10, C11.",
+    "Clean reclaim from LOD/AR-low with room back through the Asian range worked well: C05, C07, C10, C11.",
+    "Fresh breakout can still win even with shark-fin/overbought labels when there is strong price expansion and no bearish signal/MBL cross: C03, C08, C10.",
+    "Oversized hunts only survived in this packet when weekly_trend was BUY, asian_range_pips was small, and VB squeeze was present: C04, C06."
+  ],
+  "loser_traits": [
+    "Extreme hunt size without the weekly/VB/small-range exception failed: C01, C09, C13.",
+    "Late buys near HOD after a full expansion plus bearish TDI rollover were dangerous: C12, C13.",
+    "Range-bound recoveries with weak second leg and bearish MBL/signal state failed: C01, C02.",
+    "Large adverse losers often had little immediate upside: C09 MFE 1.8p, C13 MFE 8.4p, C02 MFE 6.3p."
+  ],
+  "filters_to_test": [
+    {
+      "name": "moderate_hunt_primary_allow",
+      "rule": "For GBPJPY BUY setups, prefer stop_hunt_pips <= 60 OR hunt_to_expected_level_move <= 0.60.",
+      "expected_effect": "Keeps C03,C05,C07,C08,C10,C11; needs top-exhaustion guard for C12."
+    },
+    {
+      "name": "extreme_hunt_reject_with_exception",
+      "rule": "Reject if stop_hunt_pips >= 90 OR hunt_to_expected_level_move >= 0.90, unless weekly_trend == BUY AND tdi_vb_squeeze == true AND asian_range_pips <= 30.",
+      "expected_effect": "Rejects C01,C09,C13; preserves C04,C06."
+    },
+    {
+      "name": "stale_hod_exhaustion_reject",
+      "rule": "Reject BUY if close is within 10 pips of current HOD or range_pos >= 0.85, price has travelled >= 1.5 * asian_range_pips from hunt low, and TDI contains SIGNAL_CROSS_BEARISH or MBL_CROSS_BEARISH.",
+      "expected_effect": "Targets C12,C13 without rejecting fresh shark-fin winners C03,C08."
+    },
+    {
+      "name": "fresh_reclaim_required",
+      "rule": "After BUY stop hunt, require within 8 M15 candles: one close back above AR_L, then one close above AR_mid or EMA50, with no close back below AR_L before entry.",
+      "expected_effect": "Separates clean W/reclaim winners from C01,C02 style chop."
+    },
+    {
+      "name": "momentum_breakout_exception",
+      "rule": "Allow entries above AR_H/HOD only if bars_since_first_AR_H_break <= 6, last swing-low-to-close impulse >= 0.6 * asian_range_pips, and TDI does not contain SIGNAL_CROSS_BEARISH or MBL_CROSS_BEARISH.",
+      "expected_effect": "Preserves C03,C08,C10 while rejecting stale HOD failures."
+    }
+  ],
+  "filters_to_reject": [
+    "Reject all TDI shark-fin or overbought signals: contradicted by winners C03,C04,C05,C06,C08,C10.",
+    "Reject all bearish signal crosses: contradicted by winners C07 and C11.",
+    "Reject all weekly SELL buys: contradicted by C03,C05,C07,C08,C10,C11.",
+    "Reject all HOD/AR-high breakouts: contradicted by fresh breakout winners C03,C08,C10.",
+    "Use advisory_grade == AVOID as a reject filter: all packet examples were AVOID."
+  ],
+  "pair_specific_notes": [
+    "GBPJPY tolerates 33-60p hunts well when reclaim is clean; >90p hunts need stricter context.",
+    "Use both absolute pips and range-normalized ratios because GBPJPY volatility shifts by session.",
+    "C12 had +28.5p MFE but closed as a loser, so some failures may be exit-management failures rather than pure entry failures."
+  ],
+  "uncertain_items": [
+    "Sample is small and includes same-session duplicates: C04/C06 and C05/C07.",
+    "The oversized-hunt exception may be overfit until tested on more GBPJPY weeks.",
+    "Clean W-bottom and second-leg quality need objective swing/close definitions before promotion."
+  ],
+  "next_backtest_spec": {
+    "scope": "All GBPJPY samples matching this exact setup signature, then adjacent THE_33_MW BUY early-week L3 signatures.",
+    "features_to_add": [
+      "range_pos = (entry_close - asian_low) / asian_range",
+      "distance_to_hod_pips",
+      "distance_from_hunt_low_pips",
+      "bars_since_stop_hunt_low",
+      "bars_since_first_ar_high_break",
+      "close_above_ar_mid_within_8_bars",
+      "tdi_bearish_signal_count",
+      "ema50_reclaim_before_entry"
+    ],
+    "ablations": [
+      "moderate_hunt_primary_allow",
+      "extreme_hunt_reject_with_exception",
+      "stale_hod_exhaustion_reject",
+      "fresh_reclaim_required",
+      "momentum_breakout_exception",
+      "combined_rule_set"
+    ],
+    "metrics": [
+      "sample_count",
+      "favorable_rate",
+      "avg_exit_pips",
+      "avg_mfe_pips",
+      "avg_mae_pips",
+      "t1_hit_rate",
+      "rejected_winner_count",
+      "accepted_loser_count"
+    ]
+  }
+}
+tokens used
+158,723

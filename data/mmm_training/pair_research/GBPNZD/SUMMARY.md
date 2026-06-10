@@ -1,0 +1,159 @@
+# GBPNZD MMM Pair Research
+
+Generated: 2026-06-09T09:12:44.811859+00:00
+Study window: 2021-06-08 to 2026-06-08
+
+This report is pair-specific. Do not generalize the setup to other pairs unless cross-pair convergence is separately validated.
+
+## Promotion Gate
+
+- Minimum setup sample: 10
+- Research candidate gate: Fav >= 55.0%, AvgExit >= +0.0 pips
+- Baseline-qualified gate: Fav >= 85.0%, AvgExit >= +10.9 pips
+- Split confirmation: 2 pass(es) required; split minimum sample = 3
+- Scanner baseline: 90m scanner baseline: N=100, Fav=85.0%, AvgExit=+10.9p
+
+## Validation Splits
+
+- train: 2021-06-08 to 2024-12-09
+- validation: 2024-12-10 to 2025-12-09
+- out_of_sample: 2025-12-10 to 2026-06-08
+
+## Flashcard Summary
+
+- Historical flashcards: 2016
+- Direct-profit flashcards: 790 (39.2%)
+- T1 hit rate: 19.7%
+- Average pips: -1.2
+- Average profitable pips: +30.5
+- First snapshot: 2022-06-01T11:15:00+00:00
+- Last snapshot: 2026-06-08T00:00:00+00:00
+
+## Baseline-Qualified Setups
+
+No setup currently beats the scanner baseline gate.
+
+## Research Candidate Setups
+
+| Decision | SplitPass | Direction | N | Fav% | Direct% | T1% | AvgExit | Target | MFE | MAE | Setup |
+|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| research_candidate | 1 | BUY | 11 | 81.8% | 81.8% | 27.3% | +30.0 | +30.0 | +44.5 | +13.6 | THE_33_MW\|BUY\|MID_WEEK\|L3\|ACCUMULATION\|AR_VALID\|HUNT_EXTENDED\|PUSH3_PLUS\|W_BOTTOM\|NO_RRT\|TDI_NONE\|THE_33\|CONF_75_PLUS |
+| research_candidate | 0 | BUY | 18 | 66.7% | 77.8% | 33.3% | +15.2 | +15.2 | +25.2 | +16.3 | THE_33_MW\|BUY\|MID_WEEK\|L0\|ACCUMULATION\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|NO_RRT\|TDI_CONFIRM\|THE_33\|CONF_50_74 |
+| research_candidate | 0 | BUY | 18 | 66.7% | 66.7% | 33.3% | +10.3 | +13.7 | +30.5 | +17.0 | THE_33_MW\|BUY\|MID_WEEK\|L3\|ACCUMULATION\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|RRT\|TDI_NONE\|THE_33\|CONF_75_PLUS |
+| research_candidate | 0 | BUY | 17 | 64.7% | 64.7% | 11.8% | +17.3 | +17.3 | +37.1 | +24.1 | THE_33_MW\|BUY\|MID_WEEK\|L3\|STOP_HUNT\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|NO_RRT\|TDI_NONE\|THE_33\|CONF_75_PLUS |
+| research_candidate | 0 | BUY | 11 | 63.6% | 63.6% | 36.4% | +18.0 | +18.0 | +37.1 | +15.3 | THE_33_MW\|BUY\|MID_WEEK\|L3\|ACCUMULATION\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|NO_RRT\|TDI_CONFIRM\|THE_33\|CONF_75_PLUS |
+| research_candidate | 0 | BUY | 29 | 58.6% | 58.6% | 41.4% | +18.8 | +18.8 | +40.9 | +15.3 | THE_33_MW\|BUY\|MID_WEEK\|L3\|ACCUMULATION\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|NO_RRT\|TDI_NONE\|THE_33\|CONF_75_PLUS |
+
+## All Repeated Setups
+
+| Decision | SplitPass | Direction | N | Fav% | Direct% | T1% | AvgExit | Target | MFE | MAE | Setup |
+|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| research_candidate | 1 | BUY | 11 | 81.8% | 81.8% | 27.3% | +30.0 | +30.0 | +44.5 | +13.6 | THE_33_MW\|BUY\|MID_WEEK\|L3\|ACCUMULATION\|AR_VALID\|HUNT_EXTENDED\|PUSH3_PLUS\|W_BOTTOM\|NO_RRT\|TDI_NONE\|THE_33\|CONF_75_PLUS |
+| research_candidate | 0 | BUY | 18 | 66.7% | 77.8% | 33.3% | +15.2 | +15.2 | +25.2 | +16.3 | THE_33_MW\|BUY\|MID_WEEK\|L0\|ACCUMULATION\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|NO_RRT\|TDI_CONFIRM\|THE_33\|CONF_50_74 |
+| research_candidate | 0 | BUY | 18 | 66.7% | 66.7% | 33.3% | +10.3 | +13.7 | +30.5 | +17.0 | THE_33_MW\|BUY\|MID_WEEK\|L3\|ACCUMULATION\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|RRT\|TDI_NONE\|THE_33\|CONF_75_PLUS |
+| research_candidate | 0 | BUY | 17 | 64.7% | 64.7% | 11.8% | +17.3 | +17.3 | +37.1 | +24.1 | THE_33_MW\|BUY\|MID_WEEK\|L3\|STOP_HUNT\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|NO_RRT\|TDI_NONE\|THE_33\|CONF_75_PLUS |
+| research_candidate | 0 | BUY | 11 | 63.6% | 63.6% | 36.4% | +18.0 | +18.0 | +37.1 | +15.3 | THE_33_MW\|BUY\|MID_WEEK\|L3\|ACCUMULATION\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|NO_RRT\|TDI_CONFIRM\|THE_33\|CONF_75_PLUS |
+| research_candidate | 0 | BUY | 29 | 58.6% | 58.6% | 41.4% | +18.8 | +18.8 | +40.9 | +15.3 | THE_33_MW\|BUY\|MID_WEEK\|L3\|ACCUMULATION\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|NO_RRT\|TDI_NONE\|THE_33\|CONF_75_PLUS |
+| research_only | 0 | BUY | 43 | 53.5% | 53.5% | 23.3% | +4.4 | +13.4 | +29.7 | +15.2 | THE_33_MW\|BUY\|MID_WEEK\|L0\|ACCUMULATION\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|NO_RRT\|TDI_NONE\|THE_33\|CONF_50_74 |
+| research_only | 0 | BUY | 23 | 52.2% | 52.2% | 17.4% | +7.1 | +14.8 | +32.9 | +25.2 | THE_33_MW\|BUY\|MID_WEEK\|L3\|STOP_HUNT\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|RRT\|TDI_CONFLICT\|THE_33\|CONF_75_PLUS |
+| research_only | 0 | BUY | 20 | 50.0% | 50.0% | 45.0% | +13.3 | +16.1 | +35.8 | +18.7 | THE_33_MW\|BUY\|MID_WEEK\|L3\|ACCUMULATION\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|NO_RRT\|TDI_CONFLICT\|THE_33\|CONF_75_PLUS |
+| research_only | 0 | BUY | 10 | 50.0% | 50.0% | 10.0% | +4.8 | +16.5 | +36.7 | +27.2 | THE_33_MW\|BUY\|MID_WEEK\|L3\|STOP_HUNT\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|NO_RRT\|TDI_CONFIRM\|THE_33\|CONF_75_PLUS |
+| research_only | 0 | BUY | 12 | 50.0% | 50.0% | 33.3% | +4.6 | +12.9 | +28.6 | +22.4 | THE_33_MW\|BUY\|MID_WEEK\|L0\|ACCUMULATION\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|NO_RRT\|TDI_SQUEEZE\|THE_33\|CONF_50_74 |
+| research_only | 0 | BUY | 14 | 50.0% | 50.0% | 21.4% | +4.1 | +14.2 | +31.6 | +27.7 | THE_33_MW\|BUY\|MID_WEEK\|L3\|STOP_HUNT\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|NO_RRT\|TDI_CONFLICT\|THE_33\|CONF_75_PLUS |
+| research_only | 0 | BUY | 20 | 50.0% | 50.0% | 30.0% | +4.0 | +15.6 | +34.6 | +17.9 | THE_33_MW\|BUY\|MID_WEEK\|L0\|ACCUMULATION\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|RRT\|TDI_CONFLICT\|THE_33\|CONF_50_74 |
+| research_only | 0 | BUY | 25 | 48.0% | 48.0% | 32.0% | +9.7 | +12.4 | +27.5 | +14.3 | THE_33_MW\|BUY\|MID_WEEK\|L0\|ACCUMULATION\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|RRT\|TDI_NONE\|THE_33\|CONF_50_74 |
+| research_only | 0 | BUY | 25 | 48.0% | 48.0% | 24.0% | +8.1 | +14.6 | +32.3 | +18.5 | THE_33_MW\|BUY\|MID_WEEK\|L0\|ACCUMULATION\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|NO_RRT\|TDI_CONFLICT\|THE_33\|CONF_50_74 |
+| research_only | 0 | BUY | 21 | 47.6% | 52.4% | 28.6% | +12.1 | +15.6 | +34.6 | +15.0 | THE_33_MW\|BUY\|MID_WEEK\|L0\|ACCUMULATION\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|RRT\|TDI_SQUEEZE\|THE_33\|CONF_50_74 |
+| research_only | 0 | BUY | 20 | 45.0% | 45.0% | 35.0% | +8.1 | +11.4 | +25.4 | +18.0 | THE_33_MW\|BUY\|MID_WEEK\|L0\|TRUE_TREND\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|NO_RRT\|TDI_NONE\|THE_33\|CONF_50_74 |
+| research_only | 0 | BUY | 14 | 42.9% | 42.9% | 21.4% | +12.7 | +15.6 | +34.6 | +18.4 | THE_33_MW\|BUY\|MID_WEEK\|L3\|ACCUMULATION\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|RRT\|TDI_CONFIRM\|THE_33\|CONF_75_PLUS |
+| research_only | 0 | BUY | 14 | 42.9% | 42.9% | 14.3% | -2.0 | +14.0 | +31.1 | +32.2 | THE_33_MW\|BUY\|MID_WEEK\|L3\|ACCUMULATION\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|RRT\|TDI_CONFLICT\|THE_33\|CONF_75_PLUS |
+| research_only | 0 | BUY | 22 | 40.9% | 50.0% | 31.8% | +8.4 | +15.3 | +34.0 | +20.5 | THE_33_MW\|BUY\|MID_WEEK\|L0\|STOP_HUNT\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|NO_RRT\|TDI_CONFLICT\|THE_33\|CONF_50_74 |
+| research_only | 0 | BUY | 10 | 40.0% | 40.0% | 0.0% | +14.2 | +15.9 | +35.3 | +14.8 | THE_33_MW\|BUY\|MID_WEEK\|L3\|ACCUMULATION\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|NO_RRT\|TDI_CONFLICT\|THE_33\|CONF_50_74 |
+| research_only | 0 | BUY | 10 | 40.0% | 40.0% | 20.0% | +0.7 | +17.1 | +37.9 | +20.8 | THE_33_MW\|BUY\|MID_WEEK\|L0\|ACCUMULATION\|AR_VALID\|HUNT_EXTENDED\|PUSH3_PLUS\|W_BOTTOM\|RRT\|TDI_NONE\|THE_33\|CONF_50_74 |
+| research_only | 0 | BUY | 24 | 33.3% | 33.3% | 29.2% | -5.1 | +10.0 | +22.2 | +23.1 | THE_33_MW\|BUY\|MID_WEEK\|L0\|STOP_HUNT\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|RRT\|TDI_NONE\|THE_33\|CONF_75_PLUS |
+| research_only | 0 | BUY | 12 | 33.3% | 33.3% | 8.3% | -8.1 | +8.3 | +18.4 | +28.2 | THE_33_MW\|BUY\|MID_WEEK\|L0\|STOP_HUNT\|AR_TIGHT\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|NO_RRT\|TDI_NONE\|THE_33\|CONF_50_74 |
+| research_only | 0 | BUY | 49 | 32.7% | 36.7% | 24.5% | -7.4 | +11.2 | +24.9 | +25.6 | THE_33_MW\|BUY\|MID_WEEK\|L0\|STOP_HUNT\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|NO_RRT\|TDI_NONE\|THE_33\|CONF_50_74 |
+| research_only | 0 | BUY | 19 | 31.6% | 31.6% | 21.1% | -14.4 | +10.9 | +24.1 | +42.6 | THE_33_MW\|BUY\|MID_WEEK\|L3\|TRUE_TREND\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|NO_RRT\|TDI_NONE\|THE_33\|CONF_75_PLUS |
+| research_only | 0 | BUY | 16 | 31.2% | 43.8% | 18.8% | -6.6 | +7.9 | +17.5 | +20.6 | THE_33_MW\|BUY\|MID_WEEK\|L3\|ACCUMULATION\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|RRT\|TDI_NONE\|THE_33\|CONF_50_74 |
+| research_only | 0 | BUY | 10 | 30.0% | 30.0% | 30.0% | +0.3 | +8.5 | +19.0 | +13.5 | THE_33_MW\|BUY\|MID_WEEK\|L3\|ACCUMULATION\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|NO_RRT\|TDI_NONE\|THE_33\|CONF_50_74 |
+| research_only | 0 | BUY | 10 | 30.0% | 40.0% | 40.0% | -6.7 | +8.3 | +18.4 | +8.9 | THE_33_MW\|BUY\|MID_WEEK\|L3\|ACCUMULATION\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|NO_RRT\|TDI_CONFIRM\|THE_33\|CONF_50_74 |
+| research_only | 0 | BUY | 20 | 30.0% | 30.0% | 30.0% | -18.9 | +8.9 | +19.7 | +28.4 | THE_33_MW\|BUY\|MID_WEEK\|L0\|STOP_HUNT\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|RRT\|TDI_NONE\|THE_33\|CONF_50_74 |
+| research_only | 0 | BUY | 14 | 28.6% | 35.7% | 0.0% | -17.1 | +7.1 | +15.8 | +33.1 | THE_33_MW\|BUY\|MID_WEEK\|L0\|TRUE_TREND\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|NO_RRT\|TDI_CONFIRM\|THE_33\|CONF_50_74 |
+| research_only | 0 | BUY | 14 | 28.6% | 28.6% | 7.1% | -26.5 | +10.7 | +23.8 | +46.4 | THE_33_MW\|BUY\|MID_WEEK\|L3\|TRUE_TREND\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|RRT\|TDI_NONE\|THE_33\|CONF_75_PLUS |
+| research_only | 0 | BUY | 18 | 27.8% | 27.8% | 11.1% | -5.6 | +9.3 | +20.7 | +22.9 | THE_33_MW\|BUY\|MID_WEEK\|L3\|STOP_HUNT\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|RRT\|TDI_CONFIRM\|THE_33\|CONF_75_PLUS |
+| research_only | 0 | BUY | 11 | 27.3% | 36.4% | 0.0% | -4.1 | +10.7 | +23.8 | +24.2 | THE_33_MW\|BUY\|MID_WEEK\|L3\|STOP_HUNT\|AR_VALID\|HUNT_EXTENDED\|PUSH3_PLUS\|W_BOTTOM\|NO_RRT\|TDI_NONE\|THE_33\|CONF_75_PLUS |
+| research_only | 0 | BUY | 37 | 27.0% | 29.7% | 16.2% | -13.0 | +7.7 | +17.1 | +26.5 | THE_33_MW\|BUY\|MID_WEEK\|L0\|STOP_HUNT\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|NO_RRT\|TDI_CONFIRM\|THE_33\|CONF_50_74 |
+| research_only | 0 | BUY | 10 | 20.0% | 20.0% | 30.0% | -10.1 | +8.2 | +18.2 | +20.5 | THE_33_MW\|BUY\|MID_WEEK\|L0\|STOP_HUNT\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|RRT\|TDI_CONFLICT\|THE_33\|CONF_75_PLUS |
+| research_only | 0 | BUY | 15 | 20.0% | 20.0% | 20.0% | -17.1 | +8.0 | +17.8 | +23.1 | THE_33_MW\|BUY\|MID_WEEK\|L0\|TRUE_TREND\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|RRT\|TDI_CONFIRM\|THE_33\|CONF_50_74 |
+| research_only | 0 | BUY | 27 | 18.5% | 22.2% | 3.7% | -13.8 | +5.7 | +12.6 | +28.4 | THE_33_MW\|BUY\|MID_WEEK\|L3\|STOP_HUNT\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|RRT\|TDI_NONE\|THE_33\|CONF_75_PLUS |
+| research_only | 0 | BUY | 22 | 18.2% | 18.2% | 27.3% | -5.8 | +6.8 | +15.2 | +15.7 | THE_33_MW\|BUY\|MID_WEEK\|L0\|ACCUMULATION\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|RRT\|TDI_CONFIRM\|THE_33\|CONF_50_74 |
+| research_only | 0 | BUY | 18 | 16.7% | 22.2% | 27.8% | -4.6 | +7.1 | +15.9 | +16.7 | THE_33_MW\|BUY\|MID_WEEK\|L3\|ACCUMULATION\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|RRT\|TDI_CONFIRM\|THE_33\|CONF_50_74 |
+| research_only | 0 | BUY | 19 | 15.8% | 21.1% | 10.5% | -7.0 | +8.2 | +18.2 | +28.1 | THE_33_MW\|BUY\|MID_WEEK\|L0\|STOP_HUNT\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|NO_RRT\|TDI_NONE\|THE_33\|CONF_75_PLUS |
+| research_only | 0 | BUY | 13 | 15.4% | 23.1% | 23.1% | +0.9 | +9.1 | +20.2 | +17.5 | THE_33_MW\|BUY\|MID_WEEK\|L0\|STOP_HUNT\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|RRT\|TDI_CONFIRM\|THE_33\|CONF_75_PLUS |
+| research_only | 0 | BUY | 13 | 15.4% | 30.8% | 7.7% | -11.0 | +8.2 | +18.3 | +22.6 | THE_33_MW\|BUY\|MID_WEEK\|L0\|TRUE_TREND\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|RRT\|TDI_NONE\|THE_33\|CONF_50_74 |
+| research_only | 0 | BUY | 14 | 14.3% | 14.3% | 28.6% | -18.1 | +5.5 | +12.2 | +12.6 | THE_33_MW\|BUY\|MID_WEEK\|L0\|STOP_HUNT\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|RRT\|TDI_CONFIRM\|THE_33\|CONF_50_74 |
+| research_only | 0 | BUY | 18 | 11.1% | 22.2% | 11.1% | -13.1 | +5.9 | +13.2 | +14.4 | THE_33_MW\|BUY\|MID_WEEK\|L3\|ACCUMULATION\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|RRT\|TDI_CONFLICT\|THE_33\|CONF_50_74 |
+| research_only | 0 | BUY | 10 | 10.0% | 10.0% | 20.0% | -16.0 | +6.8 | +15.2 | +14.5 | THE_33_MW\|BUY\|MID_WEEK\|L0\|STOP_HUNT\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|RRT\|TDI_CONFLICT\|THE_33\|CONF_50_74 |
+| research_only | 0 | BUY | 19 | 5.3% | 5.3% | 5.3% | -20.5 | +5.5 | +12.1 | +31.3 | THE_33_MW\|BUY\|MID_WEEK\|L3\|STOP_HUNT\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|NO_RRT\|TDI_NONE\|THE_33\|CONF_50_74 |
+| research_only | 0 | BUY | 11 | 0.0% | 0.0% | 0.0% | -12.7 | +7.9 | +17.6 | +32.5 | THE_33_MW\|BUY\|MID_WEEK\|L0\|STOP_HUNT\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|NO_RRT\|TDI_SQUEEZE\|THE_33\|CONF_50_74 |
+| research_only | 0 | BUY | 11 | 0.0% | 0.0% | 0.0% | -34.8 | +3.6 | +8.1 | +19.8 | THE_33_MW\|BUY\|MID_WEEK\|L0\|STOP_HUNT\|AR_VALID\|HUNT_PAIR_RANGE\|PUSH3_PLUS\|W_BOTTOM\|NO_RRT\|TDI_NEUTRAL\|THE_33\|CONF_50_74 |
+
+## Top Direct-Profit Flashcards
+
+| ID | Time | Dir | Outcome | Pips | T1 | Conf | Setup | Chart |
+|---:|---|---|---|---:|---|---:|---|---|
+| 41615 | 2025-08-20T01:30:00+00:00 | BUY | TIME_EXIT_PROFIT | +215.7 | no | 95 | W_BOTTOM | - |
+| 41614 | 2025-08-20T00:00:00+00:00 | BUY | OPEN_PROFIT | +199.4 | yes | 95 | W_BOTTOM | - |
+| 26451 | 2024-08-14T01:30:00+00:00 | BUY | TIME_EXIT_PROFIT | +181.6 | no | 57 | W_BOTTOM | - |
+| 41803 | 2025-10-08T01:30:00+00:00 | BUY | TIME_EXIT_PROFIT | +167.8 | no | 90 | W_BOTTOM | - |
+| 41739 | 2025-09-18T00:00:00+00:00 | BUY | TARGET_2 | +141.0 | yes | 70 | W_BOTTOM | - |
+| 26407 | 2024-07-10T01:30:00+00:00 | BUY | TIME_EXIT_PROFIT | +135.2 | no | 62 | W_BOTTOM | - |
+| 22510 | 2022-11-07T06:30:00+00:00 | BUY | TIME_EXIT_PROFIT | +118.2 | no | 60 | W_BOTTOM | - |
+| 33979 | 2025-03-03T09:30:00+00:00 | BUY | TIME_EXIT_PROFIT | +116.1 | yes | 92 | W_BOTTOM | - |
+| 22512 | 2022-11-07T09:30:00+00:00 | BUY | TARGET_2 | +106.0 | yes | 60 | W_BOTTOM | - |
+| 36404 | 2025-08-12T07:30:00+00:00 | BUY | TIME_EXIT_PROFIT | +105.7 | yes | 77 | W_BOTTOM | - |
+| 22511 | 2022-11-07T08:00:00+00:00 | BUY | TARGET_2 | +103.0 | yes | 60 | W_BOTTOM | - |
+| 41740 | 2025-09-18T01:30:00+00:00 | BUY | TARGET_2 | +102.0 | yes | 85 | W_BOTTOM | - |
+| 36354 | 2025-07-07T00:00:00+00:00 | BUY | TARGET_2 | +101.0 | yes | 77 | W_BOTTOM | - |
+| 33980 | 2025-03-03T11:00:00+00:00 | BUY | TRAIL_STOP | +98.6 | yes | 92 | W_BOTTOM | - |
+| 34007 | 2025-04-28T07:00:00+00:00 | BUY | TARGET_2 | +97.3 | yes | 62 | W_BOTTOM | - |
+| 36355 | 2025-07-07T02:00:00+00:00 | BUY | TIME_EXIT_PROFIT | +91.7 | yes | 87 | W_BOTTOM | - |
+| 22499 | 2022-10-10T13:00:00+00:00 | BUY | TIME_EXIT_PROFIT | +90.8 | no | 75 | W_BOTTOM | - |
+| 22477 | 2022-09-19T12:30:00+00:00 | BUY | TIME_EXIT_PROFIT | +90.8 | no | 70 | W_BOTTOM | - |
+| 33972 | 2025-02-28T00:00:00+00:00 | BUY | TIME_EXIT_PROFIT | +90.7 | no | 87 | W_BOTTOM | - |
+| 36367 | 2025-07-28T08:45:00+00:00 | BUY | TRAIL_STOP | +90.4 | yes | 57 | W_BOTTOM | - |
+| 26448 | 2024-08-05T06:00:00+00:00 | BUY | TARGET_2 | +88.3 | yes | 57 | W_BOTTOM | - |
+| 33993 | 2025-03-24T03:30:00+00:00 | BUY | TIME_EXIT_PROFIT | +87.5 | yes | 62 | W_BOTTOM | - |
+| 52223 | 2026-04-29T01:30:00+00:00 | BUY | TIME_EXIT_PROFIT | +86.8 | no | 75 | W_BOTTOM | - |
+| 34013 | 2025-04-28T16:30:00+00:00 | BUY | TIME_EXIT_PROFIT | +84.9 | no | 62 | W_BOTTOM | - |
+| 47334 | 2026-02-03T04:45:00+00:00 | SELL | TARGET_2 | +84.5 | yes | 100 | M_TOP | - |
+| 34008 | 2025-04-28T09:00:00+00:00 | BUY | TRAIL_STOP | +84.1 | yes | 67 | W_BOTTOM | - |
+| 20843 | 2022-08-03T01:00:00+00:00 | BUY | TARGET_2 | +83.7 | yes | 82 | W_BOTTOM | - |
+| 22501 | 2022-10-10T16:00:00+00:00 | BUY | TRAIL_STOP | +83.4 | yes | 75 | W_BOTTOM | - |
+| 41906 | 2025-11-03T13:30:00+00:00 | BUY | TARGET_2 | +83.3 | yes | 60 | W_BOTTOM | - |
+| 47035 | 2025-11-17T10:30:00+00:00 | BUY | TIME_EXIT_PROFIT | +83.2 | yes | 75 | W_BOTTOM | - |
+| 31713 | 2024-12-16T08:00:00+00:00 | BUY | TIME_EXIT_PROFIT | +83.1 | no | 57 | W_BOTTOM | - |
+| 52141 | 2026-04-07T00:30:00+00:00 | BUY | TARGET_2 | +82.8 | yes | 100 | W_BOTTOM | - |
+| 47135 | 2025-12-15T02:00:00+00:00 | BUY | TIME_EXIT_PROFIT | +82.3 | no | 70 | W_BOTTOM | - |
+| 20862 | 2022-08-15T09:30:00+00:00 | BUY | TIME_EXIT_PROFIT | +82.2 | no | 65 | W_BOTTOM | - |
+| 41726 | 2025-09-15T08:30:00+00:00 | BUY | TIME_EXIT_PROFIT | +82.1 | yes | 55 | W_BOTTOM | - |
+| 33998 | 2025-03-28T00:00:00+00:00 | BUY | TIME_EXIT_PROFIT | +81.4 | no | 82 | W_BOTTOM | - |
+| 20859 | 2022-08-15T05:00:00+00:00 | BUY | TIME_EXIT_PROFIT | +80.4 | yes | 60 | W_BOTTOM | - |
+| 29156 | 2024-10-29T14:15:00+00:00 | BUY | TIME_EXIT_PROFIT | +79.0 | yes | 92 | W_BOTTOM | - |
+| 47182 | 2025-12-29T10:30:00+00:00 | BUY | TIME_EXIT_PROFIT | +78.4 | yes | 95 | W_BOTTOM | - |
+| 47180 | 2025-12-29T07:30:00+00:00 | BUY | TIME_EXIT_PROFIT | +78.4 | no | 95 | W_BOTTOM | - |
+| 47181 | 2025-12-29T09:00:00+00:00 | BUY | TRAIL_STOP | +77.7 | yes | 95 | W_BOTTOM | - |
+| 26426 | 2024-07-24T00:00:00+00:00 | BUY | TIME_EXIT_PROFIT | +77.5 | yes | 77 | W_BOTTOM | - |
+| 34014 | 2025-04-28T18:00:00+00:00 | BUY | TIME_EXIT_PROFIT | +77.0 | no | 62 | W_BOTTOM | - |
+| 29122 | 2024-10-24T13:30:00+00:00 | BUY | TARGET_2 | +76.0 | yes | 62 | W_BOTTOM | - |
+| 47034 | 2025-11-17T09:00:00+00:00 | BUY | TARGET_2 | +74.5 | yes | 80 | W_BOTTOM | - |
+| 33964 | 2025-02-17T16:15:00+00:00 | BUY | TIME_EXIT_PROFIT | +73.9 | yes | 57 | W_BOTTOM | - |
+| 34022 | 2025-05-09T00:00:00+00:00 | BUY | TIME_EXIT_PROFIT | +73.9 | no | 62 | W_BOTTOM | - |
+| 55040 | 2026-06-03T06:00:00+00:00 | BUY | TIME_EXIT_PROFIT | +73.6 | yes | 70 | W_BOTTOM | - |
+| 47136 | 2025-12-15T03:30:00+00:00 | BUY | TARGET_2 | +73.5 | yes | 70 | W_BOTTOM | - |
+| 22478 | 2022-09-19T14:00:00+00:00 | BUY | TRAIL_STOP | +73.2 | yes | 55 | W_BOTTOM | - |
+
+## Artifact Files
+
+- `setup_performance.json`: replay grouped by normalized MMM setup signature.
+- `profitable_flashcards.jsonl`: direct-profit flashcard manifest with chart references.

@@ -1,0 +1,44 @@
+[
+  {
+    "avg_exit_pips": 1168.07692307694,
+    "avg_mae": 2475.38461538461,
+    "avg_mfe": 3274.6153846153484,
+    "baseline_split_passes": 0,
+    "direct_profit": 4,
+    "direct_profit_rate": 30.76923076923077,
+    "direction": "BUY",
+    "favorable": 4,
+    "favorable_rate": 30.76923076923077,
+    "first_snapshot": "2022-08-01T21:00:00+00:00",
+    "last_snapshot": "2023-11-20T15:15:00+00:00",
+    "normalized_key": "RRT_REVERSAL|BUY|EARLY_WEEK|L3|RETURN_ACCUM|AR_VALID|HUNT_EXTENDED|PUSH3_PLUS|NO_MW|RRT|TDI_NONE|THE_33|CONF_75_PLUS",
+    "primary_theme": "USTEC_STRENGTH",
+    "profitable_source_ids": [
+      23526,
+      23665,
+      23770,
+      23774
+    ],
+    "raw_key": "USTEC|BUY|EARLY_WEEK|BUY|L3|BUY|RETURN_ACCUM|BUY|AR_1830.0|HUNT_16290.0|PUSH3_PLUS|NO_MW|RRT|TDI_NONE|THE_33",
+    "realistic_target_pips": 1473.5769230769067,
+    "setup_family": "RRT_REVERSAL",
+    "split_stats": {
+      "train": {
+        "avg_exit_pips": 1168.07692307694,
+        "avg_mae": 2475.38461538461,
+        "avg_mfe": 3274.6153846153484,
+        "direct_profit": 4,
+        "direct_profit_rate": 30.76923076923077,
+        "favorable": 4,
+        "favorable_rate": 30.76923076923077,
+        "t1_hits": 5,
+        "t1_rate": 38.46153846153847,
+        "total": 13
+      }
+    },
+    "symbol": "USTEC",
+    "t1_hits": 5,
+    "t1_rate": 38.46153846153847,
+    "total": 13
+  }
+]
