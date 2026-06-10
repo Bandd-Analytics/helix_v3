@@ -65,7 +65,6 @@ int OnCalculate(const int rates_total, const int prev_calculated,
       DrawHLine(nmL, d[i].low,  InpLowColor,  InpSnakeStyle, InpLineWidth, "");
      }
 
-   ChartRedraw();
    return rates_total;
   }
 

@@ -94,7 +94,6 @@ int OnCalculate(const int rates_total, const int prev_calculated,
         }
      }
 
-   ChartRedraw();
    return rates_total;
   }
 //+------------------------------------------------------------------+

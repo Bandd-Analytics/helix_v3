@@ -22,9 +22,16 @@ input bool   InpShowLabels  = true;
 input bool   InpShowQuarter = false;     // Show 25/75 levels
 input string InpPrefix      = "HX_PSY_";
 
+double LastBaseLevel = 0;
+double DetectedMajorStep = 0;
+double DetectedMinorStep = 0;
+
 //+------------------------------------------------------------------+
 int OnInit()
   {
+   LastBaseLevel = 0;
+   DetectedMajorStep = 0;
+   DetectedMinorStep = 0;
    IndicatorSetString(INDICATOR_SHORTNAME, "Helix Psych Levels");
    return INIT_SUCCEEDED;
   }
@@ -68,9 +75,15 @@ int OnCalculate(const int rates_total, const int prev_calculated,
    // Round price down to nearest major
    double baseLevel = MathFloor(price / majorStep) * majorStep;
 
-   // Draw levels
-   ObjectsDeleteAll(0, InpPrefix);
+   // Skip if base level hasn't changed (no ObjectsDeleteAll, no ChartRedraw)
+   if(LastBaseLevel != 0 && MathAbs(baseLevel - LastBaseLevel) < majorStep * 0.01)
+      return rates_total;
 
+   LastBaseLevel = baseLevel;
+   DetectedMajorStep = majorStep;
+   DetectedMinorStep = minorStep;
+
+   // Update levels in-place (create once, then just move prices — no delete/recreate)
    for(int i = -InpLevelCount; i <= InpLevelCount; i++)
      {
       // Major level (00)
@@ -97,7 +110,6 @@ int OnCalculate(const int rates_total, const int prev_calculated,
         }
      }
 
-   ChartRedraw();
    return rates_total;
   }
 

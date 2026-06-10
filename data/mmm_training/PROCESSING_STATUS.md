@@ -1,6 +1,6 @@
 # MMM Training Processing Status
 
-Updated: 2026-06-07
+Updated: 2026-06-09
 
 ## Current Assets
 
@@ -39,16 +39,152 @@ Updated: 2026-06-07
   direct-profit flashcard manifests per pair.
 - Dense three-year M15 pair replay completed with `step-bars=1`, pair-specific profiles,
   `min-total=10`, scanner-baseline qualification, and train/validation/out-of-sample splits.
-- Historical study now contains 8,178 historical flashcards, including 2,159 direct-profit examples.
-- No setup currently beats the scanner baseline gate of Fav >= 85.0% and AvgExit >= +10.9p
-  with two split confirmations.
+- Expanded historical study now contains 19,373 historical flashcards and 19,853 MMM event
+  replay outcomes after broadening the search toward a five-year window.
+- Strict validation-library rebuild after expanded mining produced one promoted GBPJPY BUY setup
+  record with N=10, Fav=90.0%, AvgExit=+18.4p. Treat this as supervised demo/watchdog material,
+  not live auto-entry approval.
 - Research-only candidates remain on GBPJPY BUY W-bottom early-week L3 variants and one
   EURJPY BUY W-bottom early-week L3 true-trend variant.
-- Validation library was rebuilt with the strict baseline gate and currently has 0 promoted records.
+- Validation library was rebuilt with the strict baseline gate and currently has 1 promoted record.
 - Winner-vs-loser vision review packets generated under `vision_review_packets/` for the
   GBPJPY and EURJPY research-only candidates.
+- All four GBPJPY/EURJPY vision review packets reviewed through Codex/ChatGPT Pro and
+  Claude Max account CLIs without API keys.
+- Account model review index saved at `vision_review_packets/MODEL_REVIEW_INDEX.md`; blind
+  classification remains research-only and is not strong enough for promotion by itself.
+- OHLC-derived vision feature columns added to flashcards and backfilled for 50 packet-signature
+  flashcards, then broadened to 2,019 GBPJPY/EURJPY historical flashcards.
+- Feature-aware ablations regenerated under `vision_review_packets/`; no packet setup is promoted.
+- Pair-level feature ablations generated under `pair_feature_ablations/` for EURUSD, GBPUSD,
+  GBPJPY, USDJPY, EURJPY, GBPCHF, and AUDUSD with `min-total=10`.
+- GBPJPY produced one research-only raw baseline pass after filtering to 5 kept cases, but split
+  testing failed: train N=2, validation N=2, out-of-sample N=1, so it has 0 valid split passes.
+- Setup-intelligence database and report created from historical flashcards plus MMM event
+  outcomes at `logs/setup_intelligence.db` and `setup_intelligence/REPORT.md`.
+- Scanner-first alert-only watchlist CLI added at `helix_v3.scanner.watchlist`. It defaults to
+  the seven research pairs, reads setup-intelligence context when available, requires an exact
+  promoted validation setup for entry-eligible status, and otherwise reports watch-only or blocked
+  scanner candidates without touching live MT5 execution.
+- Current setup validation run on 2026-06-08 19:32 EAT across EURUSD, GBPUSD, GBPJPY, USDJPY,
+  EURJPY, GBPCHF, and AUDUSD found 0 exact validation-library matches. No live orders were sent.
+- Research mining scope expanded to EURUSD, GBPUSD, GBPJPY, USDJPY, EURJPY, GBPCHF, AUDUSD,
+  GBPAUD, GBPNZD, EURGBP, XAUUSD, US30, and USTEC. The aligned five-year mining plan is documented
+  at `docs/aligned_data_mining_plan.md` and uses 21 shared calendar chunks from 2021-06-08 through
+  2026-06-08.
+- MT5 symbol availability check passed for all 13 requested instruments. US30 and USTEC were
+  selectable but initially not visible in Market Watch; they remain analysis-only pending replay
+  calibration.
+- Full aligned raw mining completed across 21 shared calendar chunks. Confirmed chunk saves:
+  36,054 historical flashcards. Full-period archive rebuild wrote 40 files. Setup intelligence
+  now contains 54,075 occurrences, 13,441 setup stats, 127 price-level stats, 438 day/session
+  stats, and 2,345 cross-pair stats. Strict validation-library rebuild still has 1 promoted
+  record.
+- RRS performance grading added to setup intelligence. `R_RUNNER` means Fav >= 75%,
+  `R_REPEATER` means Fav >= 50% and < 75%, and `S_STRANGER` means Fav < 50%.
+  For setup rows with N >= 10, the current report shows 3 R_RUNNER rows, 90 R_REPEATER rows,
+  and 1,181 S_STRANGER rows. Positive-expectancy exceptions below the old 85% scanner gate are
+  now visible in `setup_intelligence/REPORT.md`; these are research candidates, not live approval.
+- Baseline distinction documented at `docs/rrs_performance_grading.md`: the old two-year
+  trading-pipeline result and the strict scanner/promotion gate measure different things. Future
+  promotion should use expectancy, payoff, drawdown/adverse-excursion behavior, split stability,
+  and RRS band instead of favorable rate alone.
+- Expectancy-led research candidate layer added to setup intelligence. The latest rebuild produced
+  380 research-only candidates: 83 demo candidates across R_RUNNER/R_REPEATER, 69 S_STRANGER
+  asymmetric exceptions, and 228 watch candidates. These are stored in
+  `logs/setup_intelligence.db` table `expectancy_candidates`; they are not inserted into
+  `validation_setups` and are not live-entry approval.
+- Scanner watchlist context now surfaces expectancy tier, RRS, profit factor, payoff ratio, and
+  split pass count for historical matches. A 2026-06-09 13:03 EAT alert-only run showed 0 promoted
+  entries and preserved strict blocking while displaying expectancy memory for GBPNZD, GBPCHF, and
+  GBPAUD candidates.
+- Instrument calibration audit completed for XAUUSD, US30, and USTEC. XAUUSD resolved to
+  `pip_size=0.01` and `pip_value_per_lot=1.00`; US30/USTEC also resolved to `pip_size=0.01` but
+  remain broker-contract/risk blocked. All three stay research-only and execution-blocked.
+- XAUUSD winner-vs-loser vision packets generated for five high-expectancy research setups with
+  `--include-non-w-bottom`. A targeted chart backfill rendered and attached 61 historical chart
+  images, and all five XAUUSD packet manifests now have 0 missing images.
+- XAUUSD account-CLI packet reviews completed for all five packets using Codex/ChatGPT Pro and
+  Claude Max. Blind scores ranged from Codex `46.7%` to `76.9%` and Claude `36.4%` to `72.7%`;
+  the strongest single-model results were Codex `10/13` on the RRT sell mid-week packet and Claude
+  `8/11` on both THE_33 M/W buy stop-hunt packets. Treat these as filter-hypothesis evidence only,
+  not promotion or live-entry approval.
+- OHLC feature backfill completed for 7,788 XAUUSD historical flashcards. Packet and pair-level
+  feature ablations were regenerated. Best XAUUSD pair-level variant is
+  `ratio_le_2_asian_gte_30_tdi_positive` on the RRT BUY mid-week L3 accumulation setup: kept `5`,
+  Fav `100.0%`, AvgExit `+770.4p`, but only `1` split pass, so decision remains
+  `research_only_split_fail`.
+- RRS-aware ablation reporting added. Packet and pair-level feature ablation reports now expose
+  base/filtered RRS, profit factor, payoff ratio, scanner-baseline split passes, and
+  expectancy-split passes. Regenerated all packet ablations and all 13 pair-feature ablation
+  reports.
+- Alert-only demo basket report generated at `setup_intelligence/ALERT_ONLY_BASKET.md`. The top
+  ranked observation row is the strict GBPJPY BUY `DEMO_ALERT` candidate with `R_RUNNER`, `N=10`,
+  Fav `90.0%`, AvgExit `+18.4p`, PF `69.22`, and `3/3` splits. XAUUSD and other analysis-only
+  profiles are explicitly marked `RESEARCH_ONLY`.
+- Scanner watchlist can now require a ranked alert-basket match via `--require-alert-basket`.
+  A 2026-06-09 19:33 EAT alert-only run across all 13 instruments showed 0 promoted entries,
+  0 watch-only entries, and 10 blocked candidates. Basket context was attached to GBPNZD
+  `#2 RESEARCH_ONLY` and GBPAUD `#13 DEMO_ALERT`, but both stayed blocked by readiness/age and
+  missing strict validation.
 
 ## Next Commands
+
+Run the alert-only scanner watchlist from stored scanner snapshots:
+
+```powershell
+.venv\Scripts\python.exe -m helix_v3.scanner.watchlist --symbols EURUSD,GBPUSD,GBPJPY,USDJPY,EURJPY,GBPCHF,AUDUSD --include-blocked
+```
+
+Rebuild the derived setup-intelligence DB/report from saved historical replay data:
+
+```powershell
+.venv\Scripts\python.exe -m helix_v3.backtest.setup_intelligence rebuild
+```
+
+Review RRS performance grading and lower-rate positive-expectancy exceptions:
+
+```powershell
+Get-Content docs\rrs_performance_grading.md
+Get-Content data\mmm_training\setup_intelligence\REPORT.md
+```
+
+Review the RRS-ranked alert-only basket:
+
+```powershell
+Get-Content data\mmm_training\setup_intelligence\ALERT_ONLY_BASKET.md
+```
+
+Review the XAUUSD visual packets:
+
+```powershell
+Get-ChildItem data\mmm_training\vision_review_packets -Directory -Filter XAUUSD*
+.venv\Scripts\python.exe -m helix_v3.training.vision_account_review_runner --packet-root data\mmm_training\vision_review_packets --timeout-seconds 1200
+```
+
+Print the expectancy-led research candidate layer:
+
+```powershell
+.venv\Scripts\python.exe -m helix_v3.backtest.setup_intelligence expectancy-report --limit 50
+```
+
+Run the alert-only scanner watchlist with expectancy context:
+
+```powershell
+.venv\Scripts\python.exe -m helix_v3.scanner.watchlist --symbols EURUSD,GBPUSD,GBPJPY,USDJPY,EURJPY,GBPCHF,AUDUSD,GBPAUD,GBPNZD,EURGBP,XAUUSD,US30,USTEC --include-blocked --limit 20
+```
+
+Run the alert-only scanner watchlist with ranked basket gating:
+
+```powershell
+.venv\Scripts\python.exe -m helix_v3.scanner.watchlist --symbols EURUSD,GBPUSD,GBPJPY,USDJPY,EURJPY,GBPCHF,AUDUSD,GBPAUD,GBPNZD,EURGBP,XAUUSD,US30,USTEC --require-alert-basket --alert-basket-limit 30 --include-blocked --limit 20
+```
+
+Run the aligned full-universe five-year mining chunks:
+
+```powershell
+.\scripts\run_aligned_mining_chunks.ps1
+```
 
 Regenerate the taught-rule validation report from the saved database:
 
@@ -84,6 +220,36 @@ Regenerate winner-vs-loser vision review packets:
 
 ```powershell
 .venv\Scripts\python.exe -m helix_v3.training.vision_review_packet_builder --symbols GBPJPY,EURJPY --min-total 10 --min-favorable-rate 55 --min-avg-exit-pips 0 --max-setups-per-pair 3 --winners-per-setup 8 --losers-per-setup 8
+```
+
+Run stored-field ablations for generated vision-review packets:
+
+```powershell
+.venv\Scripts\python.exe -m helix_v3.training.vision_filter_ablation --packet-root data\mmm_training\vision_review_packets
+```
+
+Run paid-account Codex/Claude packet reviews without API keys:
+
+```powershell
+.venv\Scripts\python.exe -m helix_v3.training.vision_account_review_runner --packet-root data\mmm_training\vision_review_packets --timeout-seconds 1200
+```
+
+Backfill OHLC-derived vision features for packet signatures:
+
+```powershell
+.venv\Scripts\python.exe -m helix_v3.training.vision_feature_backfill --packet-root data\mmm_training\vision_review_packets
+```
+
+Backfill OHLC-derived vision features for the full research scope:
+
+```powershell
+.venv\Scripts\python.exe -m helix_v3.training.vision_feature_backfill --symbols EURUSD,GBPUSD,GBPJPY,USDJPY,EURJPY,GBPCHF,AUDUSD
+```
+
+Run pair-level feature ablations across all research pairs:
+
+```powershell
+.venv\Scripts\python.exe -m helix_v3.training.vision_filter_ablation --pair-research --symbols EURUSD,GBPUSD,GBPJPY,USDJPY,EURJPY,GBPCHF,AUDUSD --pair-research-root data\mmm_training\pair_research --pair-output-root data\mmm_training\pair_feature_ablations --min-total 10 --split-min-total 3 --required-split-passes 2
 ```
 
 ## Methodology Rule Boundary

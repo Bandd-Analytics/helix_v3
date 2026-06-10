@@ -362,7 +362,7 @@ class TelegramNotifier:
         if lot_size:
             msg += f"Lots:      {lot_size}\n"
 
-        msg += f"\n--- Prices ---\n"
+        msg += "\n--- Prices ---\n"
         if entry_price:
             msg += f"Entry:     {entry_price:.5f}\n"
         if exit_price:
@@ -376,7 +376,7 @@ class TelegramNotifier:
             msg += f"Pip Value: ${pip_value:.4f}\n"
 
         if bias or cycle_level or confidence:
-            msg += f"\n--- Setup ---\n"
+            msg += "\n--- Setup ---\n"
             if bias:
                 msg += f"Bias:      {bias}\n"
             if cycle_level:
@@ -384,7 +384,7 @@ class TelegramNotifier:
             if confidence:
                 msg += f"Confidence:{confidence:.0%}\n"
 
-        msg += f"\n--- P&L ---\n"
+        msg += "\n--- P&L ---\n"
         if gross_profit:
             msg += f"Gross:     ${gross_profit:+.2f}\n"
         if commission:
@@ -394,12 +394,12 @@ class TelegramNotifier:
         msg += f"Net P&L:   ${net_profit:+.2f}\n"
 
         if t1_hit:
-            msg += f"\n--- Partial Close ---\n"
+            msg += "\n--- Partial Close ---\n"
             msg += f"T1 Hit:    Yes (+{t1_pips:.1f} pips)\n"
             msg += f"T1 Profit: ${t1_profit:.2f}\n"
 
         if equity_before or equity_after:
-            msg += f"\n--- Account ---\n"
+            msg += "\n--- Account ---\n"
             if equity_before:
                 msg += f"Before:    ${equity_before:.2f}\n"
             if equity_after:
@@ -409,7 +409,7 @@ class TelegramNotifier:
                     pct = (change / equity_before) * 100 if equity_before else 0
                     msg += f"Change:    ${change:+.2f} ({pct:+.2f}%)\n"
 
-        msg += f"\n--- Timing ---\n"
+        msg += "\n--- Timing ---\n"
         msg += f"Exit Reason: {exit_reason}\n"
         msg += f"Duration:    {_format_duration(duration_min)}\n"
         if opened_at:
@@ -432,17 +432,101 @@ class TelegramNotifier:
         if not high_readiness:
             return False
 
-        msg = f"HELIX V3 MARKET UPDATE\n{'='*30}\n"
-        for s in high_readiness[:5]:
-            msg += (
-                f"\n{s['symbol']} {s['timeframe']}: "
-                f"Ready={s['trade_readiness']}/100 "
-                f"Bias={s['bias']} "
-                f"ATR={s['atr_14']:.0f}p\n"
-                f"  {s['readiness_notes'][:60]}\n"
-            )
+        # Session phase in human terms
+        from datetime import timezone as _tz
+        h = datetime.now(_tz.utc).hour
+        if 1 <= h < 5:
+            phase = "ACCUMULATION"
+            phase_note = "Asian range forming. Watch for tight compression."
+        elif 5 <= h < 8:
+            phase = "STOP HUNT"
+            phase_note = "London breaking Asian range. Watch for fake breakouts."
+        elif 8 <= h < 13:
+            phase = "TRUE TREND"
+            phase_note = "Real move underway. Entries valid if structure confirms."
+        elif 13 <= h < 17:
+            phase = "NYC REVERSAL"
+            phase_note = "Late session. Only high-conviction setups."
+        else:
+            phase = "DEAD TIME"
+            phase_note = "Session closed. No entries."
+
+        # Day context
+        dow = datetime.now(EAT).strftime("%A")
+        day_num = datetime.now(EAT).weekday()
+        if day_num in (6, 0):
+            week = "Early week — fresh cycle, watch for initial stop hunts"
+        elif day_num in (1, 2):
+            week = "Mid week — reversal zone, highest probability window"
+        else:
+            week = "Late week — manage existing trades, reduce new exposure"
+
+        # Deduplicate: keep only M15 (skip H1 duplicates)
+        seen = set()
+        filtered = []
+        for s in high_readiness:
+            if s["symbol"] not in seen:
+                seen.add(s["symbol"])
+                filtered.append(s)
+
+        msg = (
+            f"HELIX V3 MARKET SCAN\n"
+            f"{'='*30}\n"
+            f"{dow} | {phase}\n"
+            f"{week}\n"
+            f"{phase_note}\n"
+        )
+
+        for s in filtered[:5]:
+            symbol = s["symbol"]
+            bias = s.get("bias", "NEUTRAL")
+            readiness = s.get("trade_readiness", 0)
+            spread = s.get("spread_pips", 0) or 0
+
+            # Build MMM narrative per pair
+            hunt_active = s.get("stop_hunt_active", False)
+            hunt_dir = s.get("stop_hunt_direction", "")
+            hunt_pips = s.get("stop_hunt_breach_pips", 0) or 0
+            is_accum = s.get("is_accumulation", False)
+            sess_range = s.get("session_range", 0) or 0
+            vol_comp = s.get("vol_compression", 0) or 0
+
+            # Trend from EMA stack
+            trend = s.get("trend", "NEUTRAL")
+
+            # Readiness bar
+            bar_len = readiness // 10
+            bar = ">" * bar_len + "-" * (10 - bar_len)
+
+            lines = [f"\n{symbol} {'BUY' if bias == 'BUY' else 'SELL' if bias == 'SELL' else 'NEUTRAL'}"]
+            lines.append(f"  [{bar}] {readiness}/100")
+
+            # What's happening on this pair
+            if hunt_active and hunt_pips > 0:
+                real_dir = "SELL" if hunt_dir == "BUY" else "BUY"
+                lines.append(
+                    f"  Stop hunt {hunt_dir} {hunt_pips:.0f} pips "
+                    f"— expect {real_dir} reversal"
+                )
+            elif is_accum:
+                lines.append(
+                    f"  Accumulating (range {sess_range:.0f}p, "
+                    f"compression {vol_comp:.2f})"
+                )
+            elif bias != "NEUTRAL":
+                lines.append(f"  EMA trend: {trend}, bias {bias}")
+
+            if spread > 3:
+                lines.append(f"  Spread wide: {spread:.1f}p")
+
+            msg += "\n".join(lines) + "\n"
+
         msg += f"\n{_eat_datetime()}"
         return self._send(msg)
+
+    def notify_scanner_watchlist(self, report: str) -> bool:
+        """Send the alert-only scanner watchlist report."""
+        return self._send_text(report)
 
     # ------------------------------------------------------------------
     # Period Reports (Session / EOD / Weekly / Monthly)
@@ -498,7 +582,7 @@ class TelegramNotifier:
         )
 
         if equity_start or equity_end:
-            msg += f"\n--- Account ---\n"
+            msg += "\n--- Account ---\n"
             if equity_start:
                 msg += f"Start:       ${equity_start:.2f}\n"
             if equity_end:
@@ -509,14 +593,14 @@ class TelegramNotifier:
                     msg += f"Gain/Loss:   ${gain:+.2f} ({pct:+.2f}%)\n"
 
         if best_trade:
-            msg += f"\n--- Best Trade ---\n"
+            msg += "\n--- Best Trade ---\n"
             msg += (
                 f"{best_trade.get('direction','')} {best_trade.get('symbol','')} "
                 f"{best_trade.get('pips_gained',0):+.1f} pips "
                 f"${best_trade.get('net_profit',0):+.2f}\n"
             )
         if worst_trade:
-            msg += f"\n--- Worst Trade ---\n"
+            msg += "\n--- Worst Trade ---\n"
             msg += (
                 f"{worst_trade.get('direction','')} {worst_trade.get('symbol','')} "
                 f"{worst_trade.get('pips_gained',0):+.1f} pips "
@@ -526,7 +610,7 @@ class TelegramNotifier:
         if by_symbol:
             is_long_period = period_name.upper() in ("WEEKLY", "MONTHLY")
             if is_long_period and len(by_symbol) > 2:
-                msg += f"\n--- Top & Bottom Pairs ---\n"
+                msg += "\n--- Top & Bottom Pairs ---\n"
                 sorted_syms = sorted(by_symbol.items(), key=lambda x: x[1]["net_profit"], reverse=True)
                 sym, data = sorted_syms[0]
                 msg += (
@@ -544,7 +628,7 @@ class TelegramNotifier:
                 )
                 msg += f"({len(by_symbol)} pairs traded total)\n"
             else:
-                msg += f"\n--- By Symbol ---\n"
+                msg += "\n--- By Symbol ---\n"
                 for sym, data in by_symbol.items():
                     msg += (
                         f"{sym}: {data['trades']}T "
@@ -554,7 +638,7 @@ class TelegramNotifier:
                     )
 
         if winning_setups:
-            msg += f"\n--- Top Setups ---\n"
+            msg += "\n--- Top Setups ---\n"
             for s in winning_setups[:3]:
                 msg += (
                     f"L{s.get('cycle_level', '?')} {s.get('bias', '?')}: "

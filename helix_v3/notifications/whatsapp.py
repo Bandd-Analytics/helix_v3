@@ -103,15 +103,6 @@ class WhatsAppNotifier:
                 "Body": message,
             }
 
-            files = None
-            if image_path:
-                from pathlib import Path
-                img = Path(image_path)
-                if img.exists():
-                    # Upload as multipart form with MediaUrl
-                    # Twilio sandbox accepts direct file upload
-                    files = {"MediaUrl": (None, ""), "Media": (img.name, img.read_bytes(), "image/png")}
-
             response = httpx.post(
                 url,
                 auth=(self._account_sid, self._auth_token),
@@ -194,7 +185,6 @@ class WhatsAppNotifier:
     def _upload_to_tmphost(self, image_path) -> Optional[str]:
         """Upload image to tmpfiles.org (free, no auth, 1h expiry) for Twilio MediaUrl."""
         import httpx
-        from pathlib import Path
 
         try:
             with open(image_path, "rb") as f:
@@ -369,7 +359,7 @@ class WhatsAppNotifier:
             msg += f"Lots:      {lot_size}\n"
 
         # Prices
-        msg += f"\n--- Prices ---\n"
+        msg += "\n--- Prices ---\n"
         if entry_price:
             msg += f"Entry:     {entry_price:.5f}\n"
         if exit_price:
@@ -384,7 +374,7 @@ class WhatsAppNotifier:
 
         # Bias & Setup
         if bias or cycle_level or confidence:
-            msg += f"\n--- Setup ---\n"
+            msg += "\n--- Setup ---\n"
             if bias:
                 msg += f"Bias:      {bias}\n"
             if cycle_level:
@@ -393,7 +383,7 @@ class WhatsAppNotifier:
                 msg += f"Confidence:{confidence:.0%}\n"
 
         # P&L
-        msg += f"\n--- P&L ---\n"
+        msg += "\n--- P&L ---\n"
         if gross_profit:
             msg += f"Gross:     ${gross_profit:+.2f}\n"
         if commission:
@@ -404,13 +394,13 @@ class WhatsAppNotifier:
 
         # T1 info
         if t1_hit:
-            msg += f"\n--- Partial Close ---\n"
+            msg += "\n--- Partial Close ---\n"
             msg += f"T1 Hit:    Yes (+{t1_pips:.1f} pips)\n"
             msg += f"T1 Profit: ${t1_profit:.2f}\n"
 
         # Account
         if equity_before or equity_after:
-            msg += f"\n--- Account ---\n"
+            msg += "\n--- Account ---\n"
             if equity_before:
                 msg += f"Before:    ${equity_before:.2f}\n"
             if equity_after:
@@ -421,7 +411,7 @@ class WhatsAppNotifier:
                     msg += f"Change:    ${change:+.2f} ({pct:+.2f}%)\n"
 
         # Timing
-        msg += f"\n--- Timing ---\n"
+        msg += "\n--- Timing ---\n"
         msg += f"Exit Reason: {exit_reason}\n"
         msg += f"Duration:    {_format_duration(duration_min)}\n"
         if opened_at:
@@ -444,17 +434,41 @@ class WhatsAppNotifier:
         if not high_readiness:
             return False
 
-        msg = f"HELIX V3 MARKET UPDATE\n{'='*30}\n"
-        for s in high_readiness[:5]:
-            msg += (
-                f"\n{s['symbol']} {s['timeframe']}: "
-                f"Ready={s['trade_readiness']}/100 "
-                f"Bias={s['bias']} "
-                f"ATR={s['atr_14']:.0f}p\n"
-                f"  {s['readiness_notes'][:60]}\n"
-            )
+        from datetime import timezone as _tz
+        h = datetime.now(_tz.utc).hour
+        if 1 <= h < 5:
+            phase, note = "ACCUMULATION", "Asian range forming"
+        elif 5 <= h < 8:
+            phase, note = "STOP HUNT", "London breaking Asian range"
+        elif 8 <= h < 13:
+            phase, note = "TRUE TREND", "Real move underway"
+        elif 13 <= h < 17:
+            phase, note = "NYC REVERSAL", "Late session, high conviction only"
+        else:
+            phase, note = "DEAD TIME", "No entries"
+
+        dow = datetime.now(EAT).strftime("%A")
+        seen = set()
+        filtered = [s for s in high_readiness if s["symbol"] not in seen and not seen.add(s["symbol"])]
+
+        msg = f"HELIX V3 MARKET SCAN\n{'='*30}\n{dow} | {phase}\n{note}\n"
+        for s in filtered[:5]:
+            bias = s.get("bias", "NEUTRAL")
+            readiness = s.get("trade_readiness", 0)
+            hunt_active = s.get("stop_hunt_active", False)
+            hunt_dir = s.get("stop_hunt_direction", "")
+            hunt_pips = s.get("stop_hunt_breach_pips", 0) or 0
+            bar = ">" * (readiness // 10) + "-" * (10 - readiness // 10)
+            msg += f"\n{s['symbol']} {bias}\n  [{bar}] {readiness}/100\n"
+            if hunt_active and hunt_pips > 0:
+                real_dir = "SELL" if hunt_dir == "BUY" else "BUY"
+                msg += f"  Stop hunt {hunt_dir} {hunt_pips:.0f}p — expect {real_dir}\n"
         msg += f"\n{_eat_datetime()}"
         return self._send(msg)
+
+    def notify_scanner_watchlist(self, report: str) -> bool:
+        """Send the alert-only scanner watchlist report."""
+        return self._send(report)
 
     # ------------------------------------------------------------------
     # Period Reports (Session / EOD / Weekly / Monthly)
@@ -511,7 +525,7 @@ class WhatsAppNotifier:
 
         # Account
         if equity_start or equity_end:
-            msg += f"\n--- Account ---\n"
+            msg += "\n--- Account ---\n"
             if equity_start:
                 msg += f"Start:       ${equity_start:.2f}\n"
             if equity_end:
@@ -523,14 +537,14 @@ class WhatsAppNotifier:
 
         # Best / Worst
         if best_trade:
-            msg += f"\n--- Best Trade ---\n"
+            msg += "\n--- Best Trade ---\n"
             msg += (
                 f"{best_trade.get('direction','')} {best_trade.get('symbol','')} "
                 f"{best_trade.get('pips_gained',0):+.1f} pips "
                 f"${best_trade.get('net_profit',0):+.2f}\n"
             )
         if worst_trade:
-            msg += f"\n--- Worst Trade ---\n"
+            msg += "\n--- Worst Trade ---\n"
             msg += (
                 f"{worst_trade.get('direction','')} {worst_trade.get('symbol','')} "
                 f"{worst_trade.get('pips_gained',0):+.1f} pips "
@@ -541,7 +555,7 @@ class WhatsAppNotifier:
         if by_symbol:
             is_long_period = period_name.upper() in ("WEEKLY", "MONTHLY")
             if is_long_period and len(by_symbol) > 2:
-                msg += f"\n--- Top & Bottom Pairs ---\n"
+                msg += "\n--- Top & Bottom Pairs ---\n"
                 sorted_syms = sorted(by_symbol.items(), key=lambda x: x[1]["net_profit"], reverse=True)
                 # Best
                 sym, data = sorted_syms[0]
@@ -561,7 +575,7 @@ class WhatsAppNotifier:
                 )
                 msg += f"({len(by_symbol)} pairs traded total)\n"
             else:
-                msg += f"\n--- By Symbol ---\n"
+                msg += "\n--- By Symbol ---\n"
                 for sym, data in by_symbol.items():
                     msg += (
                         f"{sym}: {data['trades']}T "
@@ -572,7 +586,7 @@ class WhatsAppNotifier:
 
         # Winning setups
         if winning_setups:
-            msg += f"\n--- Top Setups ---\n"
+            msg += "\n--- Top Setups ---\n"
             for s in winning_setups[:3]:
                 msg += (
                     f"L{s.get('cycle_level', '?')} {s.get('bias', '?')}: "

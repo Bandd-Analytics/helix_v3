@@ -4,6 +4,9 @@ __pycache__/
 dist/
 build/
 .venv/
+.pytest_cache/
+.ruff_cache/
+.tmp/
 
 # Secrets
 .env
@@ -33,3 +36,9 @@ data/mmm_training/models/
 data/mmm_training/logs/
 data/mmm_training/transcripts/
 *.bin
+
+# Compiled MQ5 binaries (build artifacts — source .mq5 is tracked)
+mt5/indicators/*.ex5
+
+# Runtime singleton locks
+logs/*.lock

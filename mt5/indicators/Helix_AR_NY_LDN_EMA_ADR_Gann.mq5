@@ -455,7 +455,6 @@ int OnCalculate(const int        rates_total,
       DrawHudLabel(InpObjPrefix + "HUD_AVGA",  10, 84,  StringFormat("AvgAsia: %.1f p", avgAsia),       clrWhite, 9);
      }
 
-   ChartRedraw();
    return rates_total;
   }
 

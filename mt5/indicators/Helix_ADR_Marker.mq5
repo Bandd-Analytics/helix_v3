@@ -73,7 +73,7 @@ int OnCalculate(const int rates_total, const int prev_calculated,
    // Today's actual range
    double todayRange = (d[0].high - d[0].low);
    double todayPips = (PipSize > 0) ? todayRange / PipSize : 0;
-   double usedPct = (adr > 0) ? (todayRange / atr) * 100.0 : 0;
+   double usedPct = (atr > 0) ? (todayRange / atr) * 100.0 : 0;
 
    // Draw lines
    DrawHLine(InpPrefix + "HIGH", markerHigh, InpHighColor, InpStyle, InpWidth, "ADR High");
@@ -84,12 +84,13 @@ int OnCalculate(const int rates_total, const int prev_calculated,
    if(InpShowHUD)
      {
       DrawLabel(InpPrefix + "HUD1", 10, 120, StringFormat("ADR(14): %.0f p", adrPips), clrWhite, 9);
-      DrawLabel(InpPrefix + "HUD2", 10, 136, StringFormat("Today:   %.0f p (%.0f%%)", todayPips, usedPct),
-                usedPct > 100 ? clrRed : usedPct > 80 ? clrOrange : clrWhite, 9);
-      DrawLabel(InpPrefix + "HUD3", 10, 152, StringFormat("3xADR:   %.0f p", adrPips * 3), clrGray, 9);
+      color usedClr = clrWhite;
+      if(usedPct > 100) usedClr = clrRed;
+      else if(usedPct > 80) usedClr = clrOrange;
+      DrawLabel(InpPrefix + "HUD2", 10, 136, StringFormat("Today:   %.0f p (%.0f%%)", todayPips, usedPct), usedClr, 9);
+      DrawLabel(InpPrefix + "HUD3", 10, 152, StringFormat("3xADR:   %.0f p", adrPips * 3.0), clrGray, 9);
      }
 
-   ChartRedraw();
    return rates_total;
   }
 

@@ -150,24 +150,31 @@ whole-symbol bans.
 Mine backdated historical flashcards and build the validation library:
 
 ```powershell
-.venv\Scripts\python.exe -m helix_v3.backtest.historical_flashcard_miner mine --days 180 --symbols EURUSD,GBPUSD,GBPJPY,USDJPY,EURJPY,GBPCHF,AUDUSD --min-confluence 50 --step-bars 4 --limit-per-symbol 100
+.venv\Scripts\python.exe -m helix_v3.backtest.historical_flashcard_miner mine --days 180 --symbols EURUSD,GBPUSD,GBPJPY,USDJPY,EURJPY,GBPCHF,AUDUSD,GBPAUD,GBPNZD,EURGBP,XAUUSD,US30,USTEC --min-confluence 50 --step-bars 4 --limit-per-symbol 100
 .venv\Scripts\python.exe -m helix_v3.backtest.validation_library promote --min-total 5 --min-favorable-rate 55
 .venv\Scripts\python.exe -m helix_v3.backtest.historical_flashcard_miner library-report --limit 50
-.venv\Scripts\python.exe -m helix_v3.backtest.historical_flashcard_miner validate-current --symbols EURUSD,GBPUSD,GBPJPY,USDJPY,EURJPY,GBPCHF,AUDUSD
+.venv\Scripts\python.exe -m helix_v3.backtest.historical_flashcard_miner validate-current --symbols EURUSD,GBPUSD,GBPJPY,USDJPY,EURJPY,GBPCHF,AUDUSD,GBPAUD,GBPNZD,EURGBP,XAUUSD,US30,USTEC
 ```
 
-Run the per-pair 3-year dense research archive. This mines each pair separately, saves historical
+Run the aligned full-universe 5-year mining chunks. This mines all instruments over the same
+calendar windows before rebuilding reports:
+
+```powershell
+.\scripts\run_aligned_mining_chunks.ps1
+```
+
+Run the per-instrument dense research archive. This mines each instrument, saves historical
 flashcards, labels direct-profit outcomes, requires scanner-baseline qualification, and writes
 `data/mmm_training/pair_research/<PAIR>/` artifacts:
 
 ```powershell
-.venv\Scripts\python.exe -m helix_v3.backtest.historical_flashcard_miner pair-study --symbols EURUSD,GBPUSD,GBPJPY,USDJPY,EURJPY,GBPCHF,AUDUSD --days 1095 --step-bars 1 --limit-per-symbol 1000 --min-confluence 50 --min-spacing-minutes 90 --min-total 10 --min-favorable-rate 55 --min-avg-exit-pips 0 --baseline-favorable-rate 85 --baseline-avg-exit-pips 10.9 --split-min-total 3 --required-split-passes 2 --validation-days 365 --out-of-sample-days 180 --max-examples 150
+.venv\Scripts\python.exe -m helix_v3.backtest.historical_flashcard_miner pair-study --symbols EURUSD,GBPUSD,GBPJPY,USDJPY,EURJPY,GBPCHF,AUDUSD,GBPAUD,GBPNZD,EURGBP,XAUUSD,US30,USTEC --days 1826 --until 2026-06-08 --step-bars 1 --limit-per-symbol 2000 --min-confluence 50 --min-spacing-minutes 90 --min-total 10 --min-favorable-rate 55 --min-avg-exit-pips 0 --baseline-favorable-rate 85 --baseline-avg-exit-pips 10.9 --split-min-total 3 --required-split-passes 2 --validation-days 365 --out-of-sample-days 180 --max-examples 150
 ```
 
 Regenerate reports without touching MT5:
 
 ```powershell
-.venv\Scripts\python.exe -m helix_v3.backtest.historical_flashcard_miner pair-study --archive-only --symbols EURUSD,GBPUSD,GBPJPY,USDJPY,EURJPY,GBPCHF,AUDUSD --days 1095 --min-total 10 --min-favorable-rate 55 --min-avg-exit-pips 0 --baseline-favorable-rate 85 --baseline-avg-exit-pips 10.9 --split-min-total 3 --required-split-passes 2 --validation-days 365 --out-of-sample-days 180 --max-examples 150
+.venv\Scripts\python.exe -m helix_v3.backtest.historical_flashcard_miner pair-study --archive-only --symbols EURUSD,GBPUSD,GBPJPY,USDJPY,EURJPY,GBPCHF,AUDUSD,GBPAUD,GBPNZD,EURGBP,XAUUSD,US30,USTEC --days 1826 --until 2026-06-08 --min-total 10 --min-favorable-rate 55 --min-avg-exit-pips 0 --baseline-favorable-rate 85 --baseline-avg-exit-pips 10.9 --split-min-total 3 --required-split-passes 2 --validation-days 365 --out-of-sample-days 180 --max-examples 150
 ```
 
 Rebuild validation records strictly from replay signatures:
@@ -180,6 +187,36 @@ Build winner-vs-loser chart packets for paid-account ChatGPT/Claude vision revie
 
 ```powershell
 .venv\Scripts\python.exe -m helix_v3.training.vision_review_packet_builder --symbols GBPJPY,EURJPY --min-total 10 --min-favorable-rate 55 --min-avg-exit-pips 0 --max-setups-per-pair 3 --winners-per-setup 8 --losers-per-setup 8
+```
+
+Run stored-field ablations for vision-review filter hypotheses:
+
+```powershell
+.venv\Scripts\python.exe -m helix_v3.training.vision_filter_ablation --packet-root data\mmm_training\vision_review_packets
+```
+
+Run paid-account Codex/Claude packet reviews without API keys:
+
+```powershell
+.venv\Scripts\python.exe -m helix_v3.training.vision_account_review_runner --packet-root data\mmm_training\vision_review_packets --timeout-seconds 1200
+```
+
+Backfill OHLC-derived feature columns for packet signatures:
+
+```powershell
+.venv\Scripts\python.exe -m helix_v3.training.vision_feature_backfill --packet-root data\mmm_training\vision_review_packets
+```
+
+Backfill OHLC-derived feature columns for full GBPJPY/EURJPY research scope:
+
+```powershell
+.venv\Scripts\python.exe -m helix_v3.training.vision_feature_backfill --symbols GBPJPY,EURJPY
+```
+
+Run pair-level feature ablations across archived research signatures:
+
+```powershell
+.venv\Scripts\python.exe -m helix_v3.training.vision_filter_ablation --pair-research --symbols GBPJPY,EURJPY --pair-research-root data\mmm_training\pair_research --pair-output-root data\mmm_training\pair_feature_ablations --min-total 10 --split-min-total 3 --required-split-passes 2
 ```
 
 Historical mining uses MT5 only for candle history. It slices each timeframe at the historical
