@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sqlite3
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
@@ -43,7 +44,10 @@ from helix_v3.visualization.annotated_chart import AnnotatedChartGenerator
 
 logger = get_logger("historical_flashcard_miner")
 
-DEFAULT_RESEARCH_SYMBOLS = "EURUSD,GBPUSD,GBPJPY,USDJPY,EURJPY,GBPCHF,AUDUSD"
+DEFAULT_RESEARCH_SYMBOLS = os.getenv(
+    "RESEARCH_SYMBOLS",
+    "EURUSD,GBPUSD,GBPJPY,USDJPY,EURJPY,GBPCHF,AUDUSD,GBPAUD,GBPNZD,EURGBP,XAUUSD,US30,USTEC",
+)
 DEFAULT_PAIR_RESEARCH_DIR = Path("data/mmm_training/pair_research")
 DEFAULT_SCANNER_BASELINE_FAVORABLE_RATE = 85.0
 DEFAULT_SCANNER_BASELINE_AVG_EXIT_PIPS = 10.9
@@ -469,6 +473,7 @@ class HistoricalFlashcardMiner:
                     adr=adr,
                     prev_hod=prev_hod,
                     prev_lod=prev_lod,
+                    pip_size=pip_size,
                 )
                 chart_path = str(path)
             except Exception as exc:

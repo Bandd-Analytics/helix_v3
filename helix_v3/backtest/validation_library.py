@@ -56,6 +56,44 @@ CREATE TABLE IF NOT EXISTS validation_setups (
 CREATE INDEX IF NOT EXISTS idx_validation_key ON validation_setups(normalized_key);
 CREATE INDEX IF NOT EXISTS idx_validation_symbol ON validation_setups(symbol, direction);
 CREATE INDEX IF NOT EXISTS idx_validation_score ON validation_setups(confidence_score);
+
+CREATE TABLE IF NOT EXISTS setup_graveyard (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    archived_at         TEXT NOT NULL DEFAULT (datetime('now')),
+    reason              TEXT NOT NULL DEFAULT 'UNDERPERFORMER',
+
+    scope               TEXT NOT NULL,
+    symbol              TEXT NOT NULL DEFAULT '',
+    direction           TEXT NOT NULL DEFAULT '',
+    normalized_key      TEXT NOT NULL,
+    setup_family        TEXT NOT NULL,
+    primary_theme       TEXT,
+    symbols             TEXT NOT NULL,
+
+    total               INTEGER NOT NULL,
+    favorable           INTEGER NOT NULL,
+    favorable_rate      REAL NOT NULL,
+    t1_rate             REAL NOT NULL,
+    avg_exit_pips       REAL,
+    avg_mfe             REAL,
+    avg_mae             REAL,
+    realistic_target_pips REAL,
+    confidence_score    REAL NOT NULL,
+
+    entry_rules         TEXT NOT NULL,
+    exit_rules          TEXT NOT NULL,
+    example_source_ids  TEXT NOT NULL,
+
+    peak_favorable_rate REAL,
+    peak_confidence     REAL,
+    first_promoted_at   TEXT,
+    times_promoted      INTEGER DEFAULT 1,
+    times_demoted       INTEGER DEFAULT 1
+);
+
+CREATE INDEX IF NOT EXISTS idx_graveyard_key ON setup_graveyard(normalized_key);
+CREATE INDEX IF NOT EXISTS idx_graveyard_symbol ON setup_graveyard(symbol, direction);
+CREATE INDEX IF NOT EXISTS idx_graveyard_reason ON setup_graveyard(reason);
 """
 
 FAVORABLE_OUTCOMES = {"TARGET_2", "TRAIL_STOP", "TIME_EXIT_PROFIT", "OPEN_PROFIT"}
@@ -116,14 +154,118 @@ class ValidationLibrary:
         min_avg_exit_pips: float = 0.0,
         min_symbols: int = 2,
     ) -> int:
+        # Build new records first so we can diff
+        replay_conn = sqlite3.connect(str(self._replay_db_path))
+        replay_conn.row_factory = sqlite3.Row
+        try:
+            new_records = self._build_pair_records(
+                replay_conn,
+                min_total=min_total,
+                min_favorable_rate=min_favorable_rate,
+                min_avg_exit_pips=min_avg_exit_pips,
+            )
+            new_records.extend(
+                self._build_cross_pair_records(
+                    replay_conn,
+                    min_total=min_total,
+                    min_favorable_rate=min_favorable_rate,
+                    min_avg_exit_pips=min_avg_exit_pips,
+                    min_symbols=min_symbols,
+                )
+            )
+        finally:
+            replay_conn.close()
+
+        # Build set of keys that will survive
+        surviving_keys = {
+            (r.scope, r.symbol, r.direction, r.normalized_key)
+            for r in new_records
+        }
+
+        # Archive setups that are about to be dropped
+        existing = self._conn.execute(
+            "SELECT * FROM validation_setups"
+        ).fetchall()
+        for row in existing:
+            key = (row["scope"], row["symbol"], row["direction"], row["normalized_key"])
+            if key not in surviving_keys:
+                self._archive_to_graveyard(row, reason="UNDERPERFORMER")
+
+        # Now clear and rebuild
         self._conn.execute("DELETE FROM validation_setups")
         self._conn.commit()
-        return self.promote_from_replay(
-            min_total=min_total,
-            min_favorable_rate=min_favorable_rate,
-            min_avg_exit_pips=min_avg_exit_pips,
-            min_symbols=min_symbols,
-        )
+        for record in new_records:
+            self.upsert(record)
+        return len(new_records)
+
+    def _archive_to_graveyard(self, row: sqlite3.Row, reason: str = "UNDERPERFORMER") -> None:
+        """Move a dropped setup to the graveyard for tracking."""
+        now = datetime.now(timezone.utc).isoformat()
+
+        # Check if this setup was already in the graveyard (re-demoted)
+        existing_grave = self._conn.execute(
+            """SELECT id, times_demoted, peak_favorable_rate, peak_confidence, first_promoted_at
+               FROM setup_graveyard
+               WHERE scope = ? AND symbol = ? AND direction = ? AND normalized_key = ?
+               ORDER BY id DESC LIMIT 1""",
+            (row["scope"], row["symbol"], row["direction"], row["normalized_key"]),
+        ).fetchone()
+
+        if existing_grave:
+            # Update existing graveyard record
+            times = (existing_grave["times_demoted"] or 1) + 1
+            peak_fav = max(
+                existing_grave["peak_favorable_rate"] or 0,
+                row["favorable_rate"],
+            )
+            peak_conf = max(
+                existing_grave["peak_confidence"] or 0,
+                row["confidence_score"],
+            )
+            self._conn.execute(
+                """UPDATE setup_graveyard
+                   SET archived_at = ?, reason = ?, total = ?, favorable = ?,
+                       favorable_rate = ?, t1_rate = ?, avg_exit_pips = ?,
+                       avg_mfe = ?, avg_mae = ?, realistic_target_pips = ?,
+                       confidence_score = ?, times_demoted = ?,
+                       peak_favorable_rate = ?, peak_confidence = ?
+                   WHERE id = ?""",
+                (
+                    now, reason, row["total"], row["favorable"],
+                    row["favorable_rate"], row["t1_rate"], row["avg_exit_pips"],
+                    row["avg_mfe"], row["avg_mae"], row["realistic_target_pips"],
+                    row["confidence_score"], times, peak_fav, peak_conf,
+                    existing_grave["id"],
+                ),
+            )
+        else:
+            # Insert new graveyard record
+            self._conn.execute(
+                """INSERT INTO setup_graveyard (
+                       archived_at, reason, scope, symbol, direction, normalized_key,
+                       setup_family, primary_theme, symbols, total, favorable,
+                       favorable_rate, t1_rate, avg_exit_pips, avg_mfe, avg_mae,
+                       realistic_target_pips, confidence_score,
+                       entry_rules, exit_rules, example_source_ids,
+                       peak_favorable_rate, peak_confidence, first_promoted_at,
+                       times_promoted, times_demoted
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    now, reason,
+                    row["scope"], row["symbol"], row["direction"], row["normalized_key"],
+                    row["setup_family"], row["primary_theme"], row["symbols"],
+                    row["total"], row["favorable"],
+                    row["favorable_rate"], row["t1_rate"],
+                    row["avg_exit_pips"], row["avg_mfe"], row["avg_mae"],
+                    row["realistic_target_pips"], row["confidence_score"],
+                    row["entry_rules"], row["exit_rules"], row["example_source_ids"],
+                    row["favorable_rate"],  # peak starts at current
+                    row["confidence_score"],  # peak starts at current
+                    row["created_at"],  # when it was first promoted
+                    1, 1,
+                ),
+            )
+        self._conn.commit()
 
     def promote_from_replay(
         self,
@@ -275,6 +417,71 @@ class ValidationLibrary:
                 f"{record.favorable_rate:>6.1f}% {record.t1_rate:>6.1f}% "
                 f"{_fmt(record.avg_exit_pips):>9} {_fmt(record.realistic_target_pips):>9} "
                 f"{record.confidence_score:>6.1f} {record.normalized_key}"
+            )
+        lines.append("=" * 128)
+        return "\n".join(lines)
+
+    def graveyard_records(
+        self,
+        *,
+        symbol: Optional[str] = None,
+        reason: Optional[str] = None,
+        limit: int = 50,
+    ) -> list[sqlite3.Row]:
+        """Query the setup graveyard for archived underperformers."""
+        clauses: list[str] = []
+        params: list[Any] = []
+        if symbol:
+            clauses.append("symbol = ?")
+            params.append(symbol)
+        if reason:
+            clauses.append("reason = ?")
+            params.append(reason)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        params.append(limit)
+        return self._conn.execute(
+            f"""SELECT * FROM setup_graveyard
+            {where}
+            ORDER BY times_demoted DESC, archived_at DESC
+            LIMIT ?""",
+            params,
+        ).fetchall()
+
+    def graveyard_report(
+        self,
+        *,
+        symbol: Optional[str] = None,
+        limit: int = 50,
+    ) -> str:
+        """Report on archived underperformers in the graveyard."""
+        rows = self.graveyard_records(symbol=symbol, limit=limit)
+        if not rows:
+            return "Setup graveyard is empty — no setups have been demoted yet."
+
+        total_graves = self._conn.execute("SELECT COUNT(*) FROM setup_graveyard").fetchone()[0]
+        repeat_offenders = self._conn.execute(
+            "SELECT COUNT(*) FROM setup_graveyard WHERE times_demoted >= 2"
+        ).fetchone()[0]
+
+        lines = [
+            "",
+            "=" * 128,
+            "  HELIX V3 SETUP GRAVEYARD — Archived Underperformers",
+            "=" * 128,
+            f"  Total archived: {total_graves} | Repeat offenders (demoted 2+): {repeat_offenders}",
+            "",
+            f"  {'Scope':<10} {'Symbol':<8} {'Dir':<5} {'N':>5} {'Fav%':>7} {'Peak%':>7} "
+            f"{'Score':>6} {'Dem#':>4} {'Reason':<16} Setup",
+            "-" * 128,
+        ]
+        for row in rows:
+            symbol_text = row["symbol"] or "CROSS"
+            lines.append(
+                f"  {row['scope']:<10} {symbol_text:<8} {row['direction']:<5} "
+                f"{row['total']:>5} {row['favorable_rate']:>6.1f}% "
+                f"{(row['peak_favorable_rate'] or row['favorable_rate']):>6.1f}% "
+                f"{row['confidence_score']:>5.1f} {row['times_demoted'] or 1:>4} "
+                f"{row['reason']:<16} {row['normalized_key'][:40]}"
             )
         lines.append("=" * 128)
         return "\n".join(lines)
@@ -565,6 +772,10 @@ def main(argv: Optional[list[str]] = None) -> None:
     p_report.add_argument("--symbol")
     p_report.add_argument("--limit", type=int, default=50)
 
+    p_graveyard = sub.add_parser("graveyard", help="Show archived underperformers")
+    p_graveyard.add_argument("--symbol")
+    p_graveyard.add_argument("--limit", type=int, default=50)
+
     args = parser.parse_args(argv)
     library = ValidationLibrary()
     try:
@@ -586,6 +797,8 @@ def main(argv: Optional[list[str]] = None) -> None:
             print(f"Rebuilt validation library with {count} records.")
         elif args.command == "report":
             print(library.report(scope=args.scope, symbol=args.symbol, limit=args.limit))
+        elif args.command == "graveyard":
+            print(library.graveyard_report(symbol=args.symbol, limit=args.limit))
     finally:
         library.close()
 

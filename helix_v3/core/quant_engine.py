@@ -7,13 +7,14 @@ divergence analysis against live MT5 data.
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 import MetaTrader5 as mt5
 import numpy as np
 import pandas as pd
 
 from config.settings import settings
+from helix_v3.core.instruments import fallback_pip_size, pip_size_from_digits
 from helix_v3.core.types import (
     Direction,
     EMAVector,
@@ -117,9 +118,8 @@ class MMMQuantitativeEngine:
     def _get_pip_value(self, symbol: str) -> float:
         info = mt5.symbol_info(symbol)
         if info is None:
-            return 0.0001
-        digits = info.digits
-        return 10 ** (-digits) * (10 if digits in (3, 5) else 1)
+            return fallback_pip_size(symbol)
+        return pip_size_from_digits(point=float(info.point), digits=int(info.digits))
 
     # ------------------------------------------------------------------
     # 1. Volatility Compression Score (Asian Accumulation)
@@ -179,9 +179,6 @@ class MMMQuantitativeEngine:
             vol_compression = 1.0
         else:
             current_range = daily_session_ranges.iloc[-1]
-            percentile_threshold = np.percentile(
-                daily_session_ranges.values, self._cfg.accumulation_percentile * 100
-            )
             vol_compression = float(current_range / daily_session_ranges.mean()) if daily_session_ranges.mean() > 0 else 1.0
 
         is_accumulation = vol_compression <= self._cfg.accumulation_percentile

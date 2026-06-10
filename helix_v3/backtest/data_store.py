@@ -7,12 +7,13 @@ sliced DataFrames to BacktestEngine.fetch_rates() without further MT5 calls.
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 import MetaTrader5 as mt5
 import pandas as pd
 
 from config.settings import settings
+from helix_v3.core.instruments import fallback_pip_size, pip_size_from_digits
 from helix_v3.utils.logger import get_logger
 
 logger = get_logger("backtest_data_store")
@@ -82,7 +83,7 @@ class HistoricalDataStore:
         info = mt5.symbol_info(symbol)
         if info is None:
             logger.warning("Symbol info not available for %s, using defaults", symbol)
-            self._pip_sizes[symbol] = 0.01 if "JPY" in symbol else 0.0001
+            self._pip_sizes[symbol] = fallback_pip_size(symbol)
             self._tick_values[symbol] = 1.0
             self._symbol_digits[symbol] = 3 if "JPY" in symbol else 5
             return
@@ -93,7 +94,7 @@ class HistoricalDataStore:
 
         digits = info.digits
         point = info.point
-        pip_size = point * 10 if digits in (3, 5) else point
+        pip_size = pip_size_from_digits(point=float(point), digits=int(digits))
         self._pip_sizes[symbol] = pip_size
         self._tick_values[symbol] = info.trade_tick_value
         self._symbol_digits[symbol] = digits

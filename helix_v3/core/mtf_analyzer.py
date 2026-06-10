@@ -167,10 +167,19 @@ class MTFAnalyzer:
     def __init__(self, engine: MMMQuantitativeEngine) -> None:
         self._engine = engine
 
+    def _current_utc(self) -> datetime:
+        """Return simulated time if backtesting, otherwise wall clock."""
+        ct = getattr(self._engine, "_current_time", None)
+        if ct is not None:
+            if ct.tzinfo is None:
+                return ct.replace(tzinfo=timezone.utc)
+            return ct.astimezone(timezone.utc)
+        return datetime.now(timezone.utc)
+
     def analyze(self, symbol: str) -> MTFAnalysis:
         """Run full top-down MTF analysis for a symbol."""
         pp = get_pair_profile(symbol)
-        now = datetime.now(timezone.utc)
+        now = self._current_utc()
 
         weekly = self._analyze_weekly(symbol)
         four_hour = self._analyze_4h(symbol)
@@ -236,7 +245,7 @@ class MTFAnalyzer:
             days_since_peak = days_since_low
 
         # Week phase
-        weekday = now_utc().weekday()
+        weekday = self._current_utc().weekday()
         if weekday in (6, 0):  # Sun-Mon
             week_phase = WeekPhase.EARLY_WEEK
         elif weekday in (1, 2):  # Tue-Wed
@@ -335,7 +344,7 @@ class MTFAnalyzer:
         lod_locked = float(recent_3["Low"].min()) > lod * 1.001
 
         # Session phase
-        hour_utc = now_utc().hour
+        hour_utc = self._current_utc().hour
         if 1 <= hour_utc < 5:
             session = SessionPhase.ACCUMULATION
         elif 5 <= hour_utc < 8:

@@ -247,6 +247,28 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         notes="EUR+JPY cross. ~$6.6/pip. Shows cycle disparity vs EURUSD.",
     ),
 
+    "EURGBP": PairProfile(
+        symbol="EURGBP",
+        tradeable=False,                   # Analysis-only until pair-specific validation exists
+        risk_tier="low",
+        max_risk_pct=0.008,
+        max_lot_size=0.5,
+        max_spread_pips=2.5,
+        stale_minutes=90,
+        stale_exit_minutes=90,
+        stale_max_pips=0.0,
+        max_duration_minutes=240,
+        trail_activation_pips=12.0,
+        trail_distance_pips=10.0,
+        sl_buffer_pips=3.0,
+        min_sl_pips=12.0,
+        stop_hunt_min_pips=12.0,
+        stop_hunt_max_pips=45.0,
+        expected_level_move_pips=45.0,
+        asian_range_max_pips=30.0,
+        notes="EUR/GBP cross. Analysis-only until historical MMM edge is proven.",
+    ),
+
     "EURCHF": PairProfile(
         symbol="EURCHF",
         risk_tier="low",
@@ -382,6 +404,54 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         expected_level_move_pips=800.0,    # Gold level moves = $8.00
         asian_range_max_pips=8000.0,       # CALIBRATED: was 400, all days exceeded — $80 range
         notes="GOLD. 1 pip=$0.01. $1/pip/lot. Violent. Min risk. Short duration.",
+    ),
+
+    # --- Indices ---
+    # Broker point/pip conventions vary. Keep analysis-only until symbol-specific
+    # replay calibration proves valid risk units and positive edge.
+
+    "US30": PairProfile(
+        symbol="US30",
+        tradeable=False,
+        risk_tier="high",
+        max_risk_pct=0.003,
+        max_lot_size=0.1,
+        max_spread_pips=80.0,
+        stale_minutes=60,
+        stale_exit_minutes=90,
+        stale_max_pips=0.0,
+        max_duration_minutes=180,
+        trail_activation_pips=250.0,
+        trail_distance_pips=180.0,
+        sl_buffer_pips=50.0,
+        min_sl_pips=300.0,
+        stop_hunt_min_pips=250.0,
+        stop_hunt_max_pips=2500.0,
+        expected_level_move_pips=1200.0,
+        asian_range_max_pips=4000.0,
+        notes="Dow/US30 index. Analysis-only; broker point values require calibration.",
+    ),
+
+    "USTEC": PairProfile(
+        symbol="USTEC",
+        tradeable=False,
+        risk_tier="high",
+        max_risk_pct=0.003,
+        max_lot_size=0.1,
+        max_spread_pips=80.0,
+        stale_minutes=60,
+        stale_exit_minutes=90,
+        stale_max_pips=0.0,
+        max_duration_minutes=180,
+        trail_activation_pips=180.0,
+        trail_distance_pips=130.0,
+        sl_buffer_pips=40.0,
+        min_sl_pips=220.0,
+        stop_hunt_min_pips=180.0,
+        stop_hunt_max_pips=2200.0,
+        expected_level_move_pips=900.0,
+        asian_range_max_pips=3500.0,
+        notes="Nasdaq/USTEC index. Analysis-only; broker point values require calibration.",
     ),
 }
 

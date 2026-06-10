@@ -390,6 +390,7 @@ class BacktestRunner:
         min_confluence: int = 50,
         max_concurrent: int = 3,
         verbose: bool = False,
+        use_validation: bool = False,
     ) -> None:
         self.data_store = data_store
         self.engine = BacktestEngine(data_store)
@@ -398,6 +399,7 @@ class BacktestRunner:
         self.min_confluence = min_confluence
         self.max_concurrent = max_concurrent
         self.verbose = verbose
+        self.use_validation = use_validation
         # In-memory re-entry guard for speed
         self._loss_cooldowns: Dict[str, datetime] = {}  # "SYMBOL_DIR" -> cooldown_until
         self._loss_counts: Dict[str, int] = {}  # "SYMBOL_DIR" -> consecutive losses
@@ -410,6 +412,21 @@ class BacktestRunner:
         self._replay_store = MMMReplayStore() if _HAS_REPLAY else None
         # Track ReplaySetup per trade for outcome recording (keyed by "SYMBOL_entry_time")
         self._trade_setups: Dict[str, object] = {}  # "SYMBOL_timestamp" -> ReplaySetup
+        # Validation library for filtering entries
+        self._validation_lib = None
+        self._validation_blocks = 0
+        self._validation_matches = 0
+        self._graveyard_warnings = 0
+        if use_validation and _HAS_REPLAY:
+            try:
+                from helix_v3.backtest.validation_library import ValidationLibrary
+                self._validation_lib = ValidationLibrary()
+                count = self._validation_lib._conn.execute(
+                    "SELECT COUNT(*) FROM validation_setups"
+                ).fetchone()[0]
+                logger.info("Validation library loaded: %d proven setups", count)
+            except Exception as e:
+                logger.warning("Failed to load validation library: %s", e)
 
     def run(self) -> None:
         """Execute the backtest."""
@@ -561,6 +578,50 @@ class BacktestRunner:
                     advisory.grade, advisory.final_score, advisory.blockers[:3],
                 )
             return
+
+        # Validation library filter — only enter proven setups
+        if self._validation_lib and _HAS_REPLAY:
+            rs = replay_setup_from_mtf(
+                analysis, snapshot_at=bar_time,
+                tdi_result=tdi_result, patterns=pat_scan,
+                source="backtest",
+            )
+            matches = self._validation_lib.validate_setup(rs)
+            if matches:
+                best = matches[0]
+                self._validation_matches += 1
+                # Block if historically poor (<30% win rate)
+                if best.total >= 5 and best.favorable_rate < 30.0:
+                    self._validation_blocks += 1
+                    if self.verbose:
+                        logger.debug(
+                            "[%s] %s %s VALIDATION BLOCK: %.0f%% win (%d samples)",
+                            bar_time.strftime("%m-%d %H:%M"), direction.value, symbol,
+                            best.favorable_rate, best.total,
+                        )
+                    return
+                # Check graveyard for repeat offenders
+                grave = self._validation_lib._conn.execute(
+                    """SELECT times_demoted FROM setup_graveyard
+                       WHERE normalized_key = ? AND (symbol = ? OR symbol = '')
+                       AND times_demoted >= 3
+                       LIMIT 1""",
+                    (best.normalized_key, symbol),
+                ).fetchone()
+                if grave:
+                    self._graveyard_warnings += 1
+                    self._validation_blocks += 1
+                    if self.verbose:
+                        logger.debug(
+                            "[%s] %s %s GRAVEYARD BLOCK: demoted %dx",
+                            bar_time.strftime("%m-%d %H:%M"), direction.value, symbol,
+                            grave[0],
+                        )
+                    return
+            elif self.use_validation:
+                # No match in validation library — skip unproven setups
+                self._validation_blocks += 1
+                return
 
         # Get entry price from M15 bar
         df_m15 = self.data_store.get_rates(symbol, "M15", bar_time, 1)
@@ -741,6 +802,10 @@ def main(argv: Optional[list] = None) -> None:
     parser.add_argument("--min-confluence", type=int, default=55, help="Min confluence score")
     parser.add_argument("--max-positions", type=int, default=3, help="Max concurrent positions")
     parser.add_argument("--verbose", "-v", action="store_true", help="Detailed trade logging")
+    parser.add_argument("--validation", action="store_true",
+                        help="Only enter setups matched by validation library (proven patterns)")
+    parser.add_argument("--compare", action="store_true",
+                        help="Run twice (with and without validation) and compare results")
     args = parser.parse_args(argv)
 
     # Date range
@@ -761,6 +826,8 @@ def main(argv: Optional[list] = None) -> None:
     print(f"Pairs: {', '.join(symbols)}")
     print(f"Starting equity: ${args.equity:.2f}")
     print(f"Min confluence: {args.min_confluence}")
+    if args.validation or args.compare:
+        print(f"Validation library: ACTIVE (only proven setups)")
     print()
 
     # Load data from MT5
@@ -769,19 +836,85 @@ def main(argv: Optional[list] = None) -> None:
     store.load()
     print()
 
-    # Run backtest
+    if args.compare:
+        # Run BOTH modes and compare
+        from helix_v3.backtest.report import print_backtest_report
+
+        print("=" * 80)
+        print("  RUN 1: BASELINE (no validation filter)")
+        print("=" * 80)
+        runner_base = BacktestRunner(
+            data_store=store,
+            initial_equity=args.equity,
+            min_confluence=args.min_confluence,
+            max_concurrent=args.max_positions,
+            verbose=args.verbose,
+            use_validation=False,
+        )
+        runner_base.run()
+        print_backtest_report(runner_base.simulator, start, end)
+
+        print("\n" + "=" * 80)
+        print("  RUN 2: VALIDATION LIBRARY ACTIVE (only proven setups)")
+        print("=" * 80)
+        runner_val = BacktestRunner(
+            data_store=store,
+            initial_equity=args.equity,
+            min_confluence=args.min_confluence,
+            max_concurrent=args.max_positions,
+            verbose=args.verbose,
+            use_validation=True,
+        )
+        runner_val.run()
+        print_backtest_report(runner_val.simulator, start, end)
+
+        # Comparison summary
+        b = runner_base.simulator
+        v = runner_val.simulator
+        b_trades = len(b.closed_trades)
+        v_trades = len(v.closed_trades)
+        b_wins = sum(1 for t in b.closed_trades if t.pnl_pips > 0)
+        v_wins = sum(1 for t in v.closed_trades if t.pnl_pips > 0)
+        b_pips = sum(t.pnl_pips for t in b.closed_trades)
+        v_pips = sum(t.pnl_pips for t in v.closed_trades)
+        b_wr = b_wins / b_trades * 100 if b_trades else 0
+        v_wr = v_wins / v_trades * 100 if v_trades else 0
+
+        print("\n" + "=" * 80)
+        print("  COMPARISON: BASELINE vs VALIDATION LIBRARY")
+        print("=" * 80)
+        print(f"  {'Metric':<25}{'Baseline':>15}{'Validated':>15}{'Delta':>15}")
+        print(f"  {'-'*70}")
+        print(f"  {'Trades':<25}{b_trades:>15}{v_trades:>15}{v_trades - b_trades:>+15}")
+        print(f"  {'Wins':<25}{b_wins:>15}{v_wins:>15}{v_wins - b_wins:>+15}")
+        print(f"  {'Win Rate':<25}{b_wr:>14.1f}%{v_wr:>14.1f}%{v_wr - b_wr:>+14.1f}%")
+        print(f"  {'Total Pips':<25}{b_pips:>15.1f}{v_pips:>15.1f}{v_pips - b_pips:>+15.1f}")
+        print(f"  {'Final Equity':<25}${b.equity:>14.2f}${v.equity:>14.2f}${v.equity - b.equity:>+14.2f}")
+        print(f"  {'Validation Matches':<25}{'-':>15}{runner_val._validation_matches:>15}")
+        print(f"  {'Validation Blocks':<25}{'-':>15}{runner_val._validation_blocks:>15}")
+        print(f"  {'Graveyard Warnings':<25}{'-':>15}{runner_val._graveyard_warnings:>15}")
+        print("=" * 80)
+        return
+
+    # Single run
     runner = BacktestRunner(
         data_store=store,
         initial_equity=args.equity,
         min_confluence=args.min_confluence,
         max_concurrent=args.max_positions,
         verbose=args.verbose,
+        use_validation=args.validation,
     )
     runner.run()
 
     # Print report
     from helix_v3.backtest.report import print_backtest_report
     print_backtest_report(runner.simulator, start, end)
+
+    if runner.use_validation:
+        print(f"\n  VALIDATION STATS: {runner._validation_matches} matches, "
+              f"{runner._validation_blocks} blocks, "
+              f"{runner._graveyard_warnings} graveyard warnings")
 
     # Auto-promote proven patterns to validation library
     if _HAS_REPLAY:

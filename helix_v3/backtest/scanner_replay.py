@@ -21,6 +21,7 @@ import pandas as pd
 from config.settings import settings
 from helix_v3.backtest.vision_store import VisionBacktestStore, label_many_horizons
 from helix_v3.consensus.validator import MMMConsensusValidator, PROMPT_VERSION
+from helix_v3.core.instruments import fallback_pip_size, pip_size_from_digits
 from helix_v3.core.quant_engine import TF_MAP
 from helix_v3.core.types import Direction, VisionVerdict
 from helix_v3.utils.logger import get_logger
@@ -399,12 +400,8 @@ def fetch_rates_range(
 def get_pip_size(symbol: str) -> float:
     info = mt5.symbol_info(symbol)
     if info is not None:
-        return info.point * (10 if info.digits in (3, 5) else 1)
-    if "JPY" in symbol:
-        return 0.01
-    if symbol.startswith("XAU"):
-        return 0.1
-    return 0.0001
+        return pip_size_from_digits(point=float(info.point), digits=int(info.digits))
+    return fallback_pip_size(symbol)
 
 
 def _rates_to_df(rates: Any) -> pd.DataFrame:
