@@ -21,6 +21,7 @@ from typing import Dict, List, Optional, Set
 
 from config.settings import settings
 from helix_v3.consensus.validator import MMMConsensusValidator
+from helix_v3.core.types import ConsensusResult
 from helix_v3.core.advisory_confidence import (
     AdvisorySetup,
     advisory_setup_from_mtf,
@@ -66,6 +67,12 @@ try:
     from helix_v3.consensus.validator import PROMPT_VERSION
 except ImportError:
     PROMPT_VERSION = "mmm_vision_v2"
+
+try:
+    from helix_v3.backtest.setup_intelligence import rrs_grade as _compute_rrs_grade
+    _HAS_SETUP_INTEL = True
+except ImportError:
+    _HAS_SETUP_INTEL = False
 
 logger = get_logger("orchestrator_v2")
 
@@ -229,6 +236,21 @@ class HelixOrchestratorV2:
         self.validation_lib = ValidationLibrary() if _HAS_VALIDATION else None
         from helix_v3.backtest.mmm_event_replay import MMMReplayStore
         self.replay_store = MMMReplayStore() if _HAS_VALIDATION else None
+        # Setup intelligence DB for RRS grading
+        self._setup_intel_conn = None
+        if _HAS_SETUP_INTEL:
+            try:
+                import sqlite3
+                intel_path = Path(settings.log_dir) / "setup_intelligence.db"
+                if intel_path.exists():
+                    self._setup_intel_conn = sqlite3.connect(str(intel_path))
+                    self._setup_intel_conn.row_factory = sqlite3.Row
+                    count = self._setup_intel_conn.execute(
+                        "SELECT COUNT(*) FROM setup_stats WHERE rrs_grade IN ('R_RUNNER','R_REPEATER') AND positive_expectancy = 1"
+                    ).fetchone()[0]
+                    logger.info("Setup intelligence loaded: %d R_RUNNER/R_REPEATER setups", count)
+            except Exception as e:
+                logger.warning("Setup intelligence DB not available: %s", e)
         # Track replay setups for open trades (keyed by symbol)
         self._live_replay_setups: Dict[str, object] = {}
         self.notifier = self._create_notifier()
@@ -336,6 +358,31 @@ class HelixOrchestratorV2:
                 logger.warning("GUARD BLOCKED: %s — %s", symbol, guard_reason)
                 return
 
+            # Per-setup signature cooldown: catches setups that persist across many
+            # M15 cycles (e.g. confluence-97 BUY re-detecting every cycle for hours).
+            setup_signature = _setup_signature(analysis)
+            sig_cooldown = self.guard.check_setup_cooldown(
+                symbol, analysis.trade_direction.value, setup_signature
+            )
+            if sig_cooldown:
+                logger.warning("SETUP COOLDOWN: %s — %s", symbol, sig_cooldown)
+                return
+
+            # P0 SESSION GATE: don't open in a session we'd immediately close in.
+            # Without this, manage_open_positions session-exits the trade ~30s after
+            # entry while we're still inside pair_profile.close_before_session.
+            from config.pair_profiles import get_pair_profile
+            from helix_v3.scanner.market_scanner import _get_session_name
+            current_session = _get_session_name()
+            pair_profile = get_pair_profile(symbol)
+            if current_session == pair_profile.close_before_session:
+                logger.warning(
+                    "SESSION GATE: %s — skipping entry, current session %s matches "
+                    "close_before_session (would immediately session-exit)",
+                    symbol, current_session,
+                )
+                return
+
             # Step 2: Generate annotated flashcard chart with full indicators
             df_m15 = self.engine.fetch_rates(symbol, "M15", count=200)
             df_d1 = self.engine.fetch_rates(symbol, "D1", count=140)
@@ -389,7 +436,16 @@ class HelixOrchestratorV2:
             if advisory.blockers:
                 logger.info("ADVISORY %s blockers: %s", symbol, "; ".join(advisory.blockers))
 
+            # Block D and AVOID grades — these have no edge
+            if advisory.grade in ("D", "AVOID"):
+                logger.warning(
+                    "ADVISORY BLOCK: %s grade=%s score=%.0f — skipping",
+                    symbol, advisory.grade, advisory.final_score,
+                )
+                return
+
             # Validation library lookup — check if this pattern has historical backing
+            validation_match = None
             if self.validation_lib and _HAS_VALIDATION:
                 replay_setup = replay_setup_from_mtf(
                     analysis,
@@ -401,20 +457,75 @@ class HelixOrchestratorV2:
                 matches = self.validation_lib.validate_setup(replay_setup)
                 if matches:
                     best = matches[0]
+                    validation_match = best
                     logger.info(
-                        "VALIDATION %s: MATCH found — %s win=%.0f%% n=%d target=%.1fp",
-                        symbol, best.setup_family, best.favorable_rate * 100,
-                        best.total, best.realistic_target_pips or 0,
+                        "VALIDATION %s: MATCH found — %s win=%.0f%% n=%d score=%.0f target=%.1fp",
+                        symbol, best.setup_family, best.favorable_rate,
+                        best.total, best.confidence_score, best.realistic_target_pips or 0,
                     )
                     # Block entry if best matching pattern has <30% win rate with enough samples
-                    if best.total >= 5 and best.favorable_rate < 0.30:
+                    # favorable_rate is stored as percentage (0-100)
+                    if best.total >= 5 and best.favorable_rate < 30.0:
                         logger.warning(
                             "VALIDATION BLOCK: %s pattern has %.0f%% win rate (%d samples) — skipping",
-                            symbol, best.favorable_rate * 100, best.total,
+                            symbol, best.favorable_rate, best.total,
                         )
                         return
+                    # Check graveyard: warn if this setup has been demoted before
+                    grave_rows = self.validation_lib._conn.execute(
+                        """SELECT times_demoted, peak_favorable_rate, favorable_rate
+                           FROM setup_graveyard
+                           WHERE normalized_key = ? AND (symbol = ? OR symbol = '')
+                           ORDER BY times_demoted DESC LIMIT 1""",
+                        (best.normalized_key, symbol),
+                    ).fetchall()
+                    if grave_rows:
+                        g = grave_rows[0]
+                        logger.warning(
+                            "VALIDATION %s: GRAVEYARD WARNING — demoted %dx, "
+                            "peak was %.0f%%, last fav was %.0f%%",
+                            symbol, g[0], g[1] or 0, g[2] or 0,
+                        )
                 else:
                     logger.debug("VALIDATION %s: No matching historical pattern", symbol)
+
+            # RRS setup intelligence lookup
+            rrs_tag = ""
+            if self._setup_intel_conn and _HAS_VALIDATION:
+                try:
+                    sig = replay_setup_from_mtf(
+                        analysis, snapshot_at=datetime.now(timezone.utc),
+                        tdi_result=tdi_result, patterns=patterns, source="live",
+                    ) if not validation_match else replay_setup
+                    from helix_v3.backtest.mmm_event_replay import build_setup_signature
+                    sig_obj = build_setup_signature(sig)
+                    nk = sig_obj.normalized_key
+                    intel_row = self._setup_intel_conn.execute(
+                        """SELECT rrs_grade, favorable_rate, total, avg_exit_pips, positive_expectancy
+                           FROM setup_stats
+                           WHERE normalized_key = ? AND symbol = ? AND total >= 5
+                           ORDER BY total DESC LIMIT 1""",
+                        (nk, symbol),
+                    ).fetchone()
+                    if not intel_row:
+                        # Try cross-pair match
+                        intel_row = self._setup_intel_conn.execute(
+                            """SELECT rrs_grade, favorable_rate, total, avg_exit_pips, positive_expectancy
+                               FROM cross_pair_stats
+                               WHERE normalized_key = ? AND symbols LIKE ? AND total >= 10
+                               ORDER BY total DESC LIMIT 1""",
+                            (nk, f"%{symbol}%"),
+                        ).fetchone()
+                    if intel_row:
+                        rrs_tag = intel_row["rrs_grade"]
+                        logger.info(
+                            "RRS %s: %s fav=%.0f%% n=%d exit=%+.1fp pos_exp=%d",
+                            symbol, rrs_tag, intel_row["favorable_rate"],
+                            intel_row["total"], intel_row["avg_exit_pips"] or 0,
+                            intel_row["positive_expectancy"],
+                        )
+                except Exception as e:
+                    logger.debug("RRS lookup failed for %s: %s", symbol, e)
 
             # Generate annotated chart with everything
             _, annotated_path = self.annotator.generate_from_mtf(
@@ -434,37 +545,71 @@ class HelixOrchestratorV2:
                             symbol, ", ".join(tdi_sigs), tdi_result.rsi, tdi_result.signal, tdi_result.base)
 
             # Step 3: Vision consensus on the chart
-            image_b64, chart_path = self.visualizer.export_vision_matrix(
-                df_m15, symbol, "M15"
+            # When API keys are available, vision consensus adds a confirmation layer.
+            # Without keys, the quantitative pipeline (MTF + advisory + RRS) is the edge.
+            chart_path = None
+            # The 2-year backtest (PF 1.35, +$686) ran without vision consensus.
+            import os
+            _has_api_key = bool(
+                getattr(self.validator, '_api_cfg', None)
+                and (self.validator._api_cfg.anthropic_key or self.validator._api_cfg.openai_key)
             )
-            consensus = await self.validator.evaluate(image_b64, symbol, "M15")
-            if self.vision_backtests:
-                self._record_vision_predictions(
-                    symbol=symbol,
-                    timeframe="M15",
-                    analysis=analysis,
-                    consensus=consensus,
-                    chart_path=str(chart_path) if chart_path else None,
+            _skip_vision = not _has_api_key
+            if _skip_vision:
+                # No API keys — create a synthetic pass-through consensus
+                consensus = ConsensusResult(
+                    agreed=True,
+                    direction=analysis.trade_direction,
+                    avg_confidence=analysis.trade_confidence,
+                    verdicts=[],
+                    divergence_notes="vision-bypassed: no API keys, quant pipeline only",
                 )
-
-            if not consensus.agreed:
                 logger.info(
-                    "No consensus for %s: %s", symbol, consensus.divergence_notes,
+                    "VISION BYPASS %s: no API keys — using quant pipeline (MTF+advisory+RRS)",
+                    symbol,
                 )
-                # Save as "missed" flashcard for learning
-                self.flashcards.save_missed_flashcard(
-                    symbol=symbol,
-                    timeframe="M15",
-                    chart_path=str(annotated_path),
-                    mtf_context=_enrich_flashcard_context(analysis, tdi_result, patterns, advisory),
-                    reason=f"Vision declined: {consensus.divergence_notes}",
-                    tags=["missed", "no_consensus", analysis.weekly.week_phase.value],
+            else:
+                image_b64, chart_path = self.visualizer.export_vision_matrix(
+                    df_m15, symbol, "M15"
                 )
-                return
+                consensus = await self.validator.evaluate(image_b64, symbol, "M15")
+                if self.vision_backtests:
+                    self._record_vision_predictions(
+                        symbol=symbol,
+                        timeframe="M15",
+                        analysis=analysis,
+                        consensus=consensus,
+                        chart_path=str(chart_path) if chart_path else None,
+                    )
+
+                if not consensus.agreed:
+                    logger.info(
+                        "No consensus for %s: %s", symbol, consensus.divergence_notes,
+                    )
+                    self.flashcards.save_missed_flashcard(
+                        symbol=symbol,
+                        timeframe="M15",
+                        chart_path=str(annotated_path),
+                        mtf_context=_enrich_flashcard_context(analysis, tdi_result, patterns, advisory),
+                        reason=f"Vision declined: {consensus.divergence_notes}",
+                        tags=["missed", "no_consensus", analysis.weekly.week_phase.value],
+                    )
+                    return
 
             # Step 4: Notify with flashcard chart (not text-only)
             setup_key = f"{symbol}_{analysis.trade_direction.value}"
             if setup_key not in self._notified_setups:
+                # Build intelligence notes
+                notes_parts = []
+                if rrs_tag:
+                    notes_parts.append(f"RRS: {rrs_tag}")
+                if validation_match:
+                    vm = validation_match
+                    notes_parts.append(
+                        f"PROVEN: {vm.favorable_rate:.0f}% win ({vm.total} samples) "
+                        f"target={vm.realistic_target_pips or 0:+.1f}p"
+                    )
+                validation_note = " | ".join(notes_parts)
                 self.notifier.notify_setup_with_chart(
                     symbol=symbol,
                     timeframe="M15",
@@ -480,6 +625,7 @@ class HelixOrchestratorV2:
                     rrt=analysis.fifteen_min.rrt_detected,
                     push_count=analysis.fifteen_min.push_count,
                     chart_path=str(annotated_path),
+                    notes=validation_note,
                 )
                 self._notified_setups.add(setup_key)
 
@@ -524,6 +670,15 @@ class HelixOrchestratorV2:
                     "TRADE EXECUTED: %s %s ticket=%d lots=%.2f confluence=%d",
                     order.direction.value, symbol, ticket, order.lot_size,
                     analysis.confluence_score,
+                )
+
+                # P1: cool down this exact setup signature for 60 min so the same
+                # MTF pattern doesn't re-fire on the next cycle.
+                self.guard.set_setup_cooldown(
+                    symbol,
+                    order.direction.value,
+                    setup_signature,
+                    minutes=60.0,
                 )
 
                 # Store replay setup for outcome recording when trade closes
@@ -665,6 +820,11 @@ class HelixOrchestratorV2:
         for symbol in self._symbols:
             await self._process_symbol(symbol)
 
+        # Send MMM narrative after all symbols are analyzed
+        if time.monotonic() - self._last_market_scan < 60:
+            # Market scan ran this cycle — send narrative with fresh data
+            self._send_mmm_narrative()
+
     def _run_market_scan(self) -> None:
         """Execute the 15-minute market condition scan with MTF context."""
         if not self.scanner:
@@ -675,9 +835,7 @@ class HelixOrchestratorV2:
             dashboard = self.scanner.print_dashboard()
             logger.info(dashboard)
 
-            high = self.scanner.get_high_readiness(min_score=50)
-            if high:
-                self.notifier.notify_market_conditions(dashboard, high)
+            # MMM narrative is sent after MTF loop, not here
 
             from helix_v3.scanner.market_scanner import _get_session_name
             current_session = _get_session_name()
@@ -694,6 +852,157 @@ class HelixOrchestratorV2:
 
         except Exception as e:
             logger.error("Market scan failed: %s", e)
+
+    def _send_mmm_narrative(self) -> None:
+        """Build and send an MMM story-style market update from MTF analysis."""
+        if not self._last_analysis:
+            return
+
+        # Only send when the story changes — track a signature
+        story_parts = []
+        for sym, a in self._last_analysis.items():
+            story_parts.append(f"{sym}_{a.four_hour.level_count}_{a.one_hour.session_phase.value}_{a.trade_direction.value}")
+        story_key = "|".join(sorted(story_parts))
+        if story_key == getattr(self, '_last_story_key', ''):
+            return
+        self._last_story_key = story_key
+
+        now = datetime.now(timezone.utc)
+        eat = now + timedelta(hours=3)
+
+        # Session phase from bar time
+        h = now.hour
+        if 1 <= h < 5:
+            session = "ACCUMULATION"
+            session_eat = "04:00-08:00 EAT"
+            session_desc = "Asia is building the range. Market makers accumulating quietly."
+        elif 5 <= h < 8:
+            session = "STOP HUNT"
+            session_eat = "08:00-11:00 EAT"
+            session_desc = "London is breaking the Asian range. This is the fake move — watch for reversals."
+        elif 8 <= h < 13:
+            session = "TRUE TREND"
+            session_eat = "11:00-16:00 EAT"
+            session_desc = "The real move is underway. If stop hunt reversed, price should be running in the true direction."
+        elif 13 <= h < 17:
+            session = "NYC REVERSAL"
+            session_eat = "16:00-20:00 EAT"
+            session_desc = "New York session. Potential reversal of the London move. Late entries only with high conviction."
+        else:
+            session = "RETURN TO ACCUMULATION"
+            session_eat = "20:00-04:00 EAT"
+            session_desc = "Session is done. Price drifting back to center. No new entries."
+
+        # Weekly structure
+        dow = eat.strftime("%A")
+        day_num = eat.weekday()
+        if day_num in (6, 0):
+            week_phase = "EARLY WEEK"
+            week_desc = "Fresh weekly cycle. Monday/Sunday sets the first direction — the stop hunt from here defines the week's bias."
+        elif day_num in (1, 2):
+            week_phase = "MID WEEK"
+            week_desc = "Mid-week reversal zone. If early week pushed one direction, expect the turn. Wednesday is historically the strongest reversal day."
+        elif day_num == 3:
+            week_phase = "MID-TO-LATE WEEK"
+            week_desc = "Thursday follow-through. If the reversal happened Wednesday, today should confirm the direction."
+        else:
+            week_phase = "LATE WEEK"
+            week_desc = "Friday wind-down. Take profits, tighten stops. No new exposure before the weekend."
+
+        lines = [
+            f"HELIX V3 — THE MMM STORY",
+            f"{'='*30}",
+            f"{dow} {eat.strftime('%d %b %Y')} | {eat.strftime('%H:%M')} EAT",
+            f"",
+            f"WEEKLY: {week_phase}",
+            f"{week_desc}",
+            f"",
+            f"SESSION: {session} ({session_eat})",
+            f"{session_desc}",
+        ]
+
+        # Per-pair narrative — group by what's interesting
+        active_setups = []
+        watching = []
+        dead = []
+
+        for sym in sorted(self._last_analysis.keys()):
+            a = self._last_analysis[sym]
+            m15 = a.fifteen_min
+            h4 = a.four_hour
+            h1 = a.one_hour
+            wk = a.weekly
+
+            level = h4.level_count
+            level_desc = {0: "no clear structure", 1: "1st push (building)", 2: "2nd push (momentum)", 3: "3rd push (exhaustion/reversal)"}
+            h4_dir = h4.trend_direction.value
+            wk_dir = wk.trend_direction.value
+            wk_phase = wk.week_phase.value
+
+            # Build the story for this pair
+            pair_lines = [f"{sym} — H4 Level {level}"]
+
+            # Weekly context
+            if wk_dir != "NEUTRAL":
+                pair_lines.append(f"  Weekly: {wk_dir} ({wk_phase})")
+            else:
+                pair_lines.append(f"  Weekly: Ranging ({wk_phase})")
+
+            # H4 cycle position
+            pair_lines.append(f"  H4: {level_desc.get(level, '?')} trending {h4_dir}")
+
+            # Today's structure
+            ar = m15.asian_range_pips or 0
+            hunt = m15.stop_hunt_detected
+            hunt_dir = m15.stop_hunt_direction.value if m15.stop_hunt_direction else ""
+            hunt_pips = m15.stop_hunt_pips or 0
+            mw = m15.m_w_forming
+            mw_pat = m15.m_w_pattern or ""
+            pushes = m15.push_count
+
+            if hunt and hunt_pips > 0:
+                real_dir = "SELL" if hunt_dir == "BUY" else "BUY" if hunt_dir == "SELL" else "?"
+                pair_lines.append(f"  Today: Asian range {ar:.0f}p. Stop hunt {hunt_dir} {hunt_pips:.0f}p — expecting {real_dir}")
+                if mw:
+                    pair_lines.append(f"  {mw_pat} forming with {pushes} pushes — reversal signal")
+            elif ar > 0:
+                pair_lines.append(f"  Today: Asian range {ar:.0f}p. No stop hunt yet.")
+            else:
+                pair_lines.append(f"  Today: No clear Asian structure.")
+
+            # Confluence verdict
+            if a.trade_valid:
+                pair_lines.append(f"  SETUP ACTIVE: {a.trade_direction.value} (confluence {a.confluence_score}/100)")
+                active_setups.append("\n".join(pair_lines))
+            elif a.confluence_score >= 40:
+                if a.rejection_reasons:
+                    pair_lines.append(f"  Forming but: {a.rejection_reasons[0]}")
+                watching.append("\n".join(pair_lines))
+            else:
+                dead.append(sym)
+
+        if active_setups:
+            lines.append(f"\nACTIVE SETUPS")
+            lines.append("-" * 25)
+            for s in active_setups:
+                lines.append(s)
+
+        if watching:
+            lines.append(f"\nWATCHING")
+            lines.append("-" * 25)
+            for s in watching:
+                lines.append(s)
+
+        if dead:
+            lines.append(f"\nNO SETUP: {', '.join(dead)}")
+
+        msg = "\n".join(lines)
+
+        # Telegram caption limit is 4096
+        if len(msg) > 4090:
+            msg = msg[:4087] + "..."
+
+        self.notifier._send(msg)
 
     # Session/report methods identical to v1
     SESSION_NAMES = {
@@ -806,6 +1115,15 @@ class HelixOrchestratorV2:
                 )
                 self._reports_sent_today.add(report_key)
 
+                # Weekly audit: rebuild validation library, drop underperformers
+                try:
+                    from helix_v3.analysis.weekly_audit import audit
+                    audit_report = audit()
+                    logger.info("Weekly audit completed:\n%s", audit_report)
+                    self.notifier._send(audit_report)
+                except Exception as e:
+                    logger.warning("Weekly audit failed: %s", e)
+
         if now.day == 1 and now.hour == 0 and now.minute < 15:
             report_key = f"monthly_{today_key}"
             if report_key not in self._reports_sent_today:
@@ -874,6 +1192,18 @@ class HelixOrchestratorV2:
 
         if not self.engine.connect():
             logger.critical("Failed to connect to MT5. Exiting.")
+            return
+
+        # Verify we connected to the intended account/server. With multiple MT5
+        # terminals installed, mt5.initialize() can land on the wrong one.
+        from helix_v3.utils.singleton import verify_connected_server
+        server_err = verify_connected_server(
+            expected_server=settings.mt5.server,
+            expected_login=settings.mt5.login,
+        )
+        if server_err:
+            logger.critical("REFUSING TO TRADE: %s", server_err)
+            self.engine.disconnect()
             return
 
         self.scanner = MarketScanner(self.engine)
@@ -965,7 +1295,37 @@ async def run_single_cycle() -> dict:
         engine.disconnect()
 
 
+def _setup_signature(analysis) -> str:
+    """Stable bucket-string identifying an MTF setup.
+
+    Keyed on the dimensions that should NOT cause a re-entry if they recur soon:
+    week phase, H4 cycle level count, H1 session phase, and a coarse confluence
+    bucket. Two near-identical scans on the same minute produce the same signature.
+    """
+    conf = analysis.confluence_score
+    conf_bucket = "75plus" if conf >= 75 else "50_74" if conf >= 50 else "lt50"
+    return (
+        f"{analysis.weekly.week_phase.value}"
+        f"|L{analysis.four_hour.level_count}"
+        f"|{analysis.one_hour.session_phase.value}"
+        f"|{conf_bucket}"
+    )
+
+
 def main() -> None:
+    import sys
+    from helix_v3.utils.singleton import acquire_singleton_lock, check_mt5_account_conflict
+
+    # Informational: two terminals on the same account aren't blocked — Python only
+    # connects to one of them. The real check (verify_connected_server) runs after
+    # MT5 initialization inside the orchestrator's run() loop.
+    conflict = check_mt5_account_conflict(settings.mt5.login)
+    if conflict:
+        logger.warning("MT5 TERMINAL CHECK: %s", conflict)
+
+    # Refuse to start if another orchestrator instance holds the lock.
+    if acquire_singleton_lock("orchestrator_v2") is None:
+        sys.exit(1)
     orchestrator = HelixOrchestratorV2()
     asyncio.run(orchestrator.run())
 

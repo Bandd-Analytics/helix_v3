@@ -51,6 +51,19 @@ CREATE TABLE IF NOT EXISTS bans (
     created_at  TEXT NOT NULL,
     trading_day TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS entry_cooldowns (
+    symbol         TEXT PRIMARY KEY,
+    cooldown_until TEXT NOT NULL,
+    set_at         TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS setup_cooldowns (
+    symbol         TEXT NOT NULL,
+    direction      TEXT NOT NULL,
+    signature      TEXT NOT NULL,
+    cooldown_until TEXT NOT NULL,
+    set_at         TEXT NOT NULL,
+    PRIMARY KEY (symbol, direction, signature)
+);
 CREATE INDEX IF NOT EXISTS idx_loss_day ON loss_events(trading_day, symbol, direction);
 CREATE INDEX IF NOT EXISTS idx_ban_day ON bans(trading_day, symbol);
 """
@@ -121,9 +134,25 @@ class ReentryGuard:
                 self._cooldowns.add(key)
 
         # Entry cooldowns: block re-entry on same symbol for 2 hours after ANY exit
-        # Keyed by symbol -> cooldown_until (UTC datetime)
-        if not hasattr(self, "_entry_cooldowns"):
-            self._entry_cooldowns: dict[str, datetime] = {}
+        # Persisted to entry_cooldowns table so cross-restart and cross-instance cooldowns hold.
+        self._entry_cooldowns: dict[str, datetime] = {}
+        now = datetime.now(timezone.utc)
+        rows = self._conn.execute(
+            "SELECT symbol, cooldown_until FROM entry_cooldowns"
+        ).fetchall()
+        for r in rows:
+            try:
+                until = datetime.fromisoformat(r["cooldown_until"])
+            except ValueError:
+                continue
+            if until > now:
+                self._entry_cooldowns[r["symbol"]] = until
+            else:
+                # Expired — purge
+                self._conn.execute(
+                    "DELETE FROM entry_cooldowns WHERE symbol = ?", (r["symbol"],)
+                )
+        self._conn.commit()
 
     def check(self, symbol: str, direction: str) -> Optional[str]:
         """Check if entry is allowed. Returns None if OK, reason string if blocked."""
@@ -162,14 +191,80 @@ class ReentryGuard:
         return None
 
     def record_exit(self, symbol: str, cooldown_hours: float = 2.0) -> None:
-        """Record a trade exit and set entry cooldown. Call after ANY trade closes."""
+        """Record a trade exit and set entry cooldown. Call after ANY trade closes.
+
+        Persists to SQLite so the cooldown holds across restarts and across instances
+        sharing the same DB file (which is the only way two orchestrators can agree).
+        """
         now = datetime.now(timezone.utc)
-        self._entry_cooldowns[symbol] = now + timedelta(hours=cooldown_hours)
+        until = now + timedelta(hours=cooldown_hours)
+        self._entry_cooldowns[symbol] = until
+        self._conn.execute(
+            "INSERT OR REPLACE INTO entry_cooldowns (symbol, cooldown_until, set_at) "
+            "VALUES (?, ?, ?)",
+            (symbol, until.isoformat(), now.isoformat()),
+        )
+        self._conn.commit()
         logger.info(
             "GUARD: %s entry cooldown set for %.1f hours (until %s)",
             symbol, cooldown_hours,
-            self._entry_cooldowns[symbol].strftime("%H:%M UTC"),
+            until.strftime("%H:%M UTC"),
         )
+
+    def set_setup_cooldown(
+        self,
+        symbol: str,
+        direction: str,
+        signature: str,
+        minutes: float = 60.0,
+    ) -> None:
+        """Block re-entry of an identical setup signature for N minutes.
+
+        Independent of the broader 2h symbol-level cooldown — this catches setups
+        that persist across many M15 cycles (e.g. range-bound 'M/W BUY confluence 97'
+        re-detecting every cycle). Persisted so it survives restarts.
+        """
+        now = datetime.now(timezone.utc)
+        until = now + timedelta(minutes=minutes)
+        self._conn.execute(
+            "INSERT OR REPLACE INTO setup_cooldowns "
+            "(symbol, direction, signature, cooldown_until, set_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (symbol, direction, signature, until.isoformat(), now.isoformat()),
+        )
+        self._conn.commit()
+        logger.info(
+            "GUARD: setup cooldown %s %s sig=%s for %.0fmin",
+            symbol, direction, signature, minutes,
+        )
+
+    def check_setup_cooldown(
+        self, symbol: str, direction: str, signature: str
+    ) -> Optional[str]:
+        """Return reason string if this signature is in cooldown, else None."""
+        row = self._conn.execute(
+            "SELECT cooldown_until FROM setup_cooldowns "
+            "WHERE symbol = ? AND direction = ? AND signature = ?",
+            (symbol, direction, signature),
+        ).fetchone()
+        if not row:
+            return None
+        try:
+            until = datetime.fromisoformat(row["cooldown_until"])
+        except ValueError:
+            return None
+        now = datetime.now(timezone.utc)
+        if until <= now:
+            # Expired — purge
+            self._conn.execute(
+                "DELETE FROM setup_cooldowns "
+                "WHERE symbol = ? AND direction = ? AND signature = ?",
+                (symbol, direction, signature),
+            )
+            self._conn.commit()
+            return None
+        remaining = int((until - now).total_seconds() / 60)
+        return f"SETUP_COOLDOWN: {symbol} {direction} sig={signature} — {remaining}min remaining"
 
     def record_loss(self, symbol: str, direction: str,
                     ticket: int = 0, loss_pips: float = 0, loss_usd: float = 0) -> None:
