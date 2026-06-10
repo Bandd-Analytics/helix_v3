@@ -31,6 +31,7 @@ import mplfinance as mpf
 import pandas as pd
 
 from config.settings import settings
+from helix_v3.core.instruments import fallback_pip_size
 from helix_v3.utils.logger import get_logger
 
 matplotlib.use("Agg")
@@ -311,6 +312,68 @@ class AnnotatedChartGenerator:
                     )
                     ax.add_patch(shade_rect)
 
+        # 1f. London Open boxes (blue) — first 75 min of London session per day
+        london_boxes = annotations.get("london_open_boxes", {})
+        for date_str, box in london_boxes.items():
+            bs = box["start_idx"] - subset_offset
+            be = box["end_idx"] - subset_offset + 1
+            if be <= 0 or bs >= x_len:
+                continue
+            bs = max(0, bs)
+            be = min(x_len, be)
+            rect = mpatches.Rectangle(
+                (bs, box["low"]), max(be - bs, 1), box["high"] - box["low"],
+                linewidth=1, edgecolor="#2196F3", facecolor="#2196F3",
+                alpha=0.18, zorder=2,
+            )
+            ax.add_patch(rect)
+
+        # 1g. NY Open boxes (red) — first 75 min of NYC session per day
+        ny_boxes = annotations.get("ny_open_boxes", {})
+        for date_str, box in ny_boxes.items():
+            bs = box["start_idx"] - subset_offset
+            be = box["end_idx"] - subset_offset + 1
+            if be <= 0 or bs >= x_len:
+                continue
+            bs = max(0, bs)
+            be = min(x_len, be)
+            rect = mpatches.Rectangle(
+                (bs, box["low"]), max(be - bs, 1), box["high"] - box["low"],
+                linewidth=1, edgecolor="#EF5350", facecolor="#EF5350",
+                alpha=0.18, zorder=2,
+            )
+            ax.add_patch(rect)
+
+        # 1h. Gann 0/0.5/1 segments — frozen Asian H/Mid/L carried to next Asian
+        gann_segments = annotations.get("gann_segments", [])
+        gann_color = "#BDBDBD"
+        for seg in gann_segments:
+            gs = seg["start_idx"] - subset_offset
+            ge = seg["end_idx"] - subset_offset
+            if ge <= 0 or gs >= x_len:
+                continue
+            gs = max(0, gs)
+            ge = min(x_len - 1, ge)
+            for level_val, level_label in (
+                (seg["low"], "0"),
+                (seg["mid"], "0.5"),
+                (seg["high"], "1"),
+            ):
+                if not (y_min <= level_val <= y_max):
+                    continue
+                ax.plot(
+                    [gs, ge], [level_val, level_val],
+                    color=gann_color, linewidth=1.0, linestyle="--",
+                    alpha=0.55, zorder=3,
+                )
+                # Label just past the segment start
+                label_x = min(gs + 3, ge)
+                ax.text(
+                    label_x, level_val, level_label,
+                    color=gann_color, fontsize=6, alpha=0.7,
+                    ha="left", va="center", zorder=10,
+                )
+
         # 2. Stop Hunt Zone (prominent red/pink per MMM flashcard style)
         hunt_h = annotations.get("stop_hunt_high")
         hunt_l = annotations.get("stop_hunt_low")
@@ -556,10 +619,13 @@ class AnnotatedChartGenerator:
         adr_stats = annotations.get("adr_stats")
         if adr_stats:
             stat_lines = []
-            for key in ["HOD", "LOD", "TDR", "ADR", "WADR", "MADR"]:
+            # Full Pine-style table order: ADR / 3xADR / Today / ADR Used% / Avg Asia,
+            # plus legacy HOD/LOD/TDR/WADR/MADR if caller provided them.
+            for key in ["HOD", "LOD", "TDR", "ADR", "ADR_3X", "ADR_USED", "AVG_ASIA", "WADR", "MADR"]:
                 val = adr_stats.get(key)
                 if val is not None:
-                    stat_lines.append(f"{key}: {val}")
+                    label = {"ADR_3X": "3xADR", "ADR_USED": "ADR%", "AVG_ASIA": "AvgAsia"}.get(key, key)
+                    stat_lines.append(f"{label}: {val}")
             if stat_lines:
                 stat_text = "\n".join(stat_lines)
                 ax.text(
@@ -683,6 +749,7 @@ class AnnotatedChartGenerator:
         adr: float = 0,
         prev_hod: float = 0,
         prev_lod: float = 0,
+        pip_size: Optional[float] = None,
     ) -> Tuple[str, Path]:
         """Generate annotated chart directly from an MTFAnalysis result.
 
@@ -695,9 +762,7 @@ class AnnotatedChartGenerator:
         # Use session infrastructure for date-precise Asian range
         from helix_v3.core.sessions import classify_sessions, get_today_asian_range
 
-        pip_val = 0.01 if "JPY" in symbol else 0.0001
-        if symbol == "XAUUSD":
-            pip_val = 0.1
+        pip_val = pip_size if pip_size and pip_size > 0 else fallback_pip_size(symbol)
         session_info = classify_sessions(df, pip_val)
 
         # Get TODAY's Asian range (date-precise, not stale)
@@ -790,6 +855,11 @@ class AnnotatedChartGenerator:
         # Session boundaries as vertical separators with labels
         annotations["session_boundaries"] = session_info.session_boundaries
 
+        # London / NY open boxes and Gann segments (Pine indicator port)
+        annotations["london_open_boxes"] = session_info.london_open_boxes
+        annotations["ny_open_boxes"] = session_info.ny_open_boxes
+        annotations["gann_segments"] = session_info.gann_segments
+
         # Day-of-week labels from session infrastructure (not manual)
         annotations["day_labels"] = session_info.day_labels
 
@@ -813,15 +883,20 @@ class AnnotatedChartGenerator:
             pip_mult = 1.0 / pip_val
             tdr_pips = (h1.hod - h1.lod) * pip_mult
             adr_pips = adr * pip_mult
+            adr_used_pct = (tdr_pips / adr_pips * 100.0) if adr_pips > 0 else 0.0
             # WADR/MADR from session_info if available
             wadr_pips = getattr(session_info, "wadr", 0) * pip_mult if hasattr(session_info, "wadr") else 0
             madr_pips = getattr(session_info, "madr", 0) * pip_mult if hasattr(session_info, "madr") else 0
             adr_stats_dict = {
                 "HOD": f"{h1.hod:.5f}",
                 "LOD": f"{h1.lod:.5f}",
-                "TDR": f"{tdr_pips:.0f}p",
-                "ADR": f"{adr_pips:.0f}p",
+                "TDR": f"{tdr_pips:.1f}p",
+                "ADR": f"{adr_pips:.1f}p",
+                "ADR_3X": f"{adr_pips * 3:.1f}p",
+                "ADR_USED": f"{adr_used_pct:.1f}%",
             }
+            if session_info.asian_avg_pips > 0:
+                adr_stats_dict["AVG_ASIA"] = f"{session_info.asian_avg_pips:.1f}p"
             if wadr_pips > 0:
                 adr_stats_dict["WADR"] = f"{wadr_pips:.0f}p"
             if madr_pips > 0:
