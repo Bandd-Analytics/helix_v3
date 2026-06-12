@@ -29,9 +29,9 @@ crossover arrows, daily HiLo.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
+from typing import List
 
 import numpy as np
 import pandas as pd
@@ -381,14 +381,14 @@ def compute_hud(df_daily: pd.DataFrame, pip_size: float = 0.0001) -> dict:
     Returns dict with all HUD fields matching your flashcard screenshots.
     """
     h = df_daily["High"]
-    l = df_daily["Low"]
+    lo = df_daily["Low"]
     c = df_daily["Close"]
     o = df_daily["Open"]
 
-    tdr = float(h.iloc[-1] - l.iloc[-1])
-    ydr = float(h.iloc[-2] - l.iloc[-2]) if len(df_daily) >= 2 else 0
+    tdr = float(h.iloc[-1] - lo.iloc[-1])
+    ydr = float(h.iloc[-2] - lo.iloc[-2]) if len(df_daily) >= 2 else 0
 
-    daily_ranges = h - l
+    daily_ranges = h - lo
 
     def _rolling_mean(series, n):
         if len(series) >= n:
@@ -401,13 +401,13 @@ def compute_hud(df_daily: pd.DataFrame, pip_size: float = 0.0001) -> dict:
 
     # Week high/low
     wh = float(h.iloc[-5:].max()) if len(df_daily) >= 5 else float(h.max())
-    wl = float(l.iloc[-5:].min()) if len(df_daily) >= 5 else float(l.min())
+    wl = float(lo.iloc[-5:].min()) if len(df_daily) >= 5 else float(lo.min())
     wr = wh - wl
 
     # Current price (latest close)
     bid = float(c.iloc[-1])
     hod = float(h.iloc[-1])
-    lod = float(l.iloc[-1])
+    lod = float(lo.iloc[-1])
 
     # Monthly/multi-week ranges
     mwr = _rolling_mean(daily_ranges, 5) * 5    # approximate weekly range

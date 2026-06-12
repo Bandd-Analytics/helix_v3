@@ -9,7 +9,6 @@ Generates:
 
 from __future__ import annotations
 
-import asyncio
 import sys
 import time
 from datetime import datetime, timedelta, timezone
@@ -205,7 +204,7 @@ def run_full_scan():
     results.sort(key=lambda x: x["confluence"], reverse=True)
 
     print(f"\n{'='*100}")
-    print(f"  TRADE OPPORTUNITIES — Ranked by Confluence Score")
+    print("  TRADE OPPORTUNITIES — Ranked by Confluence Score")
     print(f"{'='*100}\n")
 
     print(f"  {'#':<3} {'Pair':<8} {'Confl':<6} {'Dir':<8} {'Weekly':<20} {'H4':<14} "
@@ -257,39 +256,39 @@ def run_full_scan():
         print(f"  {sym} | Confluence: {r['confluence']}/100 | Action: {'ENTRY' if r['trade_valid'] else 'WATCH' if r['confluence']>=40 else 'MONITOR'}")
         print(f"  {'─'*90}")
 
-        print(f"\n  WEEKLY STRUCTURE:")
+        print("\n  WEEKLY STRUCTURE:")
         print(f"    Phase: {r['weekly_phase']} | Trend: {r['weekly_trend']} | Cycle: {r['weekly_cycle']}")
         print(f"    Days from peak: {r['days_from_peak']}")
 
-        print(f"\n  4-HOUR CONTEXT:")
+        print("\n  4-HOUR CONTEXT:")
         print(f"    Level: L{r['h4_level']} | Trend: {r['h4_trend']} | Choppy: {r['h4_choppy']}")
 
-        print(f"\n  1-HOUR INTRADAY:")
+        print("\n  1-HOUR INTRADAY:")
         print(f"    Session: {r['h1_session']} | Trend: {r['h1_trend']}")
         print(f"    HOD: {r['h1_hod']:.5f} (locked={r['h1_hod_locked']}) | LOD: {r['h1_lod']:.5f} (locked={r['h1_lod_locked']})")
         print(f"    50/200 cross: {r['h1_50_200_cross']}")
 
-        print(f"\n  15-MIN ENTRY:")
+        print("\n  15-MIN ENTRY:")
         print(f"    Asian Range: {r['m15_asian_pips']:.0f} pips (valid={r['m15_accum']})")
         print(f"    Stop Hunt: {'YES' if r['m15_hunt'] else 'no'} dir={r['m15_hunt_dir']} {r['m15_hunt_pips']:.1f}p")
         print(f"    Pushes: {r['m15_pushes']}/3 | M/W: {r['m15_mw']} | RRT: {r['m15_rrt']}")
 
-        print(f"\n  TDI (V2-Verified RSI=21):")
+        print("\n  TDI (V2-Verified RSI=21):")
         print(f"    RSI PL: {r['tdi_rsi']:.1f} | Signal: {r['tdi_signal']:.1f} | Base: {r['tdi_base']:.1f}")
         print(f"    Signals: {', '.join(r['tdi_signals'])}")
         print(f"    Shark Fin: {r['tdi_shark']} ({r['tdi_shark_dir']}) | Squeeze: {r['tdi_squeeze']}")
         print(f"    Divergence: {r['tdi_divergence']} | Cross: {r['tdi_crossed']}")
 
-        print(f"\n  PATTERNS:")
+        print("\n  PATTERNS:")
         print(f"    Trade Type: {r['trade_type']} | Total: {r['patterns_count']}")
         print(f"    RRT: {r['rrt_count']} | Spikes: {r['spike_count']} | Pin Bars: {r['pin_bar_count']}")
         print(f"    M/W: {r['pat_mw']} | Half Batman: {r['half_batman']}")
 
-        print(f"\n  PIVOTS & ADR:")
+        print("\n  PIVOTS & ADR:")
         print(f"    PP: {r['pivot_pp']:.5f} | Day Type: {r['pivot_day_type']}")
         print(f"    ADR: {r['adr_pips']:.0f}p | ADR High: {r['adr_high']:.5f} | ADR Low: {r['adr_low']:.5f}")
 
-        print(f"\n  HUD DASHBOARD:")
+        print("\n  HUD DASHBOARD:")
         print(f"    TDR: {r['hud_tdr']:.0f}p | YDR: {r['hud_ydr']:.0f}p | WADR: {r['hud_wadr']:.0f}p | MADR: {r['hud_madr']:.0f}p")
         print(f"    HYADR: {r['hud_hyadr']:.0f}p | WR: {r['hud_wr']:.0f}p | 3xADR: {r['hud_3xadr']:.0f}p")
 
@@ -301,16 +300,16 @@ def run_full_scan():
     # WHATSAPP — Send top setups with charts
     # ================================================================
     print(f"\n{'='*100}")
-    print(f"  SENDING WHATSAPP NOTIFICATIONS")
+    print("  SENDING WHATSAPP NOTIFICATIONS")
     print(f"{'='*100}\n")
 
     # Build summary message
     msg_lines = [
-        f"HELIX V3 MARKET ANALYSIS",
+        "HELIX V3 MARKET ANALYSIS",
         f"{'='*30}",
         f"{now_eat.strftime('%Y-%m-%d %H:%M EAT')}",
         f"Account: {info.login} | ${info.balance:.2f}",
-        f"",
+        "",
     ]
 
     for r in results[:6]:
@@ -377,7 +376,7 @@ def run_full_scan():
                     f"tdi_rsi={r['tdi_rsi']:.1f} adr={r['adr_pips']:.0f}p\n")
     print(f"\n  Scan saved to: {output}")
     print(f"\n{'='*100}")
-    print(f"  SCAN COMPLETE")
+    print("  SCAN COMPLETE")
     print(f"{'='*100}")
 
 

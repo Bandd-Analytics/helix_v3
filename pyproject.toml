@@ -39,6 +39,11 @@ python_files = ["test_*.py"]
 target-version = "py312"
 line-length = 100
 
+[tool.ruff.lint.per-file-ignores]
+# Standalone scan/notification scripts bootstrap sys.path before importing
+# helix_v3 — imports after that setup are intentional.
+"tests/*.py" = ["E402"]
+
 [tool.mypy]
 python_version = "3.12"
 strict = true

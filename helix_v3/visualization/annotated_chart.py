@@ -314,7 +314,7 @@ class AnnotatedChartGenerator:
 
         # 1f. London Open boxes (blue) — first 75 min of London session per day
         london_boxes = annotations.get("london_open_boxes", {})
-        for date_str, box in london_boxes.items():
+        for _date_str, box in london_boxes.items():
             bs = box["start_idx"] - subset_offset
             be = box["end_idx"] - subset_offset + 1
             if be <= 0 or bs >= x_len:
@@ -330,7 +330,7 @@ class AnnotatedChartGenerator:
 
         # 1g. NY Open boxes (red) — first 75 min of NYC session per day
         ny_boxes = annotations.get("ny_open_boxes", {})
-        for date_str, box in ny_boxes.items():
+        for _date_str, box in ny_boxes.items():
             bs = box["start_idx"] - subset_offset
             be = box["end_idx"] - subset_offset + 1
             if be <= 0 or bs >= x_len:
@@ -650,15 +650,7 @@ class AnnotatedChartGenerator:
                 zorder=20,
             )
 
-        # 13. TDI signal annotation (on TDI panel if present)
-        if has_tdi and len(axes) > 1:
-            tdi_ax = axes[-1] if len(axes) > 2 else None
-            # Find the TDI panel axis
-            for a in fig.get_axes():
-                # TDI panel has ylabel "TDI" or is the last non-empty axis
-                pass  # TDI lines already plotted via addplot; signals shown in info box
-
-        # 14. TDI signals in info box
+        # 13. TDI signals in info box (TDI lines already plotted via addplot)
         tdi_info = []
         if has_tdi:
             tdi_info.append(f"RSI: {tdi_data.rsi:.0f} | Sig: {tdi_data.signal:.0f}")

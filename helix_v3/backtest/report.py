@@ -238,7 +238,7 @@ def print_backtest_report(
 
     # Exit reasons
     exits = exit_reason_breakdown(trades)
-    print(f"  EXIT REASONS")
+    print("  EXIT REASONS")
     print(f"  {'-' * 40}")
     for reason, count in exits.items():
         pct = count / len(trades) * 100
@@ -247,7 +247,7 @@ def print_backtest_report(
     # Advisory grade breakdown
     grade_data = grade_breakdown(trades)
     if grade_data:
-        print(f"\n  ADVISORY GRADE BREAKDOWN")
+        print("\n  ADVISORY GRADE BREAKDOWN")
         print(f"  {'--' * 36}")
         print(f"  {'Grade':<10} {'Trades':>6} {'Win%':>6} {'AvgW':>7} {'AvgL':>7} "
               f"{'PF':>6} {'Exp':>7} {'Net$':>8}")
@@ -263,7 +263,7 @@ def print_backtest_report(
     # Per-pair breakdown
     pair_data = per_pair_breakdown(trades)
     if pair_data:
-        print(f"\n  PER-PAIR BREAKDOWN")
+        print("\n  PER-PAIR BREAKDOWN")
         print(f"  {'-' * 72}")
         print(f"  {'Pair':<10} {'Trades':>6} {'Win%':>6} {'AvgW':>7} {'AvgL':>7} "
               f"{'PF':>6} {'Exp':>7} {'Net$':>8}")
@@ -279,7 +279,7 @@ def print_backtest_report(
     # Monthly P&L
     months = monthly_pnl(trades)
     if months:
-        print(f"\n  MONTHLY P&L")
+        print("\n  MONTHLY P&L")
         print(f"  {'-' * 30}")
         for month, pnl in months.items():
             bar = "+" * max(0, int(pnl / 5)) if pnl > 0 else "-" * max(0, int(abs(pnl) / 5))
@@ -288,7 +288,7 @@ def print_backtest_report(
     # Equity curve summary
     if simulator.equity_curve:
         equities = [e for _, e in simulator.equity_curve]
-        print(f"\n  EQUITY CURVE")
+        print("\n  EQUITY CURVE")
         print(f"  {'-' * 30}")
         print(f"  Start:    ${equities[0]:.2f}")
         print(f"  End:      ${equities[-1]:.2f}")

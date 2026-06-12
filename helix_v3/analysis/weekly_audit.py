@@ -59,28 +59,28 @@ def audit(min_total: int = 5, min_favorable_rate: float = 50.0) -> str:
         "HELIX V3 WEEKLY AUDIT",
         f"{'='*60}",
         f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M EAT')}",
-        f"",
+        "",
         f"Validation library: {count} proven setups",
         f"Added:   {len(added)} | Removed: {len(removed)} | Changed: {len(changed)}",
         f"Graveyard: {grave_total} archived | {grave_repeat} repeat offenders",
     ]
 
     if added:
-        lines.append(f"\nNEW PROVEN SETUPS:")
+        lines.append("\nNEW PROVEN SETUPS:")
         for k in sorted(added)[:10]:
             r = after[k]
             lines.append(f"  {r['symbol']:<8} {r['direction']:<5} fav={r['favorable_rate']:.0f}% "
                          f"n={r['total']} key={r['normalized_key'][:50]}")
 
     if removed:
-        lines.append(f"\nARCHIVED TO GRAVEYARD:")
+        lines.append("\nARCHIVED TO GRAVEYARD:")
         for k in sorted(removed)[:10]:
             r = before[k]
             lines.append(f"  {r['symbol']:<8} {r['direction']:<5} fav={r['favorable_rate']:.0f}% "
                          f"n={r['total']} key={r['normalized_key'][:50]}")
 
     if changed:
-        lines.append(f"\nSIGNIFICANT CHANGES:")
+        lines.append("\nSIGNIFICANT CHANGES:")
         for k in sorted(changed)[:10]:
             b, a = before[k], after[k]
             delta = a["favorable_rate"] - b["favorable_rate"]
@@ -88,7 +88,7 @@ def audit(min_total: int = 5, min_favorable_rate: float = 50.0) -> str:
                          f"key={a['normalized_key'][:50]}")
 
     if grave_worst:
-        lines.append(f"\nWORST GRAVEYARD OFFENDERS:")
+        lines.append("\nWORST GRAVEYARD OFFENDERS:")
         for r in grave_worst:
             sym = r[0] or "CROSS"
             peak = r[4] or r[3]
@@ -97,7 +97,7 @@ def audit(min_total: int = 5, min_favorable_rate: float = 50.0) -> str:
 
     # Top 5 best active setups
     top = sorted(after.values(), key=lambda x: (-x["favorable_rate"], -x["total"]))[:5]
-    lines.append(f"\nTOP 5 ACTIVE SETUPS:")
+    lines.append("\nTOP 5 ACTIVE SETUPS:")
     for r in top:
         lines.append(f"  {r['symbol']:<8} {r['direction']:<5} fav={r['favorable_rate']:.0f}% "
                      f"n={r['total']} score={r['confidence_score']:.0f} "

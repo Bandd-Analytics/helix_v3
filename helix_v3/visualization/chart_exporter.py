@@ -14,7 +14,6 @@ from typing import Dict, Optional
 
 import matplotlib
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
 import mplfinance as mpf
 import numpy as np
 import pandas as pd

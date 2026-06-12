@@ -13,7 +13,6 @@ import MetaTrader5 as mt5
 
 from config.settings import settings
 from helix_v3.core.quant_engine import MMMQuantitativeEngine
-from helix_v3.core.types import Direction
 from helix_v3.consensus.validator import MMMConsensusValidator
 from helix_v3.execution.gatekeeper import MT5ExecutionGatekeeper
 from helix_v3.utils.logger import get_logger
@@ -234,8 +233,8 @@ async def main() -> None:
             for (sym, tf), sig in passed_filters:
                 print(f"    {sym} {tf}: hunt={sig.stop_hunt.direction.value if sig.stop_hunt else 'N/A'} trend={sig.ema_vector.trend_alignment.value}")
 
-        print(f"\n  STATUS: LIVE TEST COMPLETE")
-        print(f"  NOTE: No trades were executed (dry-run mode)")
+        print("\n  STATUS: LIVE TEST COMPLETE")
+        print("  NOTE: No trades were executed (dry-run mode)")
 
     finally:
         engine.disconnect()

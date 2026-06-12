@@ -19,7 +19,7 @@ import argparse
 import sys
 import time
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional, Tuple
+from typing import List, Tuple
 
 sys.stdout.reconfigure(encoding="utf-8")
 
@@ -42,7 +42,6 @@ def run_scan() -> Tuple[str, List[str]]:
     from helix_v3.core.patterns import scan_patterns
     from helix_v3.core.reentry_guard import ReentryGuard
     from helix_v3.visualization.annotated_chart import AnnotatedChartGenerator
-    from config.pair_profiles import get_pair_profile
     import MetaTrader5 as mt5
 
     now = datetime.now(EAT)
@@ -157,7 +156,7 @@ def _build_narrative(
     lines = []
     day_name = now.strftime("%A")
 
-    lines.append(f"HELIX V3 MARKET SCAN")
+    lines.append("HELIX V3 MARKET SCAN")
     lines.append(f"{now.strftime('%Y-%m-%d %H:%M EAT')} | {day_name} | {session}")
     lines.append(f"Bal: ${info.balance:.2f} | Eq: ${info.equity:.2f} | P&L: ${info.profit:+.2f}")
     lines.append("")
@@ -181,7 +180,6 @@ def _build_narrative(
     # Entry-grade setups
     entries = [r for r in results if r["v"] and not r["guard"]]
     watches = [r for r in results if r["c"] >= 40 and not r["v"]]
-    waiting = [r for r in results if r["c"] < 40]
 
     if entries:
         lines.append("=" * 35)
@@ -199,7 +197,7 @@ def _build_narrative(
             lines.append(f"  TDI: RSI={r['tdi_rsi']:.0f} | {tdi_str}")
             lines.append(f"  ADR: {r['hud_tdr']:.0f}/{r['adr_p']:.0f}p used ({r['hud_tdr']/r['adr_p']*100:.0f}%)" if r['adr_p'] > 0 else "")
             if r["wt"] != r["d"] and r["d"] != "NEUTRAL":
-                lines.append(f"  ** COUNTER-WEEKLY **")
+                lines.append("  ** COUNTER-WEEKLY **")
             for rej in r["rej"]:
                 lines.append(f"  ! {rej}")
     else:

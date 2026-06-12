@@ -306,7 +306,8 @@ class MMMConsensusValidator:
             )
 
         # Reject stale verdict files — prevents old signals from rubber-stamping trades
-        import os, time as _time
+        import os
+        import time as _time
         age_min = (_time.time() - os.path.getmtime(verdict_path)) / 60
         if age_min > max_age_minutes:
             logger.warning(

@@ -1,5 +1,5 @@
 """Fresh market scan with corrected M/W direction logic."""
-import sys, time
+import sys
 sys.stdout.reconfigure(encoding="utf-8")
 from datetime import datetime, timedelta, timezone
 from helix_v3.core.quant_engine import MMMQuantitativeEngine
@@ -8,7 +8,6 @@ from helix_v3.core.tdi import compute_tdi, compute_pivots, compute_adr, compute_
 from helix_v3.core.patterns import scan_patterns
 from helix_v3.core.reentry_guard import ReentryGuard
 from helix_v3.visualization.annotated_chart import AnnotatedChartGenerator
-from config.pair_profiles import get_pair_profile
 import MetaTrader5 as mt5
 
 EAT = timezone(timedelta(hours=3))
@@ -24,13 +23,13 @@ info = mt5.account_info()
 SYMBOLS = ['EURUSD','GBPUSD','AUDUSD','GBPAUD','GBPJPY','GBPNZD',
            'EURJPY','EURCHF','GBPCHF','USDCHF','USDJPY','AUDJPY','XAUUSD']
 
-print(f"HELIX V3 FRESH SCAN — Direction Fix Applied")
+print("HELIX V3 FRESH SCAN — Direction Fix Applied")
 print("=" * 80)
 print(f"{now.strftime('%Y-%m-%d %H:%M EAT')} | Bal: ${info.balance:.2f} | Eq: ${info.equity:.2f} | P&L: ${info.profit:+.2f}")
 
 positions = mt5.positions_get()
 if positions:
-    print(f"\nOPEN POSITIONS:")
+    print("\nOPEN POSITIONS:")
     for p in positions:
         pip_div = 100 if "JPY" in p.symbol else 10000
         pips = (p.price_current - p.price_open) * pip_div if p.type == 0 else (p.price_open - p.price_current) * pip_div
@@ -114,7 +113,7 @@ for i, r in enumerate(results[:7]):
     print(f"  H1: {r['h1s']} {r['h1t']}")
     print(f"    HOD: {r['hod']:.5f} (locked={r['hod_l']}) | LOD: {r['lod']:.5f} (locked={r['lod_l']})")
 
-    print(f"\n  15M:")
+    print("\n  15M:")
     print(f"    Asian Range: {r['ar']:.0f}p (valid={r['acc']})")
     print(f"    M/W: {r['mw']} -> entry direction: {r['entry_d']}")
     if r["hunt"]:
@@ -124,9 +123,9 @@ for i, r in enumerate(results[:7]):
     tdi_str = "; ".join(r["tdi_sigs"][:2]) if r["tdi_sigs"] else "neutral"
     print(f"\n  TDI: RSI={r['tdi_rsi']:.0f} Sig={r['tdi_sig']:.0f} Base={r['tdi_base']:.0f} | {tdi_str}")
     if r["tdi_shark"]:
-        print(f"    SHARK FIN active")
+        print("    SHARK FIN active")
     if r["tdi_sq"]:
-        print(f"    VB SQUEEZE")
+        print("    VB SQUEEZE")
     if r["tdi_div"] != "none":
         print(f"    DIVERGENCE: {r['tdi_div']}")
 

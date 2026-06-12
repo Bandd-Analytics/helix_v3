@@ -18,7 +18,6 @@ from typing import Any, Dict, List, Optional
 from config.settings import settings
 from helix_v3.core.types import (
     ConsensusResult,
-    Direction,
     ExecutionOrder,
     QuantSignal,
 )
@@ -443,7 +442,6 @@ class TradeJournal:
 
             # The closing deal is the last one
             close_deal = deals[-1]
-            open_deal = deals[0]
 
             row = self._conn.execute(
                 "SELECT direction, entry_price, lot_size, symbol FROM trades WHERE ticket = ?",
@@ -786,7 +784,7 @@ class TradeJournal:
                 setup_groups[key]["wins"] += 1
 
         winning_setups = []
-        for key, data in setup_groups.items():
+        for _key, data in setup_groups.items():
             data["win_rate"] = data["wins"] / data["total"] * 100 if data["total"] else 0
             winning_setups.append(data)
         winning_setups.sort(key=lambda x: x["win_rate"], reverse=True)

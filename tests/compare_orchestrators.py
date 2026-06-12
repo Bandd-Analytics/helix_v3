@@ -11,7 +11,6 @@ Output:
 from __future__ import annotations
 
 import asyncio
-import json
 import sys
 import time
 from datetime import datetime, timedelta, timezone
@@ -22,9 +21,6 @@ import MetaTrader5 as mt5
 from config.settings import settings
 from helix_v3.core.mtf_analyzer import MTFAnalyzer
 from helix_v3.core.quant_engine import MMMQuantitativeEngine
-from helix_v3.consensus.validator import MMMConsensusValidator
-from helix_v3.execution.gatekeeper import MT5ExecutionGatekeeper
-from helix_v3.visualization.chart_exporter import MMMChartVisualizer
 from helix_v3.visualization.annotated_chart import AnnotatedChartGenerator
 from helix_v3.utils.logger import get_logger
 
@@ -60,9 +56,7 @@ async def main() -> None:
     )
 
     engine = MMMQuantitativeEngine()
-    visualizer = MMMChartVisualizer()
     annotator = AnnotatedChartGenerator()
-    gatekeeper = MT5ExecutionGatekeeper()
 
     if not engine.connect():
         p("FATAL: Cannot connect to MT5", lines)
@@ -215,7 +209,7 @@ async def main() -> None:
         reverse=True,
     )
 
-    for symbol, r in sorted_syms[:5]:
+    for _symbol, r in sorted_syms[:5]:
         p(r["full_report"], lines)
 
     # ----------------------------------------------------------------
@@ -253,8 +247,6 @@ async def main() -> None:
         r2 = v2_results.get(symbol, {})
         if "error" in r2:
             continue
-
-        v1_m15 = v1_results[symbol].get("M15", {})
 
         # V2 has weekly context V1 doesn't
         notes = []
@@ -297,7 +289,7 @@ async def main() -> None:
         df = engine.fetch_rates(best_sym, "M15", count=200)
         _, chart_path = annotator.generate_from_mtf(df, best_sym, "M15", best_analysis)
         p(f"  Generated annotated chart: {chart_path}", lines)
-        p(f"  (This chart would be attached to WhatsApp in V2)", lines)
+        p("  (This chart would be attached to WhatsApp in V2)", lines)
     else:
         p("  Skipped — no analysis available", lines)
 
@@ -329,8 +321,8 @@ async def main() -> None:
     for t in tradeoffs:
         p(f"  - {t}", lines)
 
-    p(f"\n  RECOMMENDATION: V2 should replace V1 as the primary orchestrator.", lines)
-    p(f"  V1 can remain as a lightweight fast-scan fallback.", lines)
+    p("\n  RECOMMENDATION: V2 should replace V1 as the primary orchestrator.", lines)
+    p("  V1 can remain as a lightweight fast-scan fallback.", lines)
 
     engine.disconnect()
 

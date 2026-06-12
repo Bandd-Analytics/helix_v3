@@ -1328,7 +1328,7 @@ def _split_stability(
     slices = _chronological_slices(values, parts=3)
     passes = 0
     summaries: list[str] = []
-    for label, split_values in zip(labels, slices):
+    for label, split_values in zip(labels, slices, strict=True):
         avg = sum(split_values) / len(split_values) if split_values else 0.0
         if len(split_values) >= split_min_total and avg > 0.0:
             passes += 1

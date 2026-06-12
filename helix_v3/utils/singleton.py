@@ -200,7 +200,7 @@ def verify_connected_server(expected_server: str, expected_login: int) -> Option
 
     info = mt5.account_info()
     if info is None:
-        return f"mt5.account_info() returned None — cannot verify server"
+        return "mt5.account_info() returned None — cannot verify server"
     if info.login != expected_login:
         return (
             f"Connected to login {info.login} but .env expects {expected_login}. "

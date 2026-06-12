@@ -560,7 +560,7 @@ def print_pair_profiles() -> str:
         "-" * 105,
     ]
 
-    for sym, p in PAIR_PROFILES.items():
+    for _sym, p in PAIR_PROFILES.items():
         stale_str = f"{p.stale_minutes}/{p.stale_exit_minutes}"
         lines.append(
             f"  {p.symbol:8} {p.risk_tier:6} {p.max_risk_pct*100:>5.1f}% "

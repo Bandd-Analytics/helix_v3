@@ -32,14 +32,14 @@ without knowing where you are on H1, H4, and weekly.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Dict, List
 
 import numpy as np
 import pandas as pd
 
-from config.pair_profiles import PairProfile, get_pair_profile, resolve_profile
+from config.pair_profiles import PairProfile, resolve_profile
 from helix_v3.core.volatility import d1_atr_pips
 from helix_v3.core.market_time import (
     PHASE_ACCUMULATION,

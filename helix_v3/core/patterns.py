@@ -26,7 +26,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional
 
 import numpy as np
 import pandas as pd
@@ -110,20 +110,19 @@ def scan_patterns(
     closes = df["Close"].values
 
     for i in range(2, len(df)):
-        o, h, l, c = opens[i], highs[i], lows[i], closes[i]
+        o, h, lo, c = opens[i], highs[i], lows[i], closes[i]
         body = abs(c - o)
-        full_range = h - l
+        full_range = h - lo
         if full_range < 1e-10:
             continue
 
         upper_wick = h - max(o, c)
-        lower_wick = min(o, c) - l
+        lower_wick = min(o, c) - lo
         body_ratio = body / full_range
         upper_ratio = upper_wick / full_range
         lower_ratio = lower_wick / full_range
 
         price = c
-        is_bullish = c > o
 
         # --- Spike / Empire State candle (Z-score based) ---
         # Uses statistical Z-score instead of hardcoded 2.5x multiplier.

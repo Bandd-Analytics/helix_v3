@@ -15,14 +15,13 @@ from __future__ import annotations
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import MetaTrader5 as mt5
 import numpy as np
 
 from config.settings import settings
 from helix_v3.core.quant_engine import MMMQuantitativeEngine
-from helix_v3.core.types import Direction
 from helix_v3.utils.logger import get_logger
 
 logger = get_logger("market_scanner")
