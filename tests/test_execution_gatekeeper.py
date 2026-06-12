@@ -143,6 +143,11 @@ def _patch_exec_env(monkeypatch, gatekeeper) -> None:
         "symbol_info_tick",
         lambda symbol: SimpleNamespace(ask=1.1000, bid=1.0999),
     )
+    monkeypatch.setattr(
+        gatekeeper_mod.mt5,
+        "order_check",
+        lambda request: SimpleNamespace(retcode=0, comment="ok"),
+    )
 
 
 def test_execute_order_adopts_fill_after_none_result_without_resending(monkeypatch) -> None:
@@ -259,6 +264,90 @@ def test_execute_order_retries_full_volume_when_nothing_filled(monkeypatch) -> N
 
     assert [s["volume"] for s in sends] == [0.10, 0.10]
     assert ticket == 700
+
+
+def _patch_lot_env(monkeypatch, gatekeeper, equity: float, volume_step: float = 0.01) -> None:
+    """1 lot = $1/pip, EURUSD-like 5-digit symbol, fake low-tier profile."""
+    monkeypatch.setattr(gatekeeper, "_get_account_equity", lambda: equity)
+    monkeypatch.setattr(gatekeeper, "_get_pip_value", lambda symbol: 0.0001)
+    monkeypatch.setattr(
+        gatekeeper,
+        "_get_symbol_info",
+        lambda symbol: SimpleNamespace(
+            volume_min=0.01,
+            volume_max=100.0,
+            volume_step=volume_step,
+            trade_tick_value=1.0,
+            trade_tick_size=0.0001,
+        ),
+    )
+    monkeypatch.setattr(
+        gatekeeper_mod,
+        "get_pair_profile",
+        lambda symbol: SimpleNamespace(
+            max_risk_pct=0.01,
+            min_sl_pips=15.0,
+            max_lot_size=5.0,
+            risk_tier="low",
+        ),
+    )
+
+
+def test_lot_sizing_rejects_when_even_min_lot_exceeds_risk_cap(monkeypatch) -> None:
+    """Regression: layer 3 used to clamp to vol_min and send anyway."""
+    gatekeeper = _gatekeeper()
+    # $20 equity, 100-pip SL: min lot 0.01 risks $1 = 5% > 3% hard cap
+    _patch_lot_env(monkeypatch, gatekeeper, equity=20.0)
+    assert gatekeeper.calculate_lot_size("EURUSD", sl_pips=100.0) is None
+
+
+def test_lot_sizing_floors_to_volume_step_instead_of_rounding_up(monkeypatch) -> None:
+    gatekeeper = _gatekeeper()
+    # $1000 * 1% = $10 risk over 15 pips -> raw 0.667 lots; step 0.1 must
+    # floor to 0.6, not round to 0.7 (which would exceed the intended risk).
+    _patch_lot_env(monkeypatch, gatekeeper, equity=1000.0, volume_step=0.1)
+    assert gatekeeper.calculate_lot_size("EURUSD", sl_pips=15.0) == 0.6
+
+
+def test_build_order_aborts_when_lot_sizing_rejects(monkeypatch) -> None:
+    gatekeeper = _gatekeeper()
+    monkeypatch.setattr(gatekeeper, "check_drawdown_limit", lambda: True)
+    monkeypatch.setattr(gatekeeper, "check_position_limit", lambda: True)
+    monkeypatch.setattr(gatekeeper, "_check_spread", lambda symbol: True)
+    monkeypatch.setattr(gatekeeper, "_get_pip_value", lambda symbol: 0.01)
+    monkeypatch.setattr(gatekeeper, "calculate_lot_size", lambda symbol, sl_pips: None)
+    monkeypatch.setattr(
+        gatekeeper_mod.mt5,
+        "symbol_info_tick",
+        lambda symbol: SimpleNamespace(ask=200.00, bid=199.99),
+    )
+
+    order = gatekeeper.build_order(
+        "GBPJPY",
+        _signal("GBPJPY", low=199.95, high=200.05),
+        ConsensusResult(agreed=True, direction=Direction.BUY, avg_confidence=80.0),
+    )
+    assert order is None
+
+
+def test_execute_order_aborts_when_order_check_fails(monkeypatch) -> None:
+    gatekeeper = _gatekeeper()
+    _patch_exec_env(monkeypatch, gatekeeper)
+    monkeypatch.setattr(
+        gatekeeper_mod.mt5,
+        "order_check",
+        lambda request: SimpleNamespace(retcode=10019, comment="No money"),
+    )
+    monkeypatch.setattr(gatekeeper_mod.mt5, "positions_get", lambda symbol=None: [])
+    sends: list = []
+    monkeypatch.setattr(
+        gatekeeper_mod.mt5, "order_send", lambda request: sends.append(request)
+    )
+
+    order = _exec_order()
+    assert gatekeeper.execute_order(order) is None
+    assert sends == []  # never reached the server
+    assert order.status == "REJECTED"
 
 
 def _orchestrator(direction: Direction = Direction.SELL) -> tuple:

@@ -7,6 +7,7 @@ protection.
 
 from __future__ import annotations
 
+import math
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
@@ -149,13 +150,16 @@ class MT5ExecutionGatekeeper:
 
     def calculate_lot_size(
         self, symbol: str, sl_pips: float
-    ) -> float:
+    ) -> Optional[float]:
         """Lot = (Equity * PairRisk%) / (SL_pips * PipValue_per_lot)
 
         Safety layers:
         1. SL floor — never size off fewer pips than pair minimum
         2. Account-proportional max lot — caps based on equity, not static
-        3. Post-calc risk verification — rejects if actual $ risk exceeds limit
+        3. Post-calc risk verification — returns None (order ABORTED) if even
+           the broker minimum lot exceeds the hard risk cap
+
+        Returns the lot size, or None if no lot satisfies the risk cap.
         """
         profile = get_pair_profile(symbol)
         equity = self._get_account_equity()
@@ -177,8 +181,8 @@ class MT5ExecutionGatekeeper:
         tick_size = info.trade_tick_size
 
         if tick_size == 0 or effective_sl == 0:
-            logger.error("Invalid tick_size or sl_pips for lot calculation")
-            return info.volume_min
+            logger.error("Invalid tick_size or sl_pips for lot calculation — rejecting")
+            return None
 
         pip_value_per_lot = (pip_size / tick_size) * tick_value
         raw_lot = risk_amount / (effective_sl * pip_value_per_lot)
@@ -197,18 +201,32 @@ class MT5ExecutionGatekeeper:
         vol_step = info.volume_step
 
         lot = max(vol_min, min(raw_lot, vol_max))
-        lot = round(lot / vol_step) * vol_step
+        # FLOOR to the volume step — rounding could round UP past the cap.
+        if vol_step > 0:
+            lot = math.floor((lot / vol_step) + 1e-9) * vol_step
         lot = round(lot, 2)
+        if lot < vol_min:
+            lot = vol_min
 
-        # --- Safety 3: Post-calc risk verification ---
+        # --- Safety 3: Post-calc risk verification (rejects, never clamps-and-sends) ---
         actual_risk = lot * effective_sl * pip_value_per_lot
         actual_risk_pct = actual_risk / equity if equity > 0 else 1.0
         if actual_risk_pct > max_loss_pct:
+            min_risk = vol_min * effective_sl * pip_value_per_lot
+            min_risk_pct = min_risk / equity if equity > 0 else 1.0
+            if min_risk_pct > max_loss_pct:
+                logger.error(
+                    "RISK REJECT %s: even broker min lot %.2f risks %.1f%% > %.1f%% cap — "
+                    "order aborted (equity=$%.2f, sl=%.1f pips)",
+                    symbol, vol_min, min_risk_pct * 100, max_loss_pct * 100,
+                    equity, effective_sl,
+                )
+                return None
             lot = vol_min
-            actual_risk = lot * effective_sl * pip_value_per_lot
-            actual_risk_pct = actual_risk / equity if equity > 0 else 1.0
+            actual_risk = min_risk
+            actual_risk_pct = min_risk_pct
             logger.warning(
-                "Risk verification clamped %s to min lot %.2f (risk was %.1f%%)",
+                "Risk verification clamped %s to min lot %.2f (risk %.1f%%)",
                 symbol, lot, actual_risk_pct * 100,
             )
 
@@ -313,6 +331,9 @@ class MT5ExecutionGatekeeper:
                 sl = entry + (sl_pips * pip_size)
 
         lot_size = self.calculate_lot_size(symbol, sl_pips)
+        if lot_size is None:
+            logger.error("Order aborted for %s: lot sizing rejected by risk cap", symbol)
+            return None
 
         # TP levels — calibrated from 90-day validation data
         # T1: 1:1 RR (locks in profit, SL to breakeven)
@@ -440,6 +461,21 @@ class MT5ExecutionGatekeeper:
             "type_time": mt5.ORDER_TIME_GTC,
             "type_filling": mt5.ORDER_FILLING_IOC,
         }
+
+        # Margin / validity pre-check — catches NO_MONEY and invalid stops
+        # before burning retries against the server.
+        check = mt5.order_check(request)
+        if check is None:
+            logger.error("order_check returned None for %s — aborting order", order.symbol)
+            order.status = "REJECTED"
+            return None
+        if check.retcode != 0:
+            logger.error(
+                "order_check rejected %s: retcode=%d comment=%s — aborting order",
+                order.symbol, check.retcode, getattr(check, "comment", ""),
+            )
+            order.status = "REJECTED"
+            return None
 
         remaining = order.lot_size
 
