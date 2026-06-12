@@ -20,6 +20,7 @@ from helix_v3.core.types import (
     ExecutionOrder,
     QuantSignal,
 )
+from helix_v3.core.news_calendar import get_news_calendar
 from helix_v3.core.volatility import d1_atr_pips_mt5
 from helix_v3.execution.risk_state import RiskState, _trading_day
 from helix_v3.journal.trade_journal import TradeJournal
@@ -266,6 +267,27 @@ class MT5ExecutionGatekeeper:
             return False
         return True
 
+    def _check_news_blackout(self, symbol: str) -> bool:
+        """No entries within the high-impact news window (Tier 2.5).
+
+        Fail-open on calendar errors — the calendar logs loudly when the
+        feed is down; a broken feed must not silently halt all trading.
+        """
+        try:
+            event = get_news_calendar().blackout(symbol)
+        except Exception as e:
+            logger.error("News blackout check failed for %s: %s", symbol, e)
+            return True
+        if event is not None:
+            logger.warning(
+                "NEWS BLACKOUT: %s entry blocked — %s %s at %s (±%d min window)",
+                symbol, event.currency, event.title,
+                event.time_utc.strftime("%H:%M UTC"),
+                get_news_calendar().blackout_minutes,
+            )
+            return False
+        return True
+
     # ------------------------------------------------------------------
     # Order Construction & Execution
     # ------------------------------------------------------------------
@@ -281,6 +303,8 @@ class MT5ExecutionGatekeeper:
         if not self.check_position_limit():
             return None
         if not self._check_spread(symbol):
+            return None
+        if not self._check_news_blackout(symbol):
             return None
 
         direction = consensus.direction
@@ -665,6 +689,41 @@ class MT5ExecutionGatekeeper:
             else:
                 profit_pips = (entry - current) / pip_size
                 hit_t1 = current <= order.take_profit_1
+
+            # --- 0. News blackout management (Tier 2.5) ---
+            # Inside the high-impact window: a red position is the hunted —
+            # flatten it. A green position locks gains at breakeven.
+            news_ev = None
+            try:
+                news_ev = get_news_calendar().blackout(pos.symbol)
+            except Exception as e:
+                logger.error("News blackout check failed for %s: %s", pos.symbol, e)
+            if news_ev is not None:
+                if profit_pips <= 0:
+                    logger.warning(
+                        "NEWS EXIT: %s ticket=%d %+.1f pips — %s %s at %s, closing red position",
+                        pos.symbol, ticket, profit_pips, news_ev.currency,
+                        news_ev.title, news_ev.time_utc.strftime("%H:%M UTC"),
+                    )
+                    self._partial_close(pos, pos.volume)
+                    actions.append(
+                        f"NEWS EXIT: {pos.symbol} {order.direction.value} ticket={ticket} "
+                        f"{profit_pips:+.1f} pips before {news_ev.currency} {news_ev.title}"
+                    )
+                    continue
+                # In profit: lock at breakeven through the event (only tighten)
+                if order.direction == Direction.BUY and pos.sl < entry:
+                    self._modify_sl(ticket, pos.symbol, entry)
+                    actions.append(
+                        f"NEWS BE: {pos.symbol} ticket={ticket} SL->breakeven before "
+                        f"{news_ev.currency} {news_ev.title}"
+                    )
+                elif order.direction == Direction.SELL and (pos.sl > entry or pos.sl == 0):
+                    self._modify_sl(ticket, pos.symbol, entry)
+                    actions.append(
+                        f"NEWS BE: {pos.symbol} ticket={ticket} SL->breakeven before "
+                        f"{news_ev.currency} {news_ev.title}"
+                    )
 
             # --- 1. Max Duration Exit (pair-gated) ---
             max_dur = pp.max_duration_minutes

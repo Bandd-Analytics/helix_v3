@@ -50,6 +50,11 @@ class RiskConfig:
     trailing_stop_distance_pips: float = float(os.getenv("TRAIL_DISTANCE_PIPS", "15.0"))
     close_before_session: str = os.getenv("CLOSE_BEFORE_SESSION", "ASIAN_EARLY")
     reentry_guard_ban_scope: str = os.getenv("REENTRY_GUARD_BAN_SCOPE", "direction").lower()
+    # News blackout (audit Tier 2.5): no entries within +/- this window of a
+    # high-impact event on a currency in the pair; open positions get
+    # defensive management (close if red, breakeven if green).
+    news_blackout_enabled: bool = os.getenv("NEWS_BLACKOUT", "true").lower() == "true"
+    news_blackout_minutes: int = int(os.getenv("NEWS_BLACKOUT_MIN", "30"))
 
 
 @dataclass(frozen=True)

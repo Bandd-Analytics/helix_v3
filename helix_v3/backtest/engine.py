@@ -491,10 +491,19 @@ class BacktestRunner:
         use_validation: bool = False,
         slippage_pips: float = 0.5,
         commission_per_lot: float = 0.0,
+        news_events: Optional[list] = None,
     ) -> None:
         self.data_store = data_store
         self.engine = BacktestEngine(data_store)
         self.mtf = MTFAnalyzer(self.engine)
+        # News blackout (Tier 2.5): historical high-impact events, injected
+        # (e.g. --news-csv). None = no blackout in this backtest run.
+        self._news_calendar = None
+        self._news_blocks = 0
+        if news_events:
+            from helix_v3.core.news_calendar import NewsCalendar
+
+            self._news_calendar = NewsCalendar(events=news_events)
         self.simulator = TradeSimulator(
             initial_equity,
             slippage_pips=slippage_pips,
@@ -645,6 +654,12 @@ class BacktestRunner:
 
     def _check_entry(self, symbol: str, bar_time: datetime) -> None:
         """Run MTF analysis and check entry conditions for one symbol."""
+        # News blackout (Tier 2.5) — cheapest gate, check before analysis
+        if self._news_calendar is not None:
+            if self._news_calendar.blackout(symbol, bar_time) is not None:
+                self._news_blocks += 1
+                return
+
         # Re-entry guard
         direction_key_buy = f"{symbol}_BUY"
         direction_key_sell = f"{symbol}_SELL"
@@ -913,6 +928,31 @@ class BacktestRunner:
 # CLI
 # ---------------------------------------------------------------------------
 
+def _load_news_csv(path: str) -> list:
+    """Parse a historical events CSV: time_utc,currency[,title] per line."""
+    from helix_v3.core.news_calendar import HIGH_IMPACT, NewsEvent
+
+    events = []
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.lower().startswith("time"):
+                continue
+            parts = [p.strip() for p in line.split(",")]
+            if len(parts) < 2:
+                continue
+            dt = datetime.fromisoformat(parts[0])
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            events.append(NewsEvent(
+                time_utc=dt.astimezone(timezone.utc),
+                currency=parts[1].upper(),
+                title=parts[2] if len(parts) > 2 else "",
+                impact=HIGH_IMPACT,
+            ))
+    return events
+
+
 def main(argv: Optional[list] = None) -> None:
     parser = argparse.ArgumentParser(description="Helix V3 MMM Strategy Backtester")
     parser.add_argument("--days", type=int, default=14, help="Days to backtest (from today)")
@@ -935,6 +975,9 @@ def main(argv: Optional[list] = None) -> None:
                         help="After the run, promote this run's outcomes into the LIVE "
                              "validation library (off by default: a backtest must not "
                              "silently feed the gate it will be tested against)")
+    parser.add_argument("--news-csv", type=str, default=None,
+                        help="CSV of historical high-impact events (time_utc,currency[,title]) "
+                             "— entries blocked within the blackout window (Tier 2.5)")
     parser.add_argument("--compare", action="store_true",
                         help="Run twice (with and without validation) and compare results")
     args = parser.parse_args(argv)
@@ -961,6 +1004,11 @@ def main(argv: Optional[list] = None) -> None:
         print("Validation library: ACTIVE (only proven setups)")
     print()
 
+    news_events = None
+    if args.news_csv:
+        news_events = _load_news_csv(args.news_csv)
+        print(f"News blackout: {len(news_events)} high-impact events loaded")
+
     # Load data from MT5
     print("Loading historical data from MT5...")
     store = HistoricalDataStore(symbols, start, end)
@@ -983,6 +1031,7 @@ def main(argv: Optional[list] = None) -> None:
             slippage_pips=args.slippage * args.slippage_mult,
             commission_per_lot=args.commission,
             use_validation=False,
+            news_events=news_events,
         )
         runner_base.run()
         print_backtest_report(runner_base.simulator, start, end)
@@ -999,6 +1048,7 @@ def main(argv: Optional[list] = None) -> None:
             slippage_pips=args.slippage * args.slippage_mult,
             commission_per_lot=args.commission,
             use_validation=True,
+            news_events=news_events,
         )
         runner_val.run()
         print_backtest_report(runner_val.simulator, start, end)
@@ -1041,6 +1091,7 @@ def main(argv: Optional[list] = None) -> None:
         slippage_pips=args.slippage * args.slippage_mult,
         commission_per_lot=args.commission,
         use_validation=args.validation,
+        news_events=news_events,
     )
     runner.run()
 
@@ -1052,6 +1103,9 @@ def main(argv: Optional[list] = None) -> None:
         print(f"\n  VALIDATION STATS: {runner._validation_matches} matches, "
               f"{runner._validation_blocks} blocks, "
               f"{runner._graveyard_warnings} graveyard warnings")
+
+    if runner._news_calendar is not None:
+        print(f"\n  NEWS BLACKOUT: {runner._news_blocks} entry checks blocked")
 
     # Promotion into the LIVE library is opt-in (Tier 1.3): silently promoting
     # a run's own outcomes built the self-reinforcing loop the audit flagged.
