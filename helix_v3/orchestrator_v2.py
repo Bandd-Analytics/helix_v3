@@ -23,7 +23,7 @@ from typing import Dict, List, Optional, Set
 
 from config.settings import settings
 from helix_v3.consensus.validator import MMMConsensusValidator
-from helix_v3.core.types import ConsensusResult
+from helix_v3.core.types import ConsensusResult, Direction
 from helix_v3.core.advisory_confidence import (
     AdvisorySetup,
     advisory_setup_from_mtf,
@@ -559,56 +559,63 @@ class HelixOrchestratorV2:
                 logger.info("TDI %s: %s | RSI=%.0f Sig=%.0f Base=%.0f",
                             symbol, ", ".join(tdi_sigs), tdi_result.rsi, tdi_result.signal, tdi_result.base)
 
-            # Step 3: Vision consensus on the chart
-            # When API keys are available, vision consensus adds a confirmation layer.
-            # Without keys, the quantitative pipeline (MTF + advisory + RRS) is the edge.
+            # Step 3: Vision verdict — LOGGER, NOT A GATE (audit Tier 2.7).
+            # The vision layer is non-deterministic, prompt-anchored, and its
+            # 0.88 self-confidence threshold was never calibrated; keyless
+            # runs used to FABRICATE agreed=True. The execution decision below
+            # is built purely from the quant pipeline (MTF + advisory +
+            # validation library + gatekeeper). Vision verdicts are recorded
+            # to vision_store with outcomes so a measured lift over the quant
+            # baseline can be demonstrated BEFORE it is ever a gate again.
             chart_path = None
-            # The 2-year backtest (PF 1.35, +$686) ran without vision consensus.
+            vision = None
+            vision_note = "vision: not run (no API keys) — quant pipeline only"
             _has_api_key = bool(
                 getattr(self.validator, '_api_cfg', None)
                 and (self.validator._api_cfg.anthropic_key or self.validator._api_cfg.openai_key)
             )
-            _skip_vision = not _has_api_key
-            if _skip_vision:
-                # No API keys — create a synthetic pass-through consensus
-                consensus = ConsensusResult(
-                    agreed=True,
-                    direction=analysis.trade_direction,
-                    avg_confidence=analysis.trade_confidence,
-                    verdicts=[],
-                    divergence_notes="vision-bypassed: no API keys, quant pipeline only",
-                )
-                logger.info(
-                    "VISION BYPASS %s: no API keys — using quant pipeline (MTF+advisory+RRS)",
-                    symbol,
-                )
+            if _has_api_key:
+                try:
+                    image_b64, chart_path = self.visualizer.export_vision_matrix(
+                        df_m15, symbol, "M15"
+                    )
+                    vision = await self.validator.evaluate(image_b64, symbol, "M15")
+                    if self.vision_backtests:
+                        self._record_vision_predictions(
+                            symbol=symbol,
+                            timeframe="M15",
+                            analysis=analysis,
+                            consensus=vision,
+                            chart_path=str(chart_path) if chart_path else None,
+                        )
+                    vision_note = (
+                        f"vision(advisory): {vision.direction.value} "
+                        f"conf={vision.avg_confidence:.2f} agreed={vision.agreed}"
+                    )
+                    if vision.direction not in (Direction.NEUTRAL, analysis.trade_direction):
+                        logger.warning(
+                            "VISION DISAGREES (advisory only) %s: vision=%s quant=%s "
+                            "— logged to vision_store, NOT blocking",
+                            symbol, vision.direction.value,
+                            analysis.trade_direction.value,
+                        )
+                except Exception as e:
+                    logger.error(
+                        "Vision logging failed for %s: %s — proceeding on quant", symbol, e
+                    )
+                    vision_note = f"vision: error ({e})"
             else:
-                image_b64, chart_path = self.visualizer.export_vision_matrix(
-                    df_m15, symbol, "M15"
-                )
-                consensus = await self.validator.evaluate(image_b64, symbol, "M15")
-                if self.vision_backtests:
-                    self._record_vision_predictions(
-                        symbol=symbol,
-                        timeframe="M15",
-                        analysis=analysis,
-                        consensus=consensus,
-                        chart_path=str(chart_path) if chart_path else None,
-                    )
+                logger.info("VISION SKIPPED %s: no API keys — quant pipeline only", symbol)
 
-                if not consensus.agreed:
-                    logger.info(
-                        "No consensus for %s: %s", symbol, consensus.divergence_notes,
-                    )
-                    self.flashcards.save_missed_flashcard(
-                        symbol=symbol,
-                        timeframe="M15",
-                        chart_path=str(annotated_path),
-                        mtf_context=_enrich_flashcard_context(analysis, tdi_result, patterns, advisory),
-                        reason=f"Vision declined: {consensus.divergence_notes}",
-                        tags=["missed", "no_consensus", analysis.weekly.week_phase.value],
-                    )
-                    return
+            # The execution decision is the QUANT pipeline's, with the vision
+            # verdict carried along as journal metadata only.
+            consensus = ConsensusResult(
+                agreed=True,
+                direction=analysis.trade_direction,
+                avg_confidence=analysis.trade_confidence,
+                verdicts=list(vision.verdicts) if vision else [],
+                divergence_notes=vision_note,
+            )
 
             # Step 4: Notify with flashcard chart (not text-only)
             setup_key = f"{symbol}_{analysis.trade_direction.value}"

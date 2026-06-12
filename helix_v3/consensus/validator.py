@@ -1,9 +1,15 @@
-"""MMMConsensusValidator - Multi-mode vision verification engine.
+"""MMMConsensusValidator - Multi-mode vision verdict engine.
 
-Supports four validation modes (cheapest to most robust):
-  - "local": Single Anthropic API call if key available, otherwise reads
-    verdict files from disk. Cheapest real analysis mode. Stale file
-    verdicts (>30 min) are rejected to prevent old signals rubber-stamping.
+DEMOTED TO LOGGER per audit Tier 2.7: verdicts from this module are
+recorded to vision_store for offline calibration and carried as journal
+metadata — they do NOT gate live orders. The orchestrator builds its
+execution decision from the quant pipeline alone. Re-enable as a gate
+only after vision_store shows measured lift over the quant baseline.
+
+Modes (cheapest to most robust):
+  - "local": Single Anthropic API call if a key is available; otherwise
+    a declined NEUTRAL verdict. (The old file-on-disk verdict fallback
+    is REMOVED — a file must never impersonate a model verdict.)
   - "anthropic": Self-consensus via two independent Claude queries with
     different prompts (pattern + structural).
   - "openai": Single OpenAI structured-vision verdict.
@@ -17,7 +23,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -99,16 +104,13 @@ VISION_JSON_SCHEMA: Dict[str, Any] = {
     "additionalProperties": False,
 }
 
-LOCAL_VERDICTS_DIR = Path(settings.chart.output_dir).parent / "verdicts"
-
-
 class MMMConsensusValidator:
-    """Multi-mode vision consensus engine.
+    """Multi-mode vision verdict engine (logger, not a gate — Tier 2.7).
 
     Auto-detects mode based on available API keys:
     - Both keys set -> dual-api (Claude + GPT-5.5)
     - Only Anthropic key -> anthropic (two independent Claude queries)
-    - No keys -> local (reads from verdicts/ directory)
+    - No keys -> local (returns declined verdicts; nothing to log)
 
     Override with CONSENSUS_MODE env var.
     """
@@ -122,8 +124,7 @@ class MMMConsensusValidator:
         else:
             self._mode = self._auto_detect_mode()
 
-        LOCAL_VERDICTS_DIR.mkdir(parents=True, exist_ok=True)
-        logger.info("Consensus validator initialized in '%s' mode", self._mode)
+        logger.info("Consensus validator initialized in '%s' mode (advisory logger)", self._mode)
 
     def _auto_detect_mode(self) -> str:
         import os
@@ -159,6 +160,9 @@ class MMMConsensusValidator:
         payload = {
             "model": self._api_cfg.anthropic_model,
             "max_tokens": 1024,
+            # Tier 2.7: pin temperature so logged verdicts are as repeatable
+            # as the API allows (not a determinism guarantee).
+            "temperature": 0.0,
             "messages": [
                 {
                     "role": "user",
@@ -265,68 +269,6 @@ class MMMConsensusValidator:
                 if isinstance(text, str):
                     pieces.append(text)
         return "".join(pieces)
-
-    # ------------------------------------------------------------------
-    # Local Mode (Claude Code writes verdicts to disk)
-    # ------------------------------------------------------------------
-
-    def write_local_verdict(
-        self,
-        symbol: str,
-        timeframe: str,
-        verdict_json: dict,
-        label: str = "claude-code",
-    ) -> Path:
-        """Write a verdict JSON file for local mode consumption.
-
-        Call this from Claude Code interactive sessions to provide vision
-        analysis without API keys. The orchestrator picks these up automatically.
-        """
-        verdict_path = LOCAL_VERDICTS_DIR / f"{symbol}_{timeframe}.json"
-        verdict_path.write_text(json.dumps(verdict_json, indent=2))
-        logger.info("Local verdict written: %s", verdict_path)
-        return verdict_path
-
-    def _read_local_verdict(
-        self, symbol: str, timeframe: str, label: str,
-        max_age_minutes: int = 30,
-    ) -> VisionVerdict:
-        verdict_path = LOCAL_VERDICTS_DIR / f"{symbol}_{timeframe}.json"
-        if not verdict_path.exists():
-            logger.warning("No local verdict found: %s", verdict_path)
-            return VisionVerdict(
-                model_name=label,
-                direction=Direction.NEUTRAL,
-                confidence=0.0,
-                cycle_level=None,
-                m_w_detected=False,
-                rrt_detected=False,
-                pin_bar_detected=False,
-                raw_json={"error": "no_local_verdict"},
-            )
-
-        # Reject stale verdict files — prevents old signals from rubber-stamping trades
-        import os
-        import time as _time
-        age_min = (_time.time() - os.path.getmtime(verdict_path)) / 60
-        if age_min > max_age_minutes:
-            logger.warning(
-                "Stale local verdict rejected: %s (%.0f min old, limit=%d)",
-                verdict_path.name, age_min, max_age_minutes,
-            )
-            return VisionVerdict(
-                model_name=label,
-                direction=Direction.NEUTRAL,
-                confidence=0.0,
-                cycle_level=None,
-                m_w_detected=False,
-                rrt_detected=False,
-                pin_bar_detected=False,
-                raw_json={"error": "stale_verdict", "age_minutes": round(age_min)},
-            )
-
-        raw = verdict_path.read_text()
-        return self._parse_verdict(label, raw)
 
     # ------------------------------------------------------------------
     # JSON Parsing
@@ -515,13 +457,13 @@ class MMMConsensusValidator:
     async def _evaluate_local(
         self, image_b64: str, symbol: str, timeframe: str
     ) -> ConsensusResult:
-        """Local mode: single Anthropic API call if key available, else file fallback.
+        """Local mode: single Anthropic API call, or a declined verdict.
 
-        This is the cheapest real analysis mode — one API call vs two in
-        'anthropic' mode. Falls back to reading verdict files from disk only
-        when no API key is configured.
+        Cheapest real analysis mode — one API call vs two in 'anthropic'
+        mode. The old fallback that read verdict JSON files from disk is
+        REMOVED (audit Tier 2.7): a file anyone can write must never be
+        recorded as a model verdict.
         """
-        # If we have an Anthropic key AND an image, do real single-call analysis
         if self._api_cfg.anthropic_key and image_b64:
             logger.info("Local mode: analyzing chart via single Anthropic API call")
             try:
@@ -532,23 +474,11 @@ class MMMConsensusValidator:
                         VISION_SYSTEM_PROMPT,
                         "local-single-claude",
                     )
-                if verdict.confidence > 0:
-                    return self._arbitrate([verdict])
-
-                logger.warning(
-                    "Local API call returned zero confidence for %s — falling back to file",
-                    symbol,
-                )
+                return self._arbitrate([verdict])
             except Exception as e:
-                logger.error("Local API call failed for %s: %s — falling back to file", symbol, e)
+                logger.error("Local API call failed for %s: %s", symbol, e)
 
-        # Fallback: read pre-written verdicts from disk
-        v1 = self._read_local_verdict(symbol, timeframe, "claude-code-primary")
-        if v1.confidence > 0:
-            return self._arbitrate([v1])
-
-        # No API, no file — return declined consensus
-        logger.warning("No local verdict available for %s_%s (no API key, no verdict file)", symbol, timeframe)
+        logger.warning("No vision verdict for %s_%s (no API key or call failed)", symbol, timeframe)
         return self._arbitrate([
             VisionVerdict(
                 model_name="local-unavailable",
@@ -558,7 +488,7 @@ class MMMConsensusValidator:
                 m_w_detected=False,
                 rrt_detected=False,
                 pin_bar_detected=False,
-                raw_json={"error": "no_api_key_and_no_verdict_file"},
+                raw_json={"error": "no_api_key_or_call_failed"},
             )
         ])
 

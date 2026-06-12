@@ -31,8 +31,8 @@ Enterprise-grade Market Maker Method (MMM) algorithmic execution system trading 
                   Validation Library     <- Checks proven patterns
                   (validation_library)      Blocks <30% win rate
                          |
-                  Vision Consensus       <- local / anthropic / dual-api
-                  (validator.py)
+                  Vision Verdict Logger  <- advisory only (Tier 2.7),
+                  (validator.py)            logged to vision_store, never gates
                          |
                   Pair-Gated Risk        <- pair_profiles.py
                   (gatekeeper.py)           SL floor + account cap
@@ -74,7 +74,7 @@ Enterprise-grade Market Maker Method (MMM) algorithmic execution system trading 
 ### Consensus
 | File | Purpose |
 |------|---------|
-| `helix_v3/consensus/validator.py` | Multi-mode vision verification. `local`: single Anthropic API call (cheapest). `anthropic`: two Claude queries (self-consensus). `dual-api`: Claude+GPT. Stale verdict guard rejects files >30min old. |
+| `helix_v3/consensus/validator.py` | Vision verdict engine — **LOGGER, NOT A GATE (Tier 2.7)**. Verdicts recorded to vision_store + journal metadata; execution decides on quant pipeline alone. `local`: single Anthropic call. `anthropic`: two Claude queries. `dual-api`: Claude+GPT. File-based verdict fallback removed. |
 
 ### Execution
 | File | Purpose |
@@ -174,7 +174,7 @@ Enterprise-grade Market Maker Method (MMM) algorithmic execution system trading 
 - Advisory confidence grade >= C (D and AVOID are blocked)
 - Validation library check: block if matching pattern has <30% win rate (n>=5)
 - TDI confirmation (Shark Fin, Blood in the Water, VB Squeeze)
-- Vision consensus (local=1 API call, anthropic=2 calls, dual-api=Claude+GPT)
+- Vision verdict logged for calibration (Tier 2.7) — does NOT gate entries
 - Re-entry guard: no re-entry same pair/direction after loss (persistent SQLite)
 - Entry cooldown: 2 hours after ANY trade exit on same symbol (prevents same-setup churn)
 - Exposure check: no new entry if pair already has open position
@@ -221,12 +221,12 @@ Enterprise-grade Market Maker Method (MMM) algorithmic execution system trading 
 - **Weekly**: Saturday 00:00 EAT (best/worst pair only)
 - **Monthly**: 1st of month 00:00 EAT (best/worst pair only)
 
-## Consensus Modes
-- `local`: Single Anthropic API call if key available (cheapest real analysis). Falls back to verdict files if no key. Stale files >30min rejected.
+## Consensus Modes (advisory logger since Tier 2.7 — never gates orders)
+- `local`: Single Anthropic API call if key available (cheapest). No key = declined verdict (file fallback removed).
 - `anthropic`: Two Claude API calls with different prompts (self-consensus)
 - `dual-api`: Claude + GPT-5.5 in parallel (requires both API keys)
 
-Set via `CONSENSUS_MODE` in `.env`.
+Set via `CONSENSUS_MODE` in `.env`. Verdicts + outcomes accumulate in `logs/vision_backtests.db`; vision returns as a gate only after it shows measured lift over the quant baseline.
 
 ## Running
 ```bash
