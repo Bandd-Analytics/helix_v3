@@ -120,6 +120,91 @@ def test_manage_open_positions_uses_wall_clock_when_mt5_time_is_unavailable(monk
     assert actions == ["STALE EXIT: EURUSD BUY ticket=101 +0.0 pips after 91min"]
 
 
+def _orchestrator(direction: Direction = Direction.SELL) -> tuple:
+    """Bare orchestrator with a recording guard and one active GBPJPY order."""
+    orchestrator = HelixOrchestratorV2.__new__(HelixOrchestratorV2)
+    orchestrator._symbols = ["GBPJPY"]
+    orchestrator.gatekeeper = SimpleNamespace(
+        _active_orders={
+            202: ExecutionOrder(
+                symbol="GBPJPY",
+                direction=direction,
+                lot_size=0.10,
+                entry_price=200.0,
+                stop_loss=200.5,
+                take_profit_1=199.5,
+                take_profit_2=198.75,
+                sl_pips=50.0,
+                risk_reward=2.5,
+                ticket=202,
+                status="FILLED",
+            )
+        },
+        journal=SimpleNamespace(),
+    )
+    losses: list = []
+    exits: list = []
+    orchestrator.guard = SimpleNamespace(
+        record_loss=lambda symbol, direction: losses.append((symbol, direction)),
+        record_exit=lambda symbol: exits.append(symbol),
+    )
+    return orchestrator, losses, exits
+
+
+# Every action string manage_open_positions can emit, and whether the
+# position is closed afterwards. If a new action is added to the gatekeeper
+# it must be classified here.
+GATEKEEPER_ACTIONS = {
+    "TIME EXIT: GBPJPY SELL ticket=202 after 240min pips=-8.2": True,
+    "TIME EXIT: GBPJPY SELL ticket=202 after 240min pips=+14.2": True,
+    "STALE EXIT: GBPJPY SELL ticket=202 -3.0 pips after 135min": True,
+    "STALE EXIT: GBPJPY BUY ticket=202 +0.0 pips after 91min": True,
+    "SESSION EXIT: GBPJPY BUY ticket=202 before ASIAN_EARLY pips=-2.0": True,
+    "SESSION EXIT: GBPJPY BUY ticket=202 before ASIAN_EARLY pips=+1.5": True,
+    "STALE TIGHTEN: GBPJPY ticket=202 SL halved at 92min, exit at 135min if still flat": False,
+    "T1 HIT: GBPJPY ticket=202 +25.0 pips, closed 0.05 lots": False,
+    "TRAIL: GBPJPY ticket=202 SL->200.50000 locking 12.3 pips": False,
+}
+
+
+def test_exit_action_classification_covers_every_gatekeeper_action() -> None:
+    for action, is_exit in GATEKEEPER_ACTIONS.items():
+        assert HelixOrchestratorV2._is_exit_action(action) is is_exit, action
+
+
+def test_open_position_management_actions_never_record_guard_loss() -> None:
+    """TRAIL/T1/STALE TIGHTEN mention 'SL' but the position is still open.
+
+    Regression: the old substring matcher recorded a loss for every TRAIL
+    update, so two trails on a winning trade day-banned its direction.
+    """
+    orchestrator, losses, _ = _orchestrator()
+    for action, is_exit in GATEKEEPER_ACTIONS.items():
+        if not is_exit:
+            orchestrator._record_guard_loss_from_action(action)
+    assert losses == []
+
+
+def test_only_negative_pips_exits_record_guard_loss() -> None:
+    orchestrator, losses, _ = _orchestrator()
+    for action in GATEKEEPER_ACTIONS:
+        orchestrator._record_guard_loss_from_action(action)
+    assert losses == [
+        ("GBPJPY", "SELL"),  # TIME EXIT pips=-8.2
+        ("GBPJPY", "SELL"),  # STALE EXIT -3.0 pips
+        ("GBPJPY", "BUY"),   # SESSION EXIT pips=-2.0
+    ]
+
+
+def test_loss_direction_parsed_from_action_overrides_active_order() -> None:
+    # Active order says SELL, but the exit action says BUY — trust the action.
+    orchestrator, losses, _ = _orchestrator(direction=Direction.SELL)
+    orchestrator._record_guard_loss_from_action(
+        "SESSION EXIT: GBPJPY BUY ticket=202 before ASIAN_EARLY pips=-2.0"
+    )
+    assert losses == [("GBPJPY", "BUY")]
+
+
 def test_orchestrator_records_guard_loss_direction_from_active_order() -> None:
     orchestrator = HelixOrchestratorV2.__new__(HelixOrchestratorV2)
     orchestrator._symbols = ["GBPJPY"]

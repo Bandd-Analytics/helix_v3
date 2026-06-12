@@ -14,6 +14,7 @@ Everything else (trade management, position management, reports) is identical to
 from __future__ import annotations
 
 import asyncio
+import re
 import signal
 import time
 from datetime import datetime, timedelta, timezone
@@ -80,6 +81,17 @@ logger = get_logger("orchestrator_v2")
 SCAN_INTERVAL_SECONDS = 60
 MARKET_SCAN_INTERVAL_SECONDS = 900
 MIN_CONFLUENCE_SCORE = 50
+
+# Gatekeeper action strings that mean the position was CLOSED. Everything else
+# (TRAIL:, T1 HIT:, STALE TIGHTEN:) manages a position that is still open and
+# must never trigger re-entry guard exits or loss bans.
+EXIT_ACTION_PREFIXES = ("TIME EXIT:", "STALE EXIT:", "SESSION EXIT:")
+
+# Matches the signed pips figure in exit actions: "pips=+3.4" / "pips=-12.0"
+# (TIME/SESSION EXIT) or "-3.4 pips" (STALE EXIT).
+_ACTION_PIPS_RE = re.compile(r"pips=([+-]?\d+(?:\.\d+)?)|([+-]\d+(?:\.\d+)?)\s+pips")
+
+_ACTION_DIRECTION_RE = re.compile(r"\b(BUY|SELL)\b")
 
 
 def _mtf_to_flashcard_context(a: MTFAnalysis) -> Dict:
@@ -774,22 +786,51 @@ class HelixOrchestratorV2:
             return "openai", "legacy_consensus"
         return "local", "local_verdict"
 
+    @staticmethod
+    def _is_exit_action(action: str) -> bool:
+        """True only for actions where the gatekeeper CLOSED the position."""
+        return action.startswith(EXIT_ACTION_PREFIXES)
+
+    @staticmethod
+    def _action_pips(action: str) -> Optional[float]:
+        """Parse the signed pips figure embedded in an exit action string."""
+        m = _ACTION_PIPS_RE.search(action)
+        if not m:
+            return None
+        return float(m.group(1) or m.group(2))
+
     def _record_guard_loss_from_action(self, action: str) -> None:
-        """Record same-direction loss bans from trade-management action text."""
-        action_lower = action.lower()
-        loss_markers = ("sl", "stop", "loss", "stale", "time exit", "session exit")
-        if not any(marker in action_lower for marker in loss_markers):
+        """Record a re-entry-guard loss for true loss exits ONLY.
+
+        Open-position management actions (TRAIL, T1 HIT, STALE TIGHTEN) must
+        never record a loss — the old substring matcher saw the "SL" in
+        "TRAIL: ... SL->..." and day-banned winning directions after two
+        trail updates.
+        """
+        if not self._is_exit_action(action):
+            return
+        pips = self._action_pips(action)
+        if pips is None:
+            logger.warning("GUARD: exit action without parseable pips, not recording loss: %s", action)
+            return
+        if pips >= 0:
             return
 
         for sym in self._symbols:
             if sym not in action:
                 continue
 
+            # Exit actions embed the direction ("STALE EXIT: GBPJPY SELL ...")
             direction = ""
-            for order in self.gatekeeper._active_orders.values():
-                if order.symbol == sym:
-                    direction = order.direction.value
-                    break
+            dir_match = _ACTION_DIRECTION_RE.search(action)
+            if dir_match:
+                direction = dir_match.group(1)
+
+            if not direction:
+                for order in self.gatekeeper._active_orders.values():
+                    if order.symbol == sym:
+                        direction = order.direction.value
+                        break
 
             if not direction:
                 try:
@@ -804,7 +845,7 @@ class HelixOrchestratorV2:
 
             if direction:
                 self.guard.record_loss(sym, direction)
-                logger.info("GUARD: Recorded loss for %s %s", sym, direction)
+                logger.info("GUARD: Recorded loss for %s %s (%+.1f pips)", sym, direction, pips)
             else:
                 logger.warning("GUARD: Could not determine direction for %s loss", sym)
             return
@@ -817,8 +858,11 @@ class HelixOrchestratorV2:
 
         for action in actions:
             self.notifier._send(f"HELIX V3 TRADE MGMT\n{'='*25}\n{action}")
-            # Record entry cooldown for ANY trade exit (prevents same-setup churn)
-            # Also record outcome to replay store for learning loop
+            # Entry cooldown + replay recording apply only when the position
+            # actually CLOSED. TRAIL/T1/STALE TIGHTEN leave it open — firing
+            # record_exit for those put live winners on a 2h cooldown.
+            if not self._is_exit_action(action):
+                continue
             for sym in self._symbols:
                 if sym in action:
                     self.guard.record_exit(sym)
