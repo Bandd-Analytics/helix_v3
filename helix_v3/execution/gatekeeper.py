@@ -41,6 +41,10 @@ class MT5ExecutionGatekeeper:
     - Max drawdown circuit breaker (8%)
     """
 
+    # MT5 connection watchdog (Tier 3.1) — injected by the orchestrator.
+    # Class-level default so test doubles built without __init__ have it.
+    watchdog = None
+
     def __init__(self) -> None:
         self._risk_cfg = settings.risk
         self._active_orders: Dict[int, ExecutionOrder] = {}
@@ -674,7 +678,19 @@ class MT5ExecutionGatekeeper:
         """
         positions = mt5.positions_get()
         if positions is None:
+            # Tier 3.1: a dead terminal must never look like a quiet market.
+            # With open trades on the book, this cycle had NO trailing, NO
+            # stale exits, NO T1 — say so loudly and feed the watchdog.
+            logger.error(
+                "positions_get() returned None — MT5 connection suspect; "
+                "position management BLIND this cycle (last_error=%s)",
+                mt5.last_error(),
+            )
+            if self.watchdog is not None:
+                self.watchdog.record_failure("positions_get None in manage_open_positions")
             return []
+        if self.watchdog is not None:
+            self.watchdog.record_success()
 
         actions: List[str] = []
         # Robust server time: try MT5 tick time, fall back to wall clock

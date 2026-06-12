@@ -37,6 +37,7 @@ from helix_v3.core.tdi import (
 from helix_v3.core.patterns import scan_patterns
 from helix_v3.core.reentry_guard import ReentryGuard
 from helix_v3.core.regime import assess_regime
+from helix_v3.execution.mt5_watchdog import MT5Watchdog
 from helix_v3.execution.gatekeeper import MT5ExecutionGatekeeper
 from helix_v3.journal.flashcards import FlashcardSystem
 from helix_v3.notifications.whatsapp import WhatsAppNotifier
@@ -270,6 +271,10 @@ class HelixOrchestratorV2:
         self.notifier = self._create_notifier()
         # Kill-switch trips alert once per trading day
         self.gatekeeper.kill_switch_callback = self.notifier._send
+        # MT5 watchdog (Tier 3.1): reconnect with backoff + dead-man alert.
+        # Shared with the gatekeeper so a None positions_get feeds it too.
+        self.watchdog = MT5Watchdog(alert_callback=self.notifier._send)
+        self.gatekeeper.watchdog = self.watchdog
         self._running = False
         # Filter to tradeable pairs only (respects PairProfile.tradeable flag)
         from config.pair_profiles import get_pair_profile
@@ -871,6 +876,16 @@ class HelixOrchestratorV2:
 
     async def _scan_cycle(self) -> None:
         """Run one scan cycle across all symbols."""
+        # Tier 3.1: health poll first. If the terminal is dead, the watchdog
+        # reconnects with backoff and (after MT5_DEADMAN_MIN) alerts; nothing
+        # downstream this cycle can work without a broker connection.
+        if not self.watchdog.poll():
+            logger.warning(
+                "Scan cycle skipped: MT5 unhealthy (%.1f min since last good poll)",
+                self.watchdog.seconds_down() / 60,
+            )
+            return
+
         # Manage existing positions and sync journal
         actions = self.gatekeeper.manage_open_positions()
         self.gatekeeper.journal.sync_from_mt5()

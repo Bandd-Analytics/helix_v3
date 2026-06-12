@@ -18,6 +18,9 @@ class MT5Config:
     password: str = os.getenv("MT5_PASSWORD", "")
     server: str = os.getenv("MT5_SERVER", "")
     path: str = os.getenv("MT5_PATH", "")
+    # Watchdog (audit Tier 3.1): dead-man alert after this many minutes
+    # without a successful broker poll.
+    deadman_minutes: float = float(os.getenv("MT5_DEADMAN_MIN", "5"))
 
 
 @dataclass(frozen=True)
