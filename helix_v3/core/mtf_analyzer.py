@@ -163,6 +163,75 @@ class MTFAnalysis:
     rejection_reasons: List[str] = field(default_factory=list)
 
 
+def detect_mw_pattern(
+    highs,
+    lows,
+    current: float,
+    ar_high: float,
+    ar_low: float,
+    pip_size: float,
+    pp: PairProfile,
+    recency_bars: int = 8,
+) -> Direction:
+    """Tier 2.2 M/W detector — BUY for W-bottom, SELL for M-top, else NEUTRAL.
+
+    Module-level so the rule validator tests the SAME detector the live
+    pipeline trades (audit Tier 2.4), not a stale copy. A qualifying
+    pattern needs:
+      1. amplitude floor (pair-scaled) — the bounce must be real
+      2. anchoring — the hunted leg must reach the Asian boundary
+      3. neckline confirmation — price must have broken back through
+      4. recency — the second leg within the last `recency_bars` bars
+
+    `highs`/`lows` are the detection window (typically the last 20 bars),
+    `current` the latest close. When both patterns qualify, the more
+    recent one wins.
+    """
+    trough_tol = pp.stop_hunt_min_pips * pip_size            # leg-equality tolerance
+    amplitude_floor = max(5.0, pp.stop_hunt_min_pips * 0.25) * pip_size
+    anchor_tol = pp.stop_hunt_min_pips * 0.25 * pip_size
+
+    w_idx = -1  # Index of most recent qualifying W-bottom (middle bump)
+    m_idx = -1  # Index of most recent qualifying M-top (middle valley)
+    n = len(lows)
+    oldest_mid = max(1, n - recency_bars - 2)
+
+    # W-bottom: two troughs (i-2, i+2) with bump between (scan recent->old)
+    for i in range(n - 3, oldest_mid, -1):
+        if lows[i] > lows[i - 2] and lows[i] > lows[i + 2]:
+            troughs_equal = abs(lows[i - 2] - lows[i + 2]) <= trough_tol
+            deepest = min(lows[i - 2], lows[i + 2])
+            neckline = highs[i]
+            amplitude = neckline - deepest
+            anchored = deepest <= ar_low + anchor_tol
+            confirmed = current > neckline
+            if troughs_equal and amplitude >= amplitude_floor and anchored and confirmed:
+                w_idx = i
+                break
+
+    # M-top: two peaks (i-2, i+2) with valley between (scan recent->old)
+    for i in range(n - 3, oldest_mid, -1):
+        if highs[i] < highs[i - 2] and highs[i] < highs[i + 2]:
+            peaks_equal = abs(highs[i - 2] - highs[i + 2]) <= trough_tol
+            highest = max(highs[i - 2], highs[i + 2])
+            neckline = lows[i]
+            amplitude = highest - neckline
+            anchored = highest >= ar_high - anchor_tol
+            confirmed = current < neckline
+            if peaks_equal and amplitude >= amplitude_floor and anchored and confirmed:
+                m_idx = i
+                break
+
+    # Most recent pattern wins (higher index = more recent bar)
+    if w_idx >= 0 and m_idx >= 0:
+        return Direction.SELL if m_idx >= w_idx else Direction.BUY
+    if w_idx >= 0:
+        return Direction.BUY
+    if m_idx >= 0:
+        return Direction.SELL
+    return Direction.NEUTRAL
+
+
 class MTFAnalyzer:
     """Multi-timeframe MMM analysis engine.
 
@@ -467,71 +536,20 @@ class MTFAnalyzer:
         # M/W detection — this determines the DIRECTION per MMM
         # W-bottom = BUY (double bottom, MM hunted lows, true trend is up)
         # M-top = SELL (double top, MM hunted highs, true trend is down)
-        #
-        # Re-specified per audit Tier 2.2 — the old detector was an
-        # unanchored 5-bar fractal with a fixed 20-pip tolerance that fired
-        # on noise nearly every scan. A qualifying pattern now needs:
-        #   1. amplitude floor (pair-scaled) — the bounce must be real
-        #   2. anchoring — the hunted leg must reach the Asian boundary
-        #   3. neckline confirmation — price must have broken back through
-        #   4. recency — the second leg within the last 8 bars (2h on M15)
+        # Spec re-derived per audit Tier 2.2 — see detect_mw_pattern (shared
+        # with the rule validator so research tests what production trades).
         last_20 = df.iloc[-20:]
-        m_w = False
-        m_w_direction = Direction.NEUTRAL
-        m_w_highs = last_20["High"].values
-        m_w_lows = last_20["Low"].values
         current = float(df.iloc[-1]["Close"])
-
-        trough_tol = pp.stop_hunt_min_pips * pip_size            # leg-equality tolerance
-        amplitude_floor = max(5.0, pp.stop_hunt_min_pips * 0.25) * pip_size
-        anchor_tol = pp.stop_hunt_min_pips * 0.25 * pip_size
-        recency_bars = 8
-
-        w_idx = -1  # Index of most recent qualifying W-bottom (middle bump)
-        m_idx = -1  # Index of most recent qualifying M-top (middle valley)
-        n = len(m_w_lows)
-        oldest_mid = max(1, n - recency_bars - 2)
-
-        # W-bottom: two troughs (i-2, i+2) with bump between (scan recent->old)
-        for i in range(n - 3, oldest_mid, -1):
-            if m_w_lows[i] > m_w_lows[i - 2] and m_w_lows[i] > m_w_lows[i + 2]:
-                troughs_equal = abs(m_w_lows[i - 2] - m_w_lows[i + 2]) <= trough_tol
-                deepest = min(m_w_lows[i - 2], m_w_lows[i + 2])
-                neckline = m_w_highs[i]
-                amplitude = neckline - deepest
-                anchored = deepest <= ar_low + anchor_tol
-                confirmed = current > neckline
-                if troughs_equal and amplitude >= amplitude_floor and anchored and confirmed:
-                    w_idx = i
-                    break
-
-        # M-top: two peaks (i-2, i+2) with valley between (scan recent->old)
-        for i in range(n - 3, oldest_mid, -1):
-            if m_w_highs[i] < m_w_highs[i - 2] and m_w_highs[i] < m_w_highs[i + 2]:
-                peaks_equal = abs(m_w_highs[i - 2] - m_w_highs[i + 2]) <= trough_tol
-                highest = max(m_w_highs[i - 2], m_w_highs[i + 2])
-                neckline = m_w_lows[i]
-                amplitude = highest - neckline
-                anchored = highest >= ar_high - anchor_tol
-                confirmed = current < neckline
-                if peaks_equal and amplitude >= amplitude_floor and anchored and confirmed:
-                    m_idx = i
-                    break
-
-        # Use the most recent pattern (higher index = more recent bar)
-        if w_idx >= 0 and m_idx >= 0:
-            if m_idx >= w_idx:
-                m_w = True
-                m_w_direction = Direction.SELL
-            else:
-                m_w = True
-                m_w_direction = Direction.BUY
-        elif w_idx >= 0:
-            m_w = True
-            m_w_direction = Direction.BUY
-        elif m_idx >= 0:
-            m_w = True
-            m_w_direction = Direction.SELL
+        m_w_direction = detect_mw_pattern(
+            last_20["High"].values,
+            last_20["Low"].values,
+            current,
+            ar_high,
+            ar_low,
+            pip_size,
+            pp,
+        )
+        m_w = m_w_direction != Direction.NEUTRAL
 
         # RRT detection
         rrt = self._detect_rrt(df.iloc[-4:])

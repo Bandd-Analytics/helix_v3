@@ -1,11 +1,19 @@
 """MMM Rule Validator — Backtests taught methodology rules against historical MT5 data.
 
-Replays historical data for each pair and scores:
-  - Rule hit rate (how often the taught condition correlates with market behavior)
-  - Average RR (risk-reward of trades following the rule)
-  - Time-to-target (how long until TP/SL hit)
-  - Session dependency (which sessions the rule works best in)
-  - Parameter sensitivity (how changes in thresholds affect outcomes)
+Rebuilt per audit Tier 2.4. Scoring discipline:
+  - FIRST-TOUCH labeling for directional rules: target/stop walked in bar
+    order, stop wins same-bar ambiguity (the old MFE>MAE scoring counted
+    stop-out-then-rally as a HIT).
+  - NON-OVERLAPPING samples: an event's outcome window must resolve before
+    the next event can be taken.
+  - BINOMIAL tests vs base rates: directional rules test against the
+    empirical unconditional first-touch rate on the same data (same
+    target/stop/horizon); comparison rules use sign tests; conditional
+    rules test against their complement condition's rate.
+  - BENJAMINI-HOCHBERG across the whole rule x pair grid (FDR q=0.10).
+    Verdicts: VALIDATED (BH-significant), DEAD (testable, not significant),
+    INSUFFICIENT_N (n<30), DESCRIPTIVE (parameter survey, no hypothesis).
+  Rules that fail die — the report prints the kill list.
 
 Usage:
     .venv/Scripts/python.exe -m helix_v3.training.rule_validator --days 90
@@ -19,19 +27,29 @@ from __future__ import annotations
 import argparse
 import json
 import sqlite3
-from dataclasses import asdict, dataclass, field
-from datetime import datetime, timedelta, timezone
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
 
-from config.pair_profiles import PAIR_PROFILES, PairProfile, get_pair_profile
+from config.pair_profiles import PAIR_PROFILES, PairProfile, get_pair_profile, resolve_profile
 from config.settings import settings
-from helix_v3.core.patterns import PatternType, TradeType, scan_patterns
-from helix_v3.core.sessions import classify_sessions, get_prev_day_hod_lod
+from helix_v3.core.market_time import utc_to_server_stamp
+from helix_v3.core.mtf_analyzer import detect_mw_pattern
+from helix_v3.core.sessions import classify_sessions
 from helix_v3.core.tdi import compute_tdi
+from helix_v3.core.volatility import d1_atr_pips
+from helix_v3.training.rule_stats import (
+    EXPIRY,
+    TARGET,
+    benjamini_hochberg,
+    binomial_p_at_least,
+    empirical_base_rate,
+    first_touch_outcome,
+)
 from helix_v3.utils.logger import get_logger
 
 logger = get_logger("rule_validator")
@@ -104,6 +122,12 @@ class ValidationResult:
     parameters: dict = field(default_factory=dict)
     notes: str = ""
     events: List[RuleEvent] = field(default_factory=list)
+    # Tier 2.4 statistics
+    p_value: Optional[float] = None      # one-sided binomial vs base_rate
+    base_rate: Optional[float] = None    # the null hypothesis rate
+    bh_significant: bool = False         # set after BH across the run grid
+    verdict: str = ""                    # VALIDATED / DEAD / INSUFFICIENT_N / DESCRIPTIVE
+    db_id: Optional[int] = None
 
 
 class RuleValidator:
@@ -112,6 +136,18 @@ class RuleValidator:
     def __init__(self) -> None:
         self._db = sqlite3.connect(str(DB_PATH))
         self._db.executescript(SCHEMA)
+        # Tier 2.4 columns on pre-existing databases
+        for col, decl in (
+            ("p_value", "REAL"),
+            ("base_rate", "REAL"),
+            ("bh_significant", "INTEGER DEFAULT 0"),
+            ("verdict", "TEXT DEFAULT ''"),
+        ):
+            try:
+                self._db.execute(f"ALTER TABLE validation_results ADD COLUMN {col} {decl}")
+            except sqlite3.OperationalError:
+                pass
+        self._db.commit()
         self._engine = None
 
     def _get_engine(self):
@@ -127,6 +163,38 @@ class RuleValidator:
 
     def _pip_size(self, symbol: str) -> float:
         return self._get_engine()._get_pip_value(symbol)
+
+    def _resolved_profile(self, symbol: str) -> PairProfile:
+        """ATR-resolved profile (Tier 2.3) — same gates production uses."""
+        return resolve_profile(symbol, d1_atr_pips(self._get_engine(), symbol))
+
+    @staticmethod
+    def _first_touch_params(pp: PairProfile) -> Tuple[float, float, int]:
+        """(target_pips, stop_pips, horizon_bars) for first-touch labeling.
+
+        Symmetric 1:1 bracket at the production SL floor (0.25 x ATR when
+        resolved) over a 6-hour horizon — under a driftless null the
+        target rate is ~50%, and the empirical base rate captures what
+        drift/fat tails actually deliver on this data.
+        """
+        stop = max(5.0, pp.min_sl_pips)
+        return stop, stop, 24
+
+    @staticmethod
+    def _clamp_rate(rate: float) -> float:
+        return min(0.99, max(0.01, rate))
+
+    @staticmethod
+    def _d1_trading_day(ts) -> datetime:
+        """The server calendar day a D1 bar belongs to.
+
+        Since Tier 1.2, D1 bars carry true-UTC open times — server midnight
+        is 21:00/22:00 UTC the PREVIOUS day, so naive .weekday()/.date() on
+        a D1 timestamp returns the wrong calendar day (this run exposed it:
+        friday_exit found zero Fridays).
+        """
+        dt = ts.to_pydatetime() if hasattr(ts, "to_pydatetime") else ts
+        return utc_to_server_stamp(dt)
 
     # ==================================================================
     # Rule: Asian Accumulation
@@ -209,10 +277,28 @@ class RuleValidator:
         invalid_hits = sum(1 for e in invalid_events if e.outcome == "HIT")
         invalid_rate = invalid_hits / len(invalid_events) if invalid_events else 0
 
+        # Binomial vs the complement condition: do VALID accumulation days
+        # beat the rate INVALID days achieve? (overall rate if too few
+        # invalid days to estimate one). One sample per day — non-overlapping.
+        all_hits = result.hits + invalid_hits
+        all_days = len(events)
+        if len(invalid_events) >= 20:
+            p0 = invalid_rate
+        elif all_days > 0:
+            p0 = all_hits / all_days
+        else:
+            p0 = 0.5
+        result.base_rate = self._clamp_rate(p0)
+        if result.occurrences > 0:
+            result.p_value = binomial_p_at_least(
+                result.hits, result.occurrences, result.base_rate
+            )
+
         result.avg_rr = float(np.mean([e.pips_result for e in valid_events])) if valid_events else 0
         result.notes = (
             f"Valid accum hit rate: {result.hit_rate:.1%} ({result.hits}/{result.occurrences}) | "
             f"Invalid accum hit rate: {invalid_rate:.1%} ({invalid_hits}/{len(invalid_events)}) | "
+            f"p={result.p_value if result.p_value is None else f'{result.p_value:.3f}'} | "
             f"Avg day range (valid): {result.avg_rr:.0f}p"
         )
         result.events = events
@@ -271,7 +357,6 @@ class RuleValidator:
             breach_above = (max_high - asian_high) / pip
             breach_below = (asian_low - min_low) / pip
 
-            breach = max(breach_above, breach_below)
             direction = "ABOVE" if breach_above > breach_below else "BELOW"
             breach_val = breach_above if direction == "ABOVE" else breach_below
 
@@ -314,6 +399,8 @@ class RuleValidator:
         else:
             result.notes = "No breaches detected"
 
+        # Parameter survey (distribution measurement), not a falsifiable claim.
+        result.verdict = "DESCRIPTIVE"
         result.events = events
         self._save_result(result)
         return result
@@ -325,122 +412,120 @@ class RuleValidator:
     def validate_mw_direction(
         self, symbol: str, days: int = 90,
     ) -> ValidationResult:
-        """Test: When M/W forms, does following its direction produce profit?
+        """Test: When the PRODUCTION M/W detector fires, does its direction win?
 
-        Scans for M/W patterns on M15 and measures what happens after.
+        Uses detect_mw_pattern (the exact Tier 2.2 detector the live
+        pipeline trades — anchored to the day's Asian range, amplitude
+        floor, neckline confirmation, recency), first-touch labeling on a
+        1:1 ATR-scaled bracket, non-overlapping outcome windows, and a
+        binomial test against the empirical unconditional base rate.
         """
-        pp = get_pair_profile(symbol)
+        pp = self._resolved_profile(symbol)
         pip = self._pip_size(symbol)
         bars_needed = days * 96 + 200
         df = self._fetch_data(symbol, "M15", bars_needed)
+        sessions = classify_sessions(df, pip)
 
+        target_pips, stop_pips, horizon = self._first_touch_params(pp)
         result = ValidationResult(
             rule_name="mw_direction",
             symbol=symbol,
             test_date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-            parameters={"days": days, "tolerance_pips": 20},
+            parameters={
+                "days": days,
+                "target_pips": target_pips,
+                "stop_pips": stop_pips,
+                "horizon_bars": horizon,
+                "atr_pips": pp.atr_pips,
+            },
         )
 
+        highs_all = df["High"].values
+        lows_all = df["Low"].values
+        closes_all = df["Close"].values
+        dates_all = df.index.date
+
         events = []
-        # Sliding window: scan 20-bar windows for M/W
-        step = 10  # Check every 10 bars to avoid too many overlapping detections
-        for start in range(0, len(df) - 40, step):
-            window = df.iloc[start:start + 20]
-            highs = window["High"].values
-            lows = window["Low"].values
+        expiries = 0
+        next_allowed = 0  # non-overlap: next event only after prior outcome resolves
 
-            mw_dir = None
-            # W-bottom
-            for i in range(2, len(lows) - 2):
-                if lows[i] > lows[i - 2] and lows[i] > lows[i + 2]:
-                    diff = abs(lows[i - 2] - lows[i + 2]) / pip
-                    if diff < 20:
-                        mw_dir = "BUY"
-                        break
-            # M-top
-            if mw_dir is None:
-                for i in range(2, len(highs) - 2):
-                    if highs[i] < highs[i - 2] and highs[i] < highs[i + 2]:
-                        diff = abs(highs[i - 2] - highs[i + 2]) / pip
-                        if diff < 20:
-                            mw_dir = "SELL"
-                            break
+        for date_str, ar in sorted(sessions.asian_ranges.items()):
+            end_idx = int(ar.get("end_idx", 0))
+            date = pd.Timestamp(date_str).date()
+            day_positions = np.where(dates_all == date)[0]
+            day_positions = day_positions[day_positions > end_idx]
 
-            if mw_dir is None:
-                continue
+            for i in day_positions:
+                i = int(i)
+                if i < 20 or i >= len(df) - 1 or i < next_allowed:
+                    continue
+                mw_dir = detect_mw_pattern(
+                    highs_all[i - 19:i + 1],
+                    lows_all[i - 19:i + 1],
+                    float(closes_all[i]),
+                    float(ar["high"]),
+                    float(ar["low"]),
+                    pip,
+                    pp,
+                )
+                if mw_dir.value not in ("BUY", "SELL"):
+                    continue
 
-            # Measure outcome: next 20 bars after the pattern
-            future_start = start + 20
-            future_end = min(future_start + 20, len(df))
-            if future_end - future_start < 5:
-                continue
+                entry = float(closes_all[i])
+                ft = first_touch_outcome(
+                    df, i, mw_dir.value, entry, target_pips, stop_pips, horizon, pip
+                )
+                if ft is None:
+                    continue
+                next_allowed = i + ft.bars_held + 1
 
-            future = df.iloc[future_start:future_end]
-            entry_price = float(window.iloc[-1]["Close"])
+                if ft.outcome == EXPIRY:
+                    expiries += 1
+                    continue
 
-            if mw_dir == "BUY":
-                max_profit = (float(future["High"].max()) - entry_price) / pip
-                max_loss = (entry_price - float(future["Low"].min())) / pip
-            else:
-                max_profit = (entry_price - float(future["Low"].min())) / pip
-                max_loss = (float(future["High"].max()) - entry_price) / pip
-
-            hit = max_profit > max_loss and max_profit > 10
-            rr = max_profit / max_loss if max_loss > 0 else 0
-
-            event = RuleEvent(
-                rule_name="mw_direction",
-                symbol=symbol,
-                event_time=window.index[-1].to_pydatetime(),
-                direction=mw_dir,
-                outcome="HIT" if hit else "MISS",
-                pips_result=max_profit if hit else -max_loss,
-                rr_achieved=rr,
-                details={
-                    "max_profit_pips": max_profit,
-                    "max_loss_pips": max_loss,
-                    "entry_price": entry_price,
-                },
-            )
-            events.append(event)
+                events.append(RuleEvent(
+                    rule_name="mw_direction",
+                    symbol=symbol,
+                    event_time=df.index[i].to_pydatetime(),
+                    direction=mw_dir.value,
+                    outcome="HIT" if ft.outcome == TARGET else "MISS",
+                    pips_result=ft.pips_result,
+                    rr_achieved=1.0 if ft.outcome == TARGET else -1.0,
+                    time_to_outcome=ft.bars_held * 15,
+                    details={"entry_price": entry, "first_touch": ft.outcome},
+                ))
 
         result.occurrences = len(events)
         result.hits = sum(1 for e in events if e.outcome == "HIT")
         result.misses = result.occurrences - result.hits
         result.hit_rate = result.hits / result.occurrences if result.occurrences > 0 else 0
-        result.avg_rr = float(np.mean([e.rr_achieved for e in events])) if events else 0
+        result.avg_time_min = (
+            float(np.mean([e.time_to_outcome for e in events])) if events else 0
+        )
 
-        # Best session analysis
-        session_hits = {}
-        for e in events:
-            hour = e.event_time.hour
-            if 1 <= hour < 8:
-                sess = "ASIA"
-            elif 8 <= hour < 13:
-                sess = "LONDON"
-            elif 13 <= hour < 22:
-                sess = "NYC"
-            else:
-                sess = "OFF"
-            session_hits.setdefault(sess, {"hits": 0, "total": 0})
-            session_hits[sess]["total"] += 1
-            if e.outcome == "HIT":
-                session_hits[sess]["hits"] += 1
+        # Base rate: unconditional first-touch on the SAME data, same bracket,
+        # weighted by the rule's BUY/SELL mix.
+        n_buy = sum(1 for e in events if e.direction == "BUY")
+        n_sell = result.occurrences - n_buy
+        base_buy, nb = empirical_base_rate(df, "BUY", target_pips, stop_pips, horizon, pip)
+        base_sell, ns = empirical_base_rate(df, "SELL", target_pips, stop_pips, horizon, pip)
+        if result.occurrences > 0 and base_buy is not None and base_sell is not None:
+            p0 = self._clamp_rate(
+                (n_buy * base_buy + n_sell * base_sell) / result.occurrences
+            )
+        else:
+            p0 = 0.5  # symmetric 1:1 bracket fallback
+        result.base_rate = p0
+        if result.occurrences > 0:
+            result.p_value = binomial_p_at_least(result.hits, result.occurrences, p0)
 
-        best_sess = ""
-        best_rate = 0
-        for sess, data in session_hits.items():
-            rate = data["hits"] / data["total"] if data["total"] > 0 else 0
-            if rate > best_rate:
-                best_rate = rate
-                best_sess = sess
-        result.best_session = best_sess
-
+        result.parameters["expiries_excluded"] = expiries
+        result.parameters["base_n"] = (nb or 0) + (ns or 0)
         result.notes = (
-            f"M/W direction hit rate: {result.hit_rate:.1%} | "
-            f"Avg RR: {result.avg_rr:.2f} | "
-            f"Best session: {best_sess} ({best_rate:.1%}) | "
-            f"By session: {json.dumps({s: f'{d['hits']}/{d['total']}' for s, d in session_hits.items()})}"
+            f"M/W first-touch: {result.hit_rate:.1%} ({result.hits}/{result.occurrences}) "
+            f"vs base {p0:.1%} | p={result.p_value:.3f} | "
+            f"BUY/SELL={n_buy}/{n_sell} | expiries excluded: {expiries}"
+            if result.occurrences > 0 else "No qualifying M/W events"
         )
         result.events = events
         self._save_result(result)
@@ -454,7 +539,6 @@ class RuleValidator:
         self, symbol: str, days: int = 180,
     ) -> ValidationResult:
         """Test: Do Tue/Wed show more reversals than other days?"""
-        pip = self._pip_size(symbol)
         df_d1 = self._fetch_data(symbol, "D1", days + 10)
 
         result = ValidationResult(
@@ -471,7 +555,7 @@ class RuleValidator:
         for i in range(2, len(df_d1)):
             bar = df_d1.iloc[i]
             prev = df_d1.iloc[i - 1]
-            weekday = bar.name.weekday()
+            weekday = self._d1_trading_day(bar.name).weekday()
 
             if weekday > 4:
                 continue
@@ -492,7 +576,10 @@ class RuleValidator:
                 event_time=bar.name.to_pydatetime(),
                 direction="REVERSAL" if is_reversal else "CONTINUATION",
                 outcome="HIT" if is_reversal and weekday in (1, 2) else "MISS",
-                details={"weekday": weekday, "day_name": bar.name.strftime("%A")},
+                details={
+                    "weekday": weekday,
+                    "day_name": self._d1_trading_day(bar.name).strftime("%A"),
+                },
             )
             events.append(event)
 
@@ -513,8 +600,18 @@ class RuleValidator:
         result.hit_rate = midweek_hits / midweek_total if midweek_total > 0 else 0
 
         other_rate = other_hits / other_total if other_total > 0 else 0
+
+        # Binomial vs the other-days reversal rate (the MMM claim is that
+        # Tue/Wed reverse MORE often). One sample per day, non-overlapping.
+        result.base_rate = self._clamp_rate(other_rate if other_total >= 20 else 0.5)
+        if result.occurrences > 0:
+            result.p_value = binomial_p_at_least(
+                result.hits, result.occurrences, result.base_rate
+            )
+
         result.notes = (
             f"Midweek reversal rate: {result.hit_rate:.1%} vs other days: {other_rate:.1%} | "
+            f"p={result.p_value if result.p_value is None else f'{result.p_value:.3f}'} | "
             f"By day: {json.dumps(rates)}"
         )
         result.events = events
@@ -588,8 +685,15 @@ class RuleValidator:
         result.misses = result.occurrences - result.hits
         result.hit_rate = result.hits / result.occurrences if result.occurrences > 0 else 0
 
+        # Sign test: is exiting better than holding more often than a coin flip?
+        # Samples are spaced 24 bars with 12-bar windows — non-overlapping.
+        result.base_rate = 0.5
+        if result.occurrences > 0:
+            result.p_value = binomial_p_at_least(result.hits, result.occurrences, 0.5)
+
         result.notes = (
-            f"90-min stale exit correct: {result.hit_rate:.1%} | "
+            f"90-min stale exit correct: {result.hit_rate:.1%} "
+            f"(p={result.p_value if result.p_value is None else f'{result.p_value:.3f}'} vs 50%) | "
             f"Holding longer helped: {result.misses}/{result.occurrences} times"
         )
         result.events = events
@@ -603,71 +707,103 @@ class RuleValidator:
     def validate_tdi_shark_fin(
         self, symbol: str, days: int = 90,
     ) -> ValidationResult:
-        """Test: When TDI Shark Fin fires, does a reversal follow?"""
+        """Test: When TDI Shark Fin fires, does the reversal win first-touch?
+
+        First-touch labeling on a 1:1 ATR-scaled bracket, non-overlapping
+        outcome windows (the old version stepped 5 bars with 20-bar
+        outcome windows — quadruple-counted every fin), binomial test vs
+        the empirical unconditional base rate.
+        """
+        pp = self._resolved_profile(symbol)
         pip = self._pip_size(symbol)
         df = self._fetch_data(symbol, "M15", days * 96 + 200)
 
+        target_pips, stop_pips, horizon = self._first_touch_params(pp)
         result = ValidationResult(
             rule_name="tdi_shark_fin",
             symbol=symbol,
             test_date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-            parameters={"days": days},
+            parameters={
+                "days": days,
+                "target_pips": target_pips,
+                "stop_pips": stop_pips,
+                "horizon_bars": horizon,
+                "atr_pips": pp.atr_pips,
+            },
         )
 
         events = []
-        # Sliding window: compute TDI on rolling 100-bar windows
+        expiries = 0
         window_size = 100
-        step = 5
-
-        for i in range(window_size, len(df) - 20, step):
+        i = window_size
+        while i < len(df) - 1:
             window = df.iloc[i - window_size:i]
             tdi = compute_tdi(window)
 
             if not tdi.shark_fin_active:
+                i += 1
                 continue
 
-            # Measure next 20 bars
-            future = df.iloc[i:min(i + 20, len(df))]
-            entry_price = float(window.iloc[-1]["Close"])
+            direction = "SELL" if tdi.shark_fin_direction == "SHORT" else "BUY"
+            # The signal bar is the window's last bar (i-1); entry at its close.
+            signal_idx = i - 1
+            entry = float(df.iloc[signal_idx]["Close"])
+            ft = first_touch_outcome(
+                df, signal_idx, direction, entry, target_pips, stop_pips, horizon, pip
+            )
+            if ft is None:
+                break
+            # Non-overlap: resume scanning after this outcome resolved
+            i = signal_idx + ft.bars_held + 1
 
-            if tdi.shark_fin_direction == "SHORT":
-                max_profit = (entry_price - float(future["Low"].min())) / pip
-                max_loss = (float(future["High"].max()) - entry_price) / pip
-                direction = "SELL"
-            else:
-                max_profit = (float(future["High"].max()) - entry_price) / pip
-                max_loss = (entry_price - float(future["Low"].min())) / pip
-                direction = "BUY"
+            if ft.outcome == EXPIRY:
+                expiries += 1
+                continue
 
-            hit = max_profit > max_loss and max_profit > 10
-            rr = max_profit / max_loss if max_loss > 0 else 0
-
-            event = RuleEvent(
+            events.append(RuleEvent(
                 rule_name="tdi_shark_fin",
                 symbol=symbol,
-                event_time=window.index[-1].to_pydatetime(),
+                event_time=df.index[signal_idx].to_pydatetime(),
                 direction=direction,
-                outcome="HIT" if hit else "MISS",
-                pips_result=max_profit if hit else -max_loss,
-                rr_achieved=rr,
+                outcome="HIT" if ft.outcome == TARGET else "MISS",
+                pips_result=ft.pips_result,
+                rr_achieved=1.0 if ft.outcome == TARGET else -1.0,
+                time_to_outcome=ft.bars_held * 15,
                 details={
                     "shark_dir": tdi.shark_fin_direction,
                     "rsi": tdi.rsi,
-                    "vb_width": tdi.vb_width,
+                    "first_touch": ft.outcome,
                 },
-            )
-            events.append(event)
+            ))
 
         result.occurrences = len(events)
         result.hits = sum(1 for e in events if e.outcome == "HIT")
         result.misses = result.occurrences - result.hits
         result.hit_rate = result.hits / result.occurrences if result.occurrences > 0 else 0
-        result.avg_rr = float(np.mean([e.rr_achieved for e in events])) if events else 0
+        result.avg_time_min = (
+            float(np.mean([e.time_to_outcome for e in events])) if events else 0
+        )
 
+        n_buy = sum(1 for e in events if e.direction == "BUY")
+        n_sell = result.occurrences - n_buy
+        base_buy, nb = empirical_base_rate(df, "BUY", target_pips, stop_pips, horizon, pip)
+        base_sell, ns = empirical_base_rate(df, "SELL", target_pips, stop_pips, horizon, pip)
+        if result.occurrences > 0 and base_buy is not None and base_sell is not None:
+            p0 = self._clamp_rate(
+                (n_buy * base_buy + n_sell * base_sell) / result.occurrences
+            )
+        else:
+            p0 = 0.5
+        result.base_rate = p0
+        if result.occurrences > 0:
+            result.p_value = binomial_p_at_least(result.hits, result.occurrences, p0)
+
+        result.parameters["expiries_excluded"] = expiries
+        result.parameters["base_n"] = (nb or 0) + (ns or 0)
         result.notes = (
-            f"Shark Fin reversal rate: {result.hit_rate:.1%} | "
-            f"Avg RR: {result.avg_rr:.2f} | "
-            f"Total signals: {result.occurrences}"
+            f"Shark Fin first-touch: {result.hit_rate:.1%} ({result.hits}/{result.occurrences}) "
+            f"vs base {p0:.1%} | p={result.p_value:.3f} | expiries excluded: {expiries}"
+            if result.occurrences > 0 else "No shark fin signals"
         )
         result.events = events
         self._save_result(result)
@@ -729,6 +865,8 @@ class RuleValidator:
             f"NYC: {avg_moves.get('US', 0):.0f}p | "
             f"London biggest: {'YES' if london_biggest else 'NO'}"
         )
+        # Single aggregate comparison, no per-event hypothesis test.
+        result.verdict = "DESCRIPTIVE"
         self._save_result(result)
         return result
 
@@ -776,6 +914,8 @@ class RuleValidator:
         result.hit_rate = result.hits / result.occurrences if result.occurrences > 0 else 0
 
         result.notes = f"Price within ADR: {result.hit_rate:.1%} ({result.hits}/{result.occurrences})"
+        # ADR is a tautological bound (ATR measures the range) — survey only.
+        result.verdict = "DESCRIPTIVE"
         result.events = events
         self._save_result(result)
         return result
@@ -816,6 +956,9 @@ class RuleValidator:
         pivot_tp_hits = 0
         blind_tp_hits = 0
         total_tested = 0
+        # Unconditional zone-set hit counts (for the constant-prediction base rate)
+        all_m1m3_hits = 0
+        all_m2m4_hits = 0
 
         for i in range(2, len(df_d1)):
             prev = df_d1.iloc[i - 1]
@@ -841,22 +984,25 @@ class RuleValidator:
             # Where did today's HOD actually land?
             hod = curr_h
 
+            # Evaluate BOTH zone-sets on every day — the prediction is only
+            # informative if it beats always guessing the more common set.
+            in_m1m3_zones = (pivots["S2"] <= hod <= pivots["S1"]) or (pp <= hod <= pivots["R1"])
+            in_m2m4_zones = (pivots["S1"] <= hod <= pp) or (pivots["R1"] <= hod <= pivots["R2"])
+            if in_m1m3_zones:
+                all_m1m3_hits += 1
+            if in_m2m4_zones:
+                all_m2m4_hits += 1
+
             if day_type == "M1_M3":
                 m1m3_total += 1
-                # HOD should be in M1 zone (S2-S1) or M3 zone (PP-R1)
-                in_m1_zone = pivots["S2"] <= hod <= pivots["S1"]
-                in_m3_zone = pp <= hod <= pivots["R1"]
-                if in_m1_zone or in_m3_zone:
+                if in_m1m3_zones:
                     m1m3_correct += 1
                     outcome = "CORRECT"
                 else:
                     outcome = "WRONG"
             else:  # M2_M4
                 m2m4_total += 1
-                # HOD should be in M2 zone (S1-PP) or M4 zone (R1-R2)
-                in_m2_zone = pivots["S1"] <= hod <= pp
-                in_m4_zone = pivots["R1"] <= hod <= pivots["R2"]
-                if in_m2_zone or in_m4_zone:
+                if in_m2m4_zones:
                     m2m4_correct += 1
                     outcome = "CORRECT"
                 else:
@@ -909,8 +1055,21 @@ class RuleValidator:
         pivot_tp_rate = pivot_tp_hits / total_tested if total_tested > 0 else 0
         blind_tp_rate = blind_tp_hits / total_tested if total_tested > 0 else 0
 
+        # Binomial vs the best CONSTANT prediction: always guessing the
+        # unconditionally more common zone-set. The day-type map only has
+        # information if it beats that.
+        n_days = len(events)
+        if n_days > 0:
+            const_best = max(all_m1m3_hits, all_m2m4_hits) / n_days
+            result.base_rate = self._clamp_rate(const_best)
+            result.p_value = binomial_p_at_least(result.hits, n_days, result.base_rate)
+            result.parameters["const_m1m3_rate"] = all_m1m3_hits / n_days
+            result.parameters["const_m2m4_rate"] = all_m2m4_hits / n_days
+
         result.notes = (
-            f"Day-type prediction: {result.hit_rate:.1%} overall | "
+            f"Day-type prediction: {result.hit_rate:.1%} overall vs constant-best "
+            f"{result.base_rate if result.base_rate is None else f'{result.base_rate:.1%}'} "
+            f"(p={result.p_value if result.p_value is None else f'{result.p_value:.3f}'}) | "
             f"M1/M3 days: {m1m3_rate:.1%} ({m1m3_correct}/{m1m3_total}) | "
             f"M2/M4 days: {m2m4_rate:.1%} ({m2m4_correct}/{m2m4_total}) | "
             f"Pivot TP hit: {pivot_tp_rate:.1%} vs blind: {blind_tp_rate:.1%}"
@@ -954,17 +1113,18 @@ class RuleValidator:
         friday_exit_pnl = []
         hold_through_pnl = []
 
-        # Find each Friday in the data
+        # Find each Friday in the data (server trading day — D1 bars open
+        # at 21/22:00 UTC the prior day, naive weekday() is one day off)
         for i in range(1, len(df_d1)):
             bar = df_d1.iloc[i]
-            if bar.name.weekday() != 4:  # Not Friday
+            if self._d1_trading_day(bar.name).weekday() != 4:  # Not Friday
                 continue
 
             # Get Monday's open for this week
             # Look back to find Monday (weekday 0)
             mon_idx = None
             for j in range(i, max(i - 7, 0), -1):
-                if df_d1.iloc[j].name.weekday() == 0:
+                if self._d1_trading_day(df_d1.iloc[j].name).weekday() == 0:
                     mon_idx = j
                     break
             if mon_idx is None:
@@ -975,7 +1135,7 @@ class RuleValidator:
             friday_close = float(friday_bar["Close"])
 
             # Scenario 1: Exit at Friday 17:00 UTC (US session wind-down)
-            fri_date = friday_bar.name.date()
+            fri_date = self._d1_trading_day(friday_bar.name).date()
             fri_m15 = df_m15[df_m15.index.date == fri_date]
             fri_1700 = fri_m15[fri_m15.index.hour >= 17]
             if not fri_1700.empty:
@@ -999,9 +1159,6 @@ class RuleValidator:
             # If the week was up, Friday exit should capture most of the move
             # without weekend gap risk
             if abs(week_move) > 10:  # Only count meaningful weeks
-                fri_captured = fri_exit_move / week_move if week_move != 0 else 0
-                hold_captured = hold_move / week_move if week_move != 0 else 0
-
                 friday_better = abs(fri_exit_move) >= abs(hold_move)
                 friday_exit_pnl.append(fri_exit_move)
                 hold_through_pnl.append(hold_move)
@@ -1046,8 +1203,14 @@ class RuleValidator:
         gap_costs = [abs(e.details.get("gap_cost", 0)) for e in events]
         avg_gap = float(np.mean(gap_costs)) if gap_costs else 0
 
+        # Sign test: one sample per week (non-overlapping by construction).
+        result.base_rate = 0.5
+        if result.occurrences > 0:
+            result.p_value = binomial_p_at_least(result.hits, result.occurrences, 0.5)
+
         result.notes = (
-            f"Friday exit better: {result.hit_rate:.1%} ({result.hits}/{result.occurrences}) | "
+            f"Friday exit better: {result.hit_rate:.1%} ({result.hits}/{result.occurrences}, "
+            f"p={result.p_value if result.p_value is None else f'{result.p_value:.3f}'} vs 50%) | "
             f"Avg |move| fri exit: {avg_fri:.0f}p vs hold: {avg_hold:.0f}p | "
             f"Friday reversals: {reversals}/{result.occurrences} | "
             f"Avg weekend gap: {avg_gap:.1f}p"
@@ -1066,19 +1229,21 @@ class RuleValidator:
     # ==================================================================
 
     def _save_result(self, r: ValidationResult) -> None:
-        self._db.execute(
+        cursor = self._db.execute(
             """INSERT INTO validation_results
                (rule_name, symbol, test_date, occurrences, hits, misses,
                 hit_rate, avg_rr, avg_time_min, best_session, parameters,
-                notes, validated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                notes, validated_at, p_value, base_rate, bh_significant, verdict)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 r.rule_name, r.symbol, r.test_date, r.occurrences, r.hits,
                 r.misses, r.hit_rate, r.avg_rr, r.avg_time_min, r.best_session,
                 json.dumps(r.parameters), r.notes,
                 datetime.now(timezone.utc).isoformat(),
+                r.p_value, r.base_rate, int(r.bh_significant), r.verdict,
             ),
         )
+        r.db_id = cursor.lastrowid
         for e in r.events:
             self._db.execute(
                 """INSERT INTO rule_events
@@ -1142,43 +1307,87 @@ class RuleValidator:
                 logger.error("  %s: FAILED — %s", name, e)
         return results
 
+    MIN_N = 30      # below this, no verdict is rendered either way
+    BH_Q = 0.10     # FDR across the rule x pair grid
+
+    def apply_verdicts(self, results: List[ValidationResult]) -> None:
+        """Benjamini-Hochberg across the WHOLE rule x pair grid, then verdicts.
+
+        Must be called once over ALL results of a run (all pairs) — BH on
+        per-pair subsets would understate the number of tests. Verdicts:
+          VALIDATED      — BH-significant vs its base rate with n >= MIN_N
+          DEAD           — testable, n >= MIN_N, not significant. It dies.
+          INSUFFICIENT_N — n < MIN_N; not evidence either way
+          DESCRIPTIVE    — parameter survey, no hypothesis was tested
+        """
+        flags = benjamini_hochberg([r.p_value for r in results], q=self.BH_Q)
+        for r, sig in zip(results, flags, strict=True):
+            r.bh_significant = bool(sig)
+            if r.p_value is None:
+                r.verdict = r.verdict or "DESCRIPTIVE"
+            elif r.occurrences < self.MIN_N:
+                r.verdict = "INSUFFICIENT_N"
+            elif sig:
+                r.verdict = "VALIDATED"
+            else:
+                r.verdict = "DEAD"
+            if r.db_id is not None:
+                self._db.execute(
+                    "UPDATE validation_results SET bh_significant = ?, verdict = ? WHERE id = ?",
+                    (int(r.bh_significant), r.verdict, r.db_id),
+                )
+        self._db.commit()
+
     def generate_report(self) -> str:
-        """Generate a summary report from all stored validation results."""
+        """Summary report — most recent result per (rule, pair), with verdicts."""
         cursor = self._db.execute(
-            """SELECT rule_name, symbol, hit_rate, avg_rr, occurrences, notes
-               FROM validation_results
+            """SELECT rule_name, symbol, hit_rate, base_rate, p_value,
+                      occurrences, verdict, notes
+               FROM validation_results v
+               WHERE validated_at = (
+                   SELECT MAX(validated_at) FROM validation_results
+                   WHERE rule_name = v.rule_name AND symbol = v.symbol
+               )
                ORDER BY rule_name, symbol"""
         )
         rows = cursor.fetchall()
 
         lines = [
             "",
-            "=" * 90,
-            "  MMM RULE VALIDATION REPORT",
+            "=" * 110,
+            "  MMM RULE VALIDATION REPORT (first-touch / non-overlap / binomial vs base / BH-corrected)",
             f"  Generated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}",
-            "=" * 90,
+            "=" * 110,
             "",
-            f"  {'Rule':25} {'Pair':8} {'Hit Rate':>8} {'Avg RR':>7} {'N':>5}  Notes",
-            "-" * 90,
+            f"  {'Rule':22} {'Pair':8} {'Hit':>7} {'Base':>7} {'p':>7} {'N':>5} {'Verdict':14}  Notes",
+            "-" * 110,
         ]
 
+        dead = []
         for row in rows:
-            rule, sym, rate, rr, n, notes = row
-            short_notes = notes[:50] if notes else ""
+            rule, sym, rate, base, p, n, verdict, notes = row
+            base_s = f"{base:.1%}" if base is not None else "-"
+            p_s = f"{p:.3f}" if p is not None else "-"
             lines.append(
-                f"  {rule:25} {sym:8} {rate:>7.1%} {rr:>7.2f} {n:>5}  {short_notes}"
+                f"  {rule:22} {sym:8} {rate:>6.1%} {base_s:>7} {p_s:>7} {n:>5} "
+                f"{verdict or 'PENDING':14}  {(notes or '')[:38]}"
             )
+            if verdict == "DEAD":
+                dead.append(f"{rule} on {sym}")
 
         lines.append("")
-        lines.append("=" * 90)
-
-        # Status summary
+        lines.append("=" * 110)
         lines.append("")
-        lines.append("  VALIDATION STATUS LEGEND:")
-        lines.append("    VALIDATED   = hit_rate >= 60% with N >= 30")
-        lines.append("    PARTIAL     = hit_rate 40-60% or N < 30")
-        lines.append("    CONTRADICTED = hit_rate < 40% with N >= 30")
-        lines.append("    UNTESTED    = no data")
+        lines.append("  VERDICTS (audit Tier 2.4 — rules that fail die):")
+        lines.append(f"    VALIDATED      = beats its base rate, BH-significant at q={self.BH_Q} across the grid, N >= {self.MIN_N}")
+        lines.append("    DEAD           = testable with adequate N, NOT significant — do not build on this rule")
+        lines.append(f"    INSUFFICIENT_N = fewer than {self.MIN_N} resolved samples; not evidence either way")
+        lines.append("    DESCRIPTIVE    = parameter survey, no falsifiable claim tested")
+        if dead:
+            lines.append("")
+            lines.append(f"  KILL LIST ({len(dead)}):")
+            for d in dead:
+                lines.append(f"    - {d}")
         lines.append("")
 
         report = "\n".join(lines)
@@ -1211,6 +1420,9 @@ def main():
 
         pairs = [args.pair] if args.pair else list(PAIR_PROFILES.keys())
 
+        # Collect EVERYTHING first — BH must run across the whole
+        # rule x pair grid, not per pair.
+        all_results: List[ValidationResult] = []
         for pair in pairs:
             print(f"\n{'='*60}")
             print(f"  Validating: {pair} ({args.days} days)")
@@ -1223,15 +1435,20 @@ def main():
                     print(f"  Available: {', '.join(RuleValidator.ALL_RULES)}")
                     return
                 r = method(pair, args.days)
+                all_results.append(r)
                 print(f"  {r.rule_name}: {r.hit_rate:.1%} ({r.hits}/{r.occurrences})")
                 print(f"  {r.notes}")
             else:
                 results = validator.run_all(pair, args.days)
-                for r in results:
-                    status = "VALIDATED" if r.hit_rate >= 0.6 and r.occurrences >= 30 else \
-                             "PARTIAL" if r.hit_rate >= 0.4 or r.occurrences < 30 else \
-                             "CONTRADICTED"
-                    print(f"  [{status:12}] {r.rule_name:25} {r.hit_rate:>7.1%} ({r.hits}/{r.occurrences})")
+                all_results.extend(results)
+
+        validator.apply_verdicts(all_results)
+        for r in all_results:
+            p_s = f"p={r.p_value:.3f}" if r.p_value is not None else "p=-"
+            print(
+                f"  [{r.verdict:14}] {r.rule_name:22} {r.symbol:8} "
+                f"{r.hit_rate:>7.1%} ({r.hits}/{r.occurrences}) {p_s}"
+            )
 
         print("\n" + validator.generate_report())
     finally:
