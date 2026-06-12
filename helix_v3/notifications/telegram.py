@@ -17,6 +17,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from helix_v3.notifications.dispatch import fire_and_forget
 from helix_v3.utils.logger import get_logger
 
 logger = get_logger("telegram_notify")
@@ -102,7 +103,14 @@ class TelegramNotifier:
         return self._send_text(message)
 
     def _send_text(self, message: str) -> bool:
-        """Send a plain text message."""
+        """Queue a text message — fire-and-forget (audit Tier 3.2)."""
+        if not self._enabled:
+            return False
+        fire_and_forget(self._send_text_sync, message, description="Telegram text")
+        return True
+
+    def _send_text_sync(self, message: str) -> bool:
+        """Blocking text send — runs on the notify worker, never the trade path."""
         import httpx
 
         try:
@@ -140,22 +148,29 @@ class TelegramNotifier:
             return False
 
     def send_with_chart(self, message: str, chart_path: str) -> bool:
-        """Send chart image with analysis text.
+        """Queue chart image + analysis text — fire-and-forget (Tier 3.2)."""
+        if not self._enabled:
+            return False
+        fire_and_forget(
+            self._send_with_chart_sync, message, chart_path,
+            description="Telegram chart",
+        )
+        return True
+
+    def _send_with_chart_sync(self, message: str, chart_path: str) -> bool:
+        """Blocking photo+caption send — runs on the notify worker.
 
         Strategy:
         - If message <= 1024 chars: single sendPhoto with caption
         - If message > 1024 chars: sendPhoto with truncated caption,
           then full text as reply
         """
-        if not self._enabled:
-            return False
-
         import httpx
 
         img = Path(chart_path)
         if not img.exists():
             logger.warning("Chart not found: %s, sending text only", chart_path)
-            return self._send_text(message)
+            return self._send_text_sync(message)
 
         try:
             if len(message) <= _CAPTION_LIMIT:
@@ -174,7 +189,7 @@ class TelegramNotifier:
                     return True
                 else:
                     logger.error("Telegram photo send failed: %s", resp.text[:200])
-                    return self._send_text(message)
+                    return self._send_text_sync(message)
             else:
                 # Long message: send photo with short caption, then full text as reply
                 short_caption = message[:_CAPTION_LIMIT - 20] + "\n..."
@@ -205,11 +220,11 @@ class TelegramNotifier:
                     return True
                 else:
                     logger.error("Telegram photo failed: %s", resp.text[:200])
-                    return self._send_text(message)
+                    return self._send_text_sync(message)
 
         except Exception as e:
             logger.error("Telegram chart send error: %s", e)
-            return self._send_text(message)
+            return self._send_text_sync(message)
 
     # ------------------------------------------------------------------
     # Trade Setup Alert
@@ -756,7 +771,16 @@ class TelegramNotifier:
         return ok
 
     def _send_photo_only(self, chart_path: str) -> bool:
-        """Send just a photo with no caption."""
+        """Queue a captionless photo — fire-and-forget (Tier 3.2)."""
+        if not self._enabled:
+            return False
+        fire_and_forget(
+            self._send_photo_only_sync, chart_path, description="Telegram photo"
+        )
+        return True
+
+    def _send_photo_only_sync(self, chart_path: str) -> bool:
+        """Blocking photo send — runs on the notify worker."""
         import httpx
 
         try:

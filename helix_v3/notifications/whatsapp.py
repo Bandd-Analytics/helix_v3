@@ -15,6 +15,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from config.settings import settings
+from helix_v3.notifications.dispatch import fire_and_forget
 from helix_v3.utils.logger import get_logger
 
 logger = get_logger("whatsapp_notify")
@@ -80,15 +81,20 @@ class WhatsAppNotifier:
         return self._enabled
 
     def _send(self, message: str, image_path: Optional[str] = None) -> bool:
-        """Send a WhatsApp message, optionally with an attached image.
+        """Queue a WhatsApp message — fire-and-forget (audit Tier 3.2).
 
-        For image attachments, the file is uploaded to Twilio's media hosting
-        first, then the media URL is included in the message.
+        Returns True when queued. The HTTP send (30s timeout) happens on
+        the notify worker thread so it can never delay SL management;
+        failures are logged there.
         """
         if not self._enabled:
             logger.debug("WhatsApp disabled, skipping: %s", message[:80])
             return False
+        fire_and_forget(self._send_sync, message, image_path, description="WhatsApp send")
+        return True
 
+    def _send_sync(self, message: str, image_path: Optional[str] = None) -> bool:
+        """Blocking Twilio send — runs on the notify worker, never the trade path."""
         import httpx
 
         url = (

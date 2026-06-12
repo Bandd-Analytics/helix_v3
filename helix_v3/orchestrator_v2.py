@@ -14,6 +14,7 @@ Everything else (trade management, position management, reports) is identical to
 from __future__ import annotations
 
 import asyncio
+import os
 import re
 import signal
 import time
@@ -83,6 +84,9 @@ logger = get_logger("orchestrator_v2")
 SCAN_INTERVAL_SECONDS = 60
 MARKET_SCAN_INTERVAL_SECONDS = 900
 MIN_CONFLUENCE_SCORE = 50
+# Fast position-management cadence (Tier 3.2) — trailing/T1/stale/news/session
+# exits run on this clock, decoupled from the scan cycle.
+MANAGE_INTERVAL_SECONDS = int(os.getenv("MANAGE_INTERVAL_SEC", "10"))
 
 # Gatekeeper action strings that mean the position was CLOSED. Everything else
 # (TRAIL:, T1 HIT:, STALE TIGHTEN:) manages a position that is still open and
@@ -886,10 +890,50 @@ class HelixOrchestratorV2:
             )
             return
 
-        # Manage existing positions and sync journal
-        actions = self.gatekeeper.manage_open_positions()
-        self.gatekeeper.journal.sync_from_mt5()
+        # Position management lives in its own fast loop (Tier 3.2) — the
+        # scan cycle no longer touches it, so charts/vision/notifications
+        # can never delay trailing, T1, or stale exits.
 
+        # 15-minute market scan
+        now = time.monotonic()
+        if now - self._last_market_scan >= MARKET_SCAN_INTERVAL_SECONDS:
+            self._run_market_scan()
+            self._last_market_scan = now
+
+        # MTF analysis per symbol (NOT per timeframe — one top-down pass each)
+        for symbol in self._symbols:
+            await self._process_symbol(symbol)
+
+        # Send MMM narrative after all symbols are analyzed
+        if time.monotonic() - self._last_market_scan < 60:
+            # Market scan ran this cycle — send narrative with fresh data
+            self._send_mmm_narrative()
+
+    async def _manage_loop(self) -> None:
+        """Fast position-management loop (audit Tier 3.2).
+
+        Trailing / T1 / stale / news / session exits run every
+        MANAGE_INTERVAL_SECONDS, decoupled from the slow scan cycle so a
+        chart render or vision call can never delay SL management. The
+        mt5 calls inside are quick IPC; notification sends are
+        fire-and-forget threads, so one iteration is tens of ms.
+        """
+        while self._running:
+            try:
+                actions = self.gatekeeper.manage_open_positions()
+                self.gatekeeper.journal.sync_from_mt5()
+                if actions:
+                    self._handle_management_actions(actions)
+                # If the terminal is blind, drive the reconnect from here
+                # too — this loop is the position-critical path.
+                if self.watchdog.seconds_down() > MANAGE_INTERVAL_SECONDS * 2:
+                    self.watchdog.try_reconnect()
+            except Exception as e:
+                logger.error("Manage loop error: %s", e)
+            await asyncio.sleep(MANAGE_INTERVAL_SECONDS)
+
+    def _handle_management_actions(self, actions: List[str]) -> None:
+        """Notify + guard/replay bookkeeping for management actions."""
         for action in actions:
             self.notifier._send(f"HELIX V3 TRADE MGMT\n{'='*25}\n{action}")
             # Entry cooldown + replay recording apply only when the position
@@ -915,21 +959,6 @@ class HelixOrchestratorV2:
                     break
             # Track losses for persistent re-entry guard
             self._record_guard_loss_from_action(action)
-
-        # 15-minute market scan
-        now = time.monotonic()
-        if now - self._last_market_scan >= MARKET_SCAN_INTERVAL_SECONDS:
-            self._run_market_scan()
-            self._last_market_scan = now
-
-        # MTF analysis per symbol (NOT per timeframe — one top-down pass each)
-        for symbol in self._symbols:
-            await self._process_symbol(symbol)
-
-        # Send MMM narrative after all symbols are analyzed
-        if time.monotonic() - self._last_market_scan < 60:
-            # Market scan ran this cycle — send narrative with fresh data
-            self._send_mmm_narrative()
 
     def _run_market_scan(self) -> None:
         """Execute the 15-minute market condition scan with MTF context."""
@@ -1325,6 +1354,10 @@ class HelixOrchestratorV2:
         if _HAS_ROLE_REPORT:
             logger.info("\n%s", format_role_report())
 
+        # Fast position-management task (Tier 3.2): trailing/T1/stale exits
+        # on their own clock, never waiting for charts/vision/notifications.
+        manage_task = asyncio.create_task(self._manage_loop())
+
         try:
             while self._running:
                 cycle_start = time.monotonic()
@@ -1339,6 +1372,11 @@ class HelixOrchestratorV2:
                 if sleep_time > 0 and self._running:
                     await asyncio.sleep(sleep_time)
         finally:
+            manage_task.cancel()
+            try:
+                await manage_task
+            except (asyncio.CancelledError, Exception):
+                pass
             if self.scanner:
                 self.scanner.close()
             self.flashcards.close()
