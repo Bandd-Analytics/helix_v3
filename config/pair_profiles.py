@@ -12,8 +12,33 @@ Calibrated from MMM Book (Steve Mauro) methodology:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Dict, List
+from dataclasses import dataclass, replace
+from typing import Dict, List, Optional
+
+
+@dataclass(frozen=True)
+class GateRatios:
+    """Universal gate ratios — fractions of ATR(20, D1) in pips (audit Tier 2.3).
+
+    Derived 2026-06-12 from the cross-pair survey
+    (tools/manual/atr_ratio_survey.py): medians of static_gate / ATR
+    across the 13 FX pairs. The old per-pair pip constants were mostly
+    ATR proxies (FX medians were tight); XAUUSD/US30/USTEC ratios were
+    vacuous (0.003-0.07 on most gates), which is exactly why their
+    fixed-pip gates passed everything. With ratios, every instrument
+    gets real gates by construction.
+    """
+    asian_range_max: float = 0.55
+    stop_hunt_min: float = 0.30
+    stop_hunt_max: float = 1.00     # a hunt deeper than one daily range isn't a hunt
+    expected_level_move: float = 0.95
+    trail_activation: float = 0.20
+    trail_distance: float = 0.15
+    sl_buffer: float = 0.05
+    min_sl: float = 0.25
+
+
+GATE_RATIOS = GateRatios()
 
 
 @dataclass
@@ -65,6 +90,13 @@ class PairProfile:
 
     # Asian range max for valid accumulation
     asian_range_max_pips: float = 50.0
+
+    # ATR(20, D1) this profile was resolved against (Tier 2.3).
+    # 0.0 = static profile — the pip fields above are the legacy per-pair
+    # estimates, used only when ATR is unavailable and for replay/signature
+    # bucketing (keys must stay comparable with the historical libraries).
+    # >0 = the pip gate fields were computed as GATE_RATIOS x this ATR.
+    atr_pips: float = 0.0
 
     # Entry calibration advisory fields. These are used by replay/advisory reports
     # and are not live execution gates unless explicitly enforced by orchestration.
@@ -480,6 +512,38 @@ def get_pair_profile(symbol: str) -> PairProfile:
         trail_distance_pips=15.0,
         sl_buffer_pips=4.0,
         notes="Unknown pair — conservative defaults.",
+    )
+
+
+def resolve_profile(symbol: str, atr_pips: Optional[float]) -> PairProfile:
+    """ATR-resolved copy of the pair profile (audit Tier 2.3).
+
+    The eight pip-denominated gates become GATE_RATIOS x ATR(20, D1).
+    Floors are true per-instrument facts, expressed in spreads:
+      - sl_buffer  >= 1 full spread (a buffer inside the spread is noise)
+      - trail_distance >= 2 spreads (trailing closer than spread churns)
+      - min_sl     >= 4 spreads (never size off a stop the spread can eat)
+
+    Falls back to the static profile when ATR is unavailable (None/<=0).
+    """
+    pp = get_pair_profile(symbol)
+    if not atr_pips or atr_pips <= 0:
+        return pp
+
+    r = GATE_RATIOS
+    spread = pp.max_spread_pips
+    trail_distance = max(r.trail_distance * atr_pips, 2.0 * spread)
+    return replace(
+        pp,
+        atr_pips=round(atr_pips, 1),
+        asian_range_max_pips=round(r.asian_range_max * atr_pips, 1),
+        stop_hunt_min_pips=round(r.stop_hunt_min * atr_pips, 1),
+        stop_hunt_max_pips=round(r.stop_hunt_max * atr_pips, 1),
+        expected_level_move_pips=round(r.expected_level_move * atr_pips, 1),
+        trail_activation_pips=round(max(r.trail_activation * atr_pips, trail_distance), 1),
+        trail_distance_pips=round(trail_distance, 1),
+        sl_buffer_pips=round(max(r.sl_buffer * atr_pips, spread), 1),
+        min_sl_pips=round(max(r.min_sl * atr_pips, 4.0 * spread), 1),
     )
 
 

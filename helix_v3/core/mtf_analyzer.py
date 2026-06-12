@@ -39,7 +39,8 @@ from typing import Dict, List
 import numpy as np
 import pandas as pd
 
-from config.pair_profiles import PairProfile, get_pair_profile
+from config.pair_profiles import PairProfile, get_pair_profile, resolve_profile
+from helix_v3.core.volatility import d1_atr_pips
 from helix_v3.core.market_time import (
     PHASE_ACCUMULATION,
     PHASE_NYC_REVERSAL,
@@ -185,7 +186,10 @@ class MTFAnalyzer:
 
     def analyze(self, symbol: str) -> MTFAnalysis:
         """Run full top-down MTF analysis for a symbol."""
-        pp = get_pair_profile(symbol)
+        # Tier 2.3: gates scale with current volatility. The engine serves
+        # D1 as-of decision time in backtest mode, so this is look-ahead
+        # safe; if ATR is unavailable the static profile is the fallback.
+        pp = resolve_profile(symbol, d1_atr_pips(self._engine, symbol))
         now = self._current_utc()
 
         weekly = self._analyze_weekly(symbol)

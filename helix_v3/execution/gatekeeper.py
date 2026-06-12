@@ -13,7 +13,7 @@ from typing import Dict, List, Optional
 
 import MetaTrader5 as mt5
 
-from config.pair_profiles import get_pair_profile
+from config.pair_profiles import PairProfile, get_pair_profile, resolve_profile
 from config.settings import settings
 from helix_v3.core.types import (
     ConsensusResult,
@@ -21,6 +21,7 @@ from helix_v3.core.types import (
     ExecutionOrder,
     QuantSignal,
 )
+from helix_v3.core.volatility import d1_atr_pips_mt5
 from helix_v3.execution.risk_state import RiskState, _trading_day
 from helix_v3.journal.trade_journal import TradeJournal
 from helix_v3.utils.logger import get_logger
@@ -58,6 +59,13 @@ class MT5ExecutionGatekeeper:
         if info is None:
             raise ConnectionError("Cannot retrieve MT5 account info")
         return float(info.equity)
+
+    def _resolved_profile(self, symbol: str) -> PairProfile:
+        """Pair profile with gates scaled to ATR(20, D1) — Tier 2.3.
+
+        Falls back to the static profile if MT5 can't serve D1 bars.
+        """
+        return resolve_profile(symbol, d1_atr_pips_mt5(symbol))
 
     def _get_account_balance(self) -> float:
         info = mt5.account_info()
@@ -161,7 +169,7 @@ class MT5ExecutionGatekeeper:
 
         Returns the lot size, or None if no lot satisfies the risk cap.
         """
-        profile = get_pair_profile(symbol)
+        profile = self._resolved_profile(symbol)
         equity = self._get_account_equity()
         risk_pct = profile.max_risk_pct
         risk_amount = equity * risk_pct
@@ -295,7 +303,7 @@ class MT5ExecutionGatekeeper:
         # SL placement: behind structural level with sensible cap
         # Cap at expected_level_move_pips — if SL needs to be wider than one
         # full level move, the entry is too far from the formation.
-        profile = get_pair_profile(symbol)
+        profile = self._resolved_profile(symbol)
         buffer = profile.sl_buffer_pips * pip_size
         max_sl_dist = profile.expected_level_move_pips * pip_size
 
@@ -647,7 +655,7 @@ class MT5ExecutionGatekeeper:
                 self._active_orders[ticket] = order
 
             pip_size = self._get_pip_value(pos.symbol)
-            pp = get_pair_profile(pos.symbol)
+            pp = self._resolved_profile(pos.symbol)
             entry = pos.price_open
             current = pos.price_current
             duration_min = (server_time - pos.time) / 60 if server_time > pos.time else 0

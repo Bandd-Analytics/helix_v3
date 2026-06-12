@@ -19,7 +19,7 @@ from typing import Dict, List, Optional
 
 import pandas as pd
 
-from config.pair_profiles import get_pair_profile, get_tradeable_symbols
+from config.pair_profiles import PairProfile, get_pair_profile, get_tradeable_symbols
 from helix_v3.backtest.data_store import HistoricalDataStore
 from helix_v3.core.mtf_analyzer import MTFAnalyzer
 from helix_v3.core.quant_engine import MMMQuantitativeEngine
@@ -118,6 +118,10 @@ class SimulatedTrade:
     realized_dollars: float = 0.0
     advisory_grade: str = ""
     advisory_score: float = 0.0
+    # ATR-resolved profile frozen at entry (Tier 2.3) — management params
+    # (trail/stale/duration) come from entry-time volatility, not a static
+    # table and not a peek at later bars.
+    profile: Optional[PairProfile] = None
 
     def __post_init__(self):
         self.remaining_lots = self.lot_size
@@ -177,13 +181,16 @@ class TradeSimulator:
         sl_price: float,
         pip_size: float,
         pip_value_per_lot: float,
+        profile: Optional[PairProfile] = None,
     ) -> Optional[SimulatedTrade]:
         """Open a simulated trade with proper lot sizing.
 
         `entry_price` is the raw bar close — entry costs (half spread +
-        slippage, adverse direction) are applied here.
+        slippage, adverse direction) are applied here. `profile` should be
+        the ATR-resolved profile from decision time (Tier 2.3); it is
+        frozen on the trade for all management decisions.
         """
-        profile = get_pair_profile(symbol)
+        profile = profile or get_pair_profile(symbol)
 
         entry_cost = self._side_cost_pips(symbol) * pip_size
         if direction == Direction.BUY:
@@ -244,6 +251,7 @@ class TradeSimulator:
             sl_pips=sl_pips,
             pip_size=pip_size,
             pip_value_per_lot=pip_value_per_lot,
+            profile=profile,
         )
         self.open_trades.append(trade)
         return trade
@@ -268,7 +276,7 @@ class TradeSimulator:
             low = float(bar["Low"])
             close = float(bar["Close"])
             trade.last_close = close
-            profile = get_pair_profile(trade.symbol)
+            profile = trade.profile or get_pair_profile(trade.symbol)
 
             # Track MFE/MAE
             if trade.direction == Direction.BUY:
@@ -745,7 +753,8 @@ class BacktestRunner:
 
         bar = df_m15.iloc[-1]
         pip_size = self.data_store.get_pip_size(symbol)
-        profile = get_pair_profile(symbol)
+        # ATR-resolved at decision time by the MTF analyzer (Tier 2.3)
+        profile = getattr(analysis, "pair_profile", None) or get_pair_profile(symbol)
 
         # Raw bar close — entry costs (half spread + slippage, adverse side)
         # are applied inside TradeSimulator.open_trade (Tier 1.5).
@@ -796,6 +805,7 @@ class BacktestRunner:
             sl_price=sl_price,
             pip_size=pip_size,
             pip_value_per_lot=pip_value_per_lot,
+            profile=profile,
         )
 
         if trade:

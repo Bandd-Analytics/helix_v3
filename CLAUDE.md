@@ -194,6 +194,8 @@ Enterprise-grade Market Maker Method (MMM) algorithmic execution system trading 
 
 ## Pair Risk Profiles
 
+**ATR-normalized since 2026-06-12 (audit Tier 2.3):** all pip-denominated gates (Asian range max, hunt min/max, level move, trail, SL buffer, min SL) resolve at decision time as `GATE_RATIOS x ATR(20, D1)` via `resolve_profile()` in `config/pair_profiles.py` (ATR from `helix_v3/core/volatility.py`), with spread-based floors. The fixed pip values in the table below are the legacy static estimates, used only as fallback when ATR is unavailable and for replay signature bucketing.
+
 | Pair | Tier | Risk% | Hunt Range | Level Move | Trail | SL Buffer | Min SL |
 |------|------|-------|-----------|-----------|-------|-----------|--------|
 | EURUSD | Low | 1.0% | 20-40p | 70p | 15/12p | 3p | 15p |

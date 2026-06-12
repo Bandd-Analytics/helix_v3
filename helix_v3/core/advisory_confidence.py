@@ -71,7 +71,9 @@ def advisory_setup_from_mtf(
 
     symbol = str(getattr(analysis, "symbol", ""))
     direction = _enum_value(getattr(analysis, "trade_direction", "NEUTRAL"))
-    profile = get_pair_profile(symbol)
+    # Prefer the ATR-resolved profile the MTF analyzer attached (Tier 2.3)
+    # so range/hunt ratios are measured against the live gate values.
+    profile = getattr(analysis, "pair_profile", None) or get_pair_profile(symbol)
     m15 = getattr(analysis, "fifteen_min", None)
     h4 = getattr(analysis, "four_hour", None)
     h1 = getattr(analysis, "one_hour", None)
