@@ -12,6 +12,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import math
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
@@ -98,6 +99,7 @@ class SimulatedTrade:
     take_profit_2: float
     sl_pips: float
     pip_size: float
+    pip_value_per_lot: float = 10.0
     # State
     status: str = "OPEN"  # OPEN, T1_HIT, CLOSED
     exit_price: float = 0.0
@@ -108,25 +110,63 @@ class SimulatedTrade:
     max_favorable_pips: float = 0.0
     max_adverse_pips: float = 0.0
     t1_closed: bool = False
+    t1_pips: float = 0.0
     remaining_lots: float = 0.0
     current_sl: float = 0.0
+    stale_tightened: bool = False
+    last_close: float = 0.0
+    realized_dollars: float = 0.0
     advisory_grade: str = ""
     advisory_score: float = 0.0
 
     def __post_init__(self):
         self.remaining_lots = self.lot_size
         self.current_sl = self.stop_loss
+        self.last_close = self.entry_price
 
 
 class TradeSimulator:
-    """Simulates trade lifecycle bar-by-bar matching live V2 rules."""
+    """Simulates trade lifecycle bar-by-bar matching live V2 rules.
 
-    def __init__(self, initial_equity: float = 1000.0) -> None:
-        self.equity = initial_equity
-        self.peak_equity = initial_equity
+    Honest accounting (audit Tier 1.4-1.6):
+      - P&L comes from the actual computed lot x pip value, not from
+        equity-fraction shortcuts; risk is taken from equity at ENTRY.
+      - T1 partials book realized cash at the closed size immediately;
+        the remainder is all that TP2/SL can pay later.
+      - Costs: full spread (half per side) + slippage per side on every
+        fill, commission per lot per round trip at final close.
+      - SL fills at the bar OPEN when the bar gapped through the stop.
+      - Same-bar ordering is conservative: SL first, then T1, then TP2.
+      - Equity curve and the drawdown breaker are MARK-TO-MARKET.
+    """
+
+    def __init__(
+        self,
+        initial_equity: float = 1000.0,
+        slippage_pips: float = 0.5,
+        commission_per_lot: float = 0.0,
+    ) -> None:
+        self.equity = initial_equity          # realized cash
+        self.mtm_equity = initial_equity      # realized + floating
+        self.peak_equity = initial_equity     # peak of MTM equity
+        self.slippage_pips = slippage_pips
+        self.commission_per_lot = commission_per_lot
         self.open_trades: List[SimulatedTrade] = []
         self.closed_trades: List[SimulatedTrade] = []
-        self.equity_curve: List[tuple] = []  # (datetime, equity)
+        self.equity_curve: List[tuple] = []  # (datetime, mtm_equity)
+
+    # -- cost model --------------------------------------------------------
+
+    def _side_cost_pips(self, symbol: str) -> float:
+        """Half the full spread plus slippage — paid on EVERY fill side."""
+        profile = get_pair_profile(symbol)
+        return profile.max_spread_pips / 2.0 + self.slippage_pips
+
+    def _net_exit_price(self, trade: SimulatedTrade, fill_price: float) -> float:
+        cost = self._side_cost_pips(trade.symbol) * trade.pip_size
+        if trade.direction == Direction.BUY:
+            return fill_price - cost
+        return fill_price + cost
 
     def open_trade(
         self,
@@ -138,8 +178,19 @@ class TradeSimulator:
         pip_size: float,
         pip_value_per_lot: float,
     ) -> Optional[SimulatedTrade]:
-        """Open a simulated trade with proper lot sizing."""
+        """Open a simulated trade with proper lot sizing.
+
+        `entry_price` is the raw bar close — entry costs (half spread +
+        slippage, adverse direction) are applied here.
+        """
         profile = get_pair_profile(symbol)
+
+        entry_cost = self._side_cost_pips(symbol) * pip_size
+        if direction == Direction.BUY:
+            entry_price = entry_price + entry_cost
+        else:
+            entry_price = entry_price - entry_cost
+
         sl_pips = abs(entry_price - sl_price) / pip_size
 
         # Apply SL floor — widen actual SL if too tight (prevents suicide stops)
@@ -161,7 +212,8 @@ class TradeSimulator:
         # Account-proportional cap (3% hard limit)
         account_max_lot = (self.equity * 0.03) / (effective_sl * pip_value_per_lot)
         lot = min(raw_lot, profile.max_lot_size, account_max_lot)
-        lot = max(0.01, round(round(lot / 0.01) * 0.01, 2))
+        # FLOOR to lot step (matching the live gatekeeper — never round up)
+        lot = max(0.01, round(math.floor(lot / 0.01 + 1e-9) * 0.01, 2))
 
         # TP levels — calibrated from validation data
         # T1: 1:1 RR (unchanged — locks in profit)
@@ -191,12 +243,17 @@ class TradeSimulator:
             take_profit_2=tp2,
             sl_pips=sl_pips,
             pip_size=pip_size,
+            pip_value_per_lot=pip_value_per_lot,
         )
         self.open_trades.append(trade)
         return trade
 
     def process_bar(self, bar_time: datetime, bars: Dict[str, pd.Series]) -> List[str]:
-        """Process one M15 bar for all open trades. Returns action descriptions."""
+        """Process one M15 bar for all open trades. Returns action descriptions.
+
+        Same-bar ordering is conservative: SL first (assume the worst path),
+        then T1 partial, then TP2 on the remainder.
+        """
         actions = []
         still_open = []
 
@@ -206,9 +263,11 @@ class TradeSimulator:
                 still_open.append(trade)
                 continue
 
+            bar_open = float(bar["Open"])
             high = float(bar["High"])
             low = float(bar["Low"])
             close = float(bar["Close"])
+            trade.last_close = close
             profile = get_pair_profile(trade.symbol)
 
             # Track MFE/MAE
@@ -226,82 +285,23 @@ class TradeSimulator:
 
             duration_min = (bar_time - trade.entry_time).total_seconds() / 60
 
-            # --- Check SL hit ---
+            # --- 1. SL hit (gap-aware: a stop is a market order — when the
+            # bar OPENS beyond the stop it fills at the open, not the level) ---
             sl_hit = False
             if trade.direction == Direction.BUY and low <= trade.current_sl:
                 sl_hit = True
+                fill = min(bar_open, trade.current_sl)
             elif trade.direction == Direction.SELL and high >= trade.current_sl:
                 sl_hit = True
+                fill = max(bar_open, trade.current_sl)
 
             if sl_hit:
-                trade.exit_price = trade.current_sl
-                trade.exit_time = bar_time
-                trade.exit_reason = "SL_HIT"
-                trade.status = "CLOSED"
-                self._finalize_trade(trade)
+                self.close_trade(trade, fill, bar_time, "SL_HIT")
                 actions.append(f"SL HIT: {trade.symbol} {trade.pnl_pips:+.1f}p")
-                self.closed_trades.append(trade)
                 continue
 
-            # --- Check TP2 hit ---
-            tp2_hit = False
-            if trade.direction == Direction.BUY and high >= trade.take_profit_2:
-                tp2_hit = True
-            elif trade.direction == Direction.SELL and low <= trade.take_profit_2:
-                tp2_hit = True
-
-            if tp2_hit:
-                trade.exit_price = trade.take_profit_2
-                trade.exit_time = bar_time
-                trade.exit_reason = "TP2_HIT"
-                trade.status = "CLOSED"
-                self._finalize_trade(trade)
-                actions.append(f"TP2 HIT: {trade.symbol} {trade.pnl_pips:+.1f}p")
-                self.closed_trades.append(trade)
-                continue
-
-            # --- Max duration exit ---
-            if duration_min >= profile.max_duration_minutes:
-                trade.exit_price = close
-                trade.exit_time = bar_time
-                trade.exit_reason = "MAX_DURATION"
-                trade.status = "CLOSED"
-                self._finalize_trade(trade)
-                actions.append(f"TIME EXIT: {trade.symbol} {trade.pnl_pips:+.1f}p")
-                self.closed_trades.append(trade)
-                continue
-
-            # --- Tiered stale trade management ---
-            # Phase 1 (stale_minutes): Tighten SL to 50% for extended pairs
-            # Phase 2 (stale_exit_minutes): Full exit
-            stale_phase1 = profile.stale_minutes
-            stale_phase2 = getattr(profile, "stale_exit_minutes", stale_phase1)
-
-            if duration_min >= stale_phase2 and profit_pips <= 0:
-                trade.exit_price = close
-                trade.exit_time = bar_time
-                trade.exit_reason = "STALE"
-                trade.status = "CLOSED"
-                self._finalize_trade(trade)
-                actions.append(f"STALE EXIT: {trade.symbol} {trade.pnl_pips:+.1f}p at {duration_min:.0f}min")
-                self.closed_trades.append(trade)
-                continue
-
-            if (duration_min >= stale_phase1 and profit_pips <= 0
-                    and stale_phase2 > stale_phase1
-                    and not getattr(trade, "_stale_tightened", False)):
-                # Phase 1: tighten SL to half for volatile crosses
-                if trade.sl_pips > 0:
-                    half_sl = trade.sl_pips / 2.0
-                    pip_size = profile.min_sl_pips / profile.min_sl_pips if profile.min_sl_pips > 0 else 0.0001
-                    if trade.direction == Direction.BUY:
-                        trade.stop_loss = trade.entry_price - half_sl * pip_size
-                    else:
-                        trade.stop_loss = trade.entry_price + half_sl * pip_size
-                    trade._stale_tightened = True
-                    actions.append(f"STALE TIGHTEN: {trade.symbol} SL halved at {duration_min:.0f}min")
-
-            # --- T1 partial close at 1:1 RR ---
+            # --- 2. T1 partial close at 1:1 RR (checked BEFORE TP2: if both
+            # are inside one bar, T1 banked first is the conservative path) ---
             if not trade.t1_closed:
                 t1_hit = False
                 if trade.direction == Direction.BUY and high >= trade.take_profit_1:
@@ -310,13 +310,59 @@ class TradeSimulator:
                     t1_hit = True
 
                 if t1_hit:
-                    trade.t1_closed = True
-                    trade.remaining_lots = round(trade.lot_size * 0.5, 2)
-                    trade.current_sl = trade.entry_price  # SL to breakeven
-                    trade.status = "T1_HIT"
-                    actions.append(f"T1 HIT: {trade.symbol} +{fav:.1f}p, SL->BE")
+                    self._book_t1(trade)
+                    actions.append(f"T1 HIT: {trade.symbol} +{trade.t1_pips:.1f}p, SL->BE")
 
-            # --- Trailing stop (after T1) ---
+            # --- 3. TP2 hit (remainder only if T1 already banked) ---
+            tp2_hit = False
+            if trade.direction == Direction.BUY and high >= trade.take_profit_2:
+                tp2_hit = True
+            elif trade.direction == Direction.SELL and low <= trade.take_profit_2:
+                tp2_hit = True
+
+            if tp2_hit:
+                self.close_trade(trade, trade.take_profit_2, bar_time, "TP2_HIT")
+                actions.append(f"TP2 HIT: {trade.symbol} {trade.pnl_pips:+.1f}p")
+                continue
+
+            # --- 4. Max duration exit ---
+            if duration_min >= profile.max_duration_minutes:
+                self.close_trade(trade, close, bar_time, "MAX_DURATION")
+                actions.append(f"TIME EXIT: {trade.symbol} {trade.pnl_pips:+.1f}p")
+                continue
+
+            # --- 5. Tiered stale trade management ---
+            # Phase 1 (stale_minutes): Tighten SL to 50% for extended pairs
+            # Phase 2 (stale_exit_minutes): Full exit
+            stale_phase1 = profile.stale_minutes
+            stale_phase2 = getattr(profile, "stale_exit_minutes", stale_phase1)
+
+            if duration_min >= stale_phase2 and profit_pips <= 0:
+                self.close_trade(trade, close, bar_time, "STALE")
+                actions.append(f"STALE EXIT: {trade.symbol} {trade.pnl_pips:+.1f}p at {duration_min:.0f}min")
+                continue
+
+            if (duration_min >= stale_phase1 and profit_pips <= 0
+                    and stale_phase2 > stale_phase1
+                    and not trade.stale_tightened):
+                # Phase 1: tighten the LIVE stop (current_sl — exits read it)
+                # to half the original distance, in the trade's own pip size.
+                # The old code computed pip_size = min_sl/min_sl = 1.0 and
+                # wrote trade.stop_loss, which nothing reads: a double no-op.
+                if trade.sl_pips > 0:
+                    half_dist = (trade.sl_pips / 2.0) * trade.pip_size
+                    if trade.direction == Direction.BUY:
+                        new_sl = trade.entry_price - half_dist
+                        if new_sl > trade.current_sl:
+                            trade.current_sl = new_sl
+                    else:
+                        new_sl = trade.entry_price + half_dist
+                        if new_sl < trade.current_sl:
+                            trade.current_sl = new_sl
+                    trade.stale_tightened = True
+                    actions.append(f"STALE TIGHTEN: {trade.symbol} SL halved at {duration_min:.0f}min")
+
+            # --- 6. Trailing stop (after T1) ---
             if trade.t1_closed and profit_pips >= profile.trail_activation_pips:
                 if trade.direction == Direction.BUY:
                     new_sl = close - profile.trail_distance_pips * trade.pip_size
@@ -331,37 +377,77 @@ class TradeSimulator:
 
         self.open_trades = still_open
 
-        # Record equity snapshot
+        # Mark-to-market equity snapshot — drawdown must see floating losses
         unrealized = sum(self._unrealized_pnl(t) for t in self.open_trades)
-        self.equity_curve.append((bar_time, self.equity + unrealized))
+        self.mtm_equity = self.equity + unrealized
+        self.peak_equity = max(self.peak_equity, self.mtm_equity)
+        self.equity_curve.append((bar_time, self.mtm_equity))
 
         return actions
 
-    def _finalize_trade(self, trade: SimulatedTrade) -> None:
-        """Calculate final P&L and update equity."""
+    def _book_t1(self, trade: SimulatedTrade) -> None:
+        """Bank the T1 partial: realized cash for the closed half, SL to BE."""
+        net = self._net_exit_price(trade, trade.take_profit_1)
         if trade.direction == Direction.BUY:
-            trade.pnl_pips = (trade.exit_price - trade.entry_price) / trade.pip_size
+            pips = (net - trade.entry_price) / trade.pip_size
         else:
-            trade.pnl_pips = (trade.entry_price - trade.exit_price) / trade.pip_size
+            pips = (trade.entry_price - net) / trade.pip_size
 
-        # Simplified P&L: pips * lot * pip_value_per_lot (approximate)
-        # For accuracy we'd need tick_value, but this is a reasonable approximation
-        profile = get_pair_profile(trade.symbol)
-        risk_per_pip = (self.equity * profile.max_risk_pct) / trade.sl_pips if trade.sl_pips > 0 else 0
-        trade.pnl_dollars = trade.pnl_pips * (risk_per_pip / trade.sl_pips) * trade.sl_pips if trade.sl_pips > 0 else 0
+        t1_lots = round(trade.lot_size * 0.5, 2)
+        dollars = pips * trade.pip_value_per_lot * t1_lots
+        trade.realized_dollars += dollars
+        self.equity += dollars
 
-        # Simpler: use risk amount as the unit
-        # If SL hit: lose risk_amount. If TP2 hit: win risk_amount * RR
-        risk_amount = self.equity * profile.max_risk_pct
-        if trade.sl_pips > 0:
-            trade.pnl_dollars = (trade.pnl_pips / trade.sl_pips) * risk_amount
+        trade.t1_closed = True
+        trade.t1_pips = pips
+        trade.remaining_lots = round(trade.lot_size - t1_lots, 2)
+        trade.current_sl = trade.entry_price  # SL to breakeven
+        trade.status = "T1_HIT"
 
-        self.equity += trade.pnl_dollars
-        self.peak_equity = max(self.peak_equity, self.equity)
+    def close_trade(
+        self,
+        trade: SimulatedTrade,
+        fill_price: float,
+        exit_time: datetime,
+        reason: str,
+    ) -> None:
+        """Close the remaining position at fill_price (exit costs applied here)."""
+        net = self._net_exit_price(trade, fill_price)
+        if trade.direction == Direction.BUY:
+            rem_pips = (net - trade.entry_price) / trade.pip_size
+        else:
+            rem_pips = (trade.entry_price - net) / trade.pip_size
+
+        rem_dollars = rem_pips * trade.pip_value_per_lot * trade.remaining_lots
+        commission = self.commission_per_lot * trade.lot_size
+
+        trade.exit_price = net
+        trade.exit_time = exit_time
+        trade.exit_reason = reason
+        trade.status = "CLOSED"
+        trade.realized_dollars += rem_dollars - commission
+        trade.pnl_dollars = trade.realized_dollars
+
+        # Lot-weighted average pips across the T1 leg and the remainder
+        t1_lots = round(trade.lot_size - trade.remaining_lots, 2)
+        if trade.lot_size > 0:
+            trade.pnl_pips = (
+                trade.t1_pips * t1_lots + rem_pips * trade.remaining_lots
+            ) / trade.lot_size
+        else:
+            trade.pnl_pips = rem_pips
+
+        self.equity += rem_dollars - commission
+        trade.remaining_lots = 0.0
+        self.closed_trades.append(trade)
 
     def _unrealized_pnl(self, trade: SimulatedTrade) -> float:
-        """Rough unrealized P&L estimate for equity curve."""
-        return 0.0  # Conservative: don't count unrealized
+        """Mark the open remainder to the latest close."""
+        if trade.direction == Direction.BUY:
+            pips = (trade.last_close - trade.entry_price) / trade.pip_size
+        else:
+            pips = (trade.entry_price - trade.last_close) / trade.pip_size
+        return pips * trade.pip_value_per_lot * trade.remaining_lots
 
     def has_open_position(self, symbol: str) -> bool:
         return any(t.symbol == symbol for t in self.open_trades)
@@ -374,9 +460,10 @@ class TradeSimulator:
 
     @property
     def max_drawdown_pct(self) -> float:
+        """Current drawdown from peak, MARK-TO-MARKET (floating losses count)."""
         if self.peak_equity <= 0:
             return 0.0
-        return (self.peak_equity - self.equity) / self.peak_equity
+        return (self.peak_equity - self.mtm_equity) / self.peak_equity
 
 
 # ---------------------------------------------------------------------------
@@ -394,11 +481,17 @@ class BacktestRunner:
         max_concurrent: int = 3,
         verbose: bool = False,
         use_validation: bool = False,
+        slippage_pips: float = 0.5,
+        commission_per_lot: float = 0.0,
     ) -> None:
         self.data_store = data_store
         self.engine = BacktestEngine(data_store)
         self.mtf = MTFAnalyzer(self.engine)
-        self.simulator = TradeSimulator(initial_equity)
+        self.simulator = TradeSimulator(
+            initial_equity,
+            slippage_pips=slippage_pips,
+            commission_per_lot=commission_per_lot,
+        )
         self.min_confluence = min_confluence
         self.max_concurrent = max_concurrent
         self.verbose = verbose
@@ -508,17 +601,11 @@ class BacktestRunner:
                 )
 
         # Close any remaining open trades at last bar
+        end_time = sorted_times[-1].to_pydatetime().replace(tzinfo=timezone.utc) + timedelta(minutes=15)
         for trade in list(self.simulator.open_trades):
             last_bar = current_bars.get(trade.symbol)
-            if last_bar is not None:
-                trade.exit_price = float(last_bar["Close"])
-            else:
-                trade.exit_price = trade.entry_price
-            trade.exit_time = sorted_times[-1].to_pydatetime().replace(tzinfo=timezone.utc) + timedelta(minutes=15)
-            trade.exit_reason = "BACKTEST_END"
-            trade.status = "CLOSED"
-            self.simulator._finalize_trade(trade)
-            self.simulator.closed_trades.append(trade)
+            fill = float(last_bar["Close"]) if last_bar is not None else trade.entry_price
+            self.simulator.close_trade(trade, fill, end_time, "BACKTEST_END")
         self.simulator.open_trades.clear()
 
         logger.info(
@@ -640,14 +727,9 @@ class BacktestRunner:
         pip_size = self.data_store.get_pip_size(symbol)
         profile = get_pair_profile(symbol)
 
-        # Simulate spread (half spread on each side)
-        spread_pips = profile.max_spread_pips * 0.5  # Use half of max as typical
-        spread = spread_pips * pip_size
-
-        if direction == Direction.BUY:
-            entry_price = float(bar["Close"]) + spread / 2
-        else:
-            entry_price = float(bar["Close"]) - spread / 2
+        # Raw bar close — entry costs (half spread + slippage, adverse side)
+        # are applied inside TradeSimulator.open_trade (Tier 1.5).
+        entry_price = float(bar["Close"])
 
         # SL from session bounds (Asian range) with sensible cap
         # Per MMM: SL goes behind the formation that invalidates the trade.
@@ -810,6 +892,12 @@ def main(argv: Optional[list] = None) -> None:
     parser.add_argument("--min-confluence", type=int, default=55, help="Min confluence score")
     parser.add_argument("--max-positions", type=int, default=3, help="Max concurrent positions")
     parser.add_argument("--verbose", "-v", action="store_true", help="Detailed trade logging")
+    parser.add_argument("--slippage", type=float, default=0.5,
+                        help="Slippage in pips per fill side (default 0.5)")
+    parser.add_argument("--slippage-mult", type=float, default=1.0,
+                        help="Slippage stress multiplier: run at 0/1/2 to bracket the edge")
+    parser.add_argument("--commission", type=float, default=0.0,
+                        help="Commission per lot per round trip in account currency")
     parser.add_argument("--validation", action="store_true",
                         help="Only enter setups matched by validation library (proven patterns)")
     parser.add_argument("--compare", action="store_true",
@@ -857,6 +945,8 @@ def main(argv: Optional[list] = None) -> None:
             min_confluence=args.min_confluence,
             max_concurrent=args.max_positions,
             verbose=args.verbose,
+            slippage_pips=args.slippage * args.slippage_mult,
+            commission_per_lot=args.commission,
             use_validation=False,
         )
         runner_base.run()
@@ -871,6 +961,8 @@ def main(argv: Optional[list] = None) -> None:
             min_confluence=args.min_confluence,
             max_concurrent=args.max_positions,
             verbose=args.verbose,
+            slippage_pips=args.slippage * args.slippage_mult,
+            commission_per_lot=args.commission,
             use_validation=True,
         )
         runner_val.run()
@@ -911,6 +1003,8 @@ def main(argv: Optional[list] = None) -> None:
         min_confluence=args.min_confluence,
         max_concurrent=args.max_positions,
         verbose=args.verbose,
+        slippage_pips=args.slippage * args.slippage_mult,
+        commission_per_lot=args.commission,
         use_validation=args.validation,
     )
     runner.run()
