@@ -2,13 +2,20 @@
 
 from __future__ import annotations
 
+import math
 from collections import defaultdict
 from datetime import datetime
+from statistics import NormalDist
 from typing import List
 
 import numpy as np
 
 from helix_v3.backtest.engine import TradeSimulator, SimulatedTrade
+
+# Assumed number of strategy configurations tried during research/calibration.
+# The Deflated Sharpe Ratio corrects for selection across trials; with ~450
+# tunable parameters this default is, if anything, generous to the strategy.
+DEFAULT_N_TRIALS = 50
 
 
 def compute_metrics(trades: List[SimulatedTrade]) -> dict:
@@ -33,10 +40,14 @@ def compute_metrics(trades: List[SimulatedTrade]) -> dict:
 
     all_pnl = [t.pnl_pips for t in trades]
     expectancy = np.mean(all_pnl)
-    std = np.std(all_pnl) if len(all_pnl) > 1 else 1.0
-    sharpe = (expectancy / std) * np.sqrt(252) if std > 0 else 0
 
-    # Max drawdown from dollar P&L sequence
+    # NOTE: no "Sharpe" here. The old per-trade-pips x sqrt(252) formula
+    # treated every trade as a daily return and mixed pips across pairs —
+    # a 0.28-sigma per-trade edge mechanically printed "4.37". The real
+    # Sharpe comes from equity_curve_metrics() on daily MTM dollar returns.
+
+    # Max drawdown from realized dollar P&L sequence (per-group fallback;
+    # the MTM curve drawdown in equity_curve_metrics is authoritative)
     cumulative = np.cumsum([t.pnl_dollars for t in trades])
     peak = np.maximum.accumulate(cumulative)
     drawdowns = peak - cumulative
@@ -51,7 +62,6 @@ def compute_metrics(trades: List[SimulatedTrade]) -> dict:
         "avg_loss": float(avg_loss),
         "profit_factor": profit_factor,
         "expectancy": float(expectancy),
-        "sharpe": sharpe,
         "max_dd_dollars": max_dd_dollars,
         "gross_profit": gross_profit,
         "gross_loss": gross_loss,
@@ -59,6 +69,91 @@ def compute_metrics(trades: List[SimulatedTrade]) -> dict:
         "avg_mfe": float(np.mean([t.max_favorable_pips for t in trades])),
         "avg_mae": float(np.mean([t.max_adverse_pips for t in trades])),
     }
+
+
+def equity_curve_metrics(equity_curve: List[tuple]) -> dict:
+    """Daily dollar-return Sharpe, return-moment shape, and MTM drawdown.
+
+    The curve is (timestamp, mark-to-market equity) snapshots. Daily returns
+    use the last snapshot of each UTC day; drawdown uses every snapshot so
+    intraday floating excursions count.
+    """
+    empty = {
+        "daily_sharpe": 0.0, "n_days": 0, "skew": 0.0, "kurtosis": 3.0,
+        "max_dd_pct": 0.0, "max_dd_dollars": 0.0, "sharpe_daily_raw": 0.0,
+    }
+    if not equity_curve or len(equity_curve) < 2:
+        return empty
+
+    eq = np.array([e for _, e in equity_curve], dtype=float)
+    peak = np.maximum.accumulate(eq)
+    dd = peak - eq
+    with np.errstate(divide="ignore", invalid="ignore"):
+        dd_pct = np.where(peak > 0, dd / peak, 0.0)
+    max_dd_dollars = float(dd.max())
+    max_dd_pct = float(dd_pct.max()) * 100.0
+
+    # Last MTM equity of each UTC day -> daily returns
+    daily: dict = {}
+    for ts, e in equity_curve:
+        daily[ts.date()] = e
+    vals = np.array(list(daily.values()), dtype=float)
+    if len(vals) < 3 or np.any(vals[:-1] <= 0):
+        return {**empty, "max_dd_pct": max_dd_pct, "max_dd_dollars": max_dd_dollars}
+
+    rets = np.diff(vals) / vals[:-1]
+    std = rets.std(ddof=1)
+    sr_daily = float(rets.mean() / std) if std > 0 else 0.0
+
+    mu = rets.mean()
+    m2 = ((rets - mu) ** 2).mean()
+    if m2 > 0:
+        skew = float(((rets - mu) ** 3).mean() / m2 ** 1.5)
+        kurt = float(((rets - mu) ** 4).mean() / m2 ** 2)
+    else:
+        skew, kurt = 0.0, 3.0
+
+    return {
+        "daily_sharpe": sr_daily * math.sqrt(252),
+        "sharpe_daily_raw": sr_daily,
+        "n_days": len(rets),
+        "skew": skew,
+        "kurtosis": kurt,
+        "max_dd_pct": max_dd_pct,
+        "max_dd_dollars": max_dd_dollars,
+    }
+
+
+def deflated_sharpe_probability(
+    sharpe_daily: float,
+    n_obs: int,
+    skew: float = 0.0,
+    kurtosis: float = 3.0,
+    n_trials: int = DEFAULT_N_TRIALS,
+) -> float:
+    """Deflated Sharpe Ratio (Bailey & Lopez de Prado, 2014).
+
+    Probability that the observed (non-annualized, daily) Sharpe exceeds the
+    expected MAXIMUM Sharpe of `n_trials` skill-less strategies — i.e. the
+    chance this result is not just selection bias. The variance of trial
+    Sharpes is approximated by the SR estimator variance (the trial SRs
+    themselves were not recorded during calibration).
+    """
+    if n_obs < 3:
+        return 0.0
+    nd = NormalDist()
+    euler_gamma = 0.5772156649015329
+
+    sr_var = (1 - skew * sharpe_daily + (kurtosis - 1) / 4 * sharpe_daily**2) / (n_obs - 1)
+    sr_std = math.sqrt(max(sr_var, 1e-12))
+    n_trials = max(int(n_trials), 2)
+    z1 = nd.inv_cdf(1 - 1 / n_trials)
+    z2 = nd.inv_cdf(1 - 1 / (n_trials * math.e))
+    sr0 = sr_std * ((1 - euler_gamma) * z1 + euler_gamma * z2)
+
+    denom = math.sqrt(max(1 - skew * sharpe_daily + (kurtosis - 1) / 4 * sharpe_daily**2, 1e-12))
+    z = (sharpe_daily - sr0) * math.sqrt(n_obs - 1) / denom
+    return nd.cdf(z)
 
 
 def per_pair_breakdown(trades: List[SimulatedTrade]) -> dict:
@@ -116,6 +211,12 @@ def print_backtest_report(
         print("=" * 80)
         return
 
+    curve = equity_curve_metrics(simulator.equity_curve)
+    dsr = deflated_sharpe_probability(
+        curve["sharpe_daily_raw"], curve["n_days"],
+        curve["skew"], curve["kurtosis"],
+    )
+
     # Overall metrics
     print(f"""
   OVERALL METRICS
@@ -126,9 +227,10 @@ def print_backtest_report(
   Avg Loss:        {metrics['avg_loss']:.1f} pips
   Profit Factor:   {metrics['profit_factor']:.2f}
   Expectancy:      {metrics['expectancy']:+.1f} pips/trade
-  Sharpe Ratio:    {metrics['sharpe']:.2f}
+  Sharpe (daily $ returns, annualized): {curve['daily_sharpe']:.2f}  (n={curve['n_days']} days)
+  Deflated Sharpe prob.: {dsr:.2f}  (vs max of {DEFAULT_N_TRIALS} assumed trials; >0.95 = likely real)
   Net P&L:         ${metrics['net_pnl']:+.2f}
-  Max Drawdown:    ${metrics['max_dd_dollars']:.2f}
+  Max Drawdown:    {curve['max_dd_pct']:.1f}% (${curve['max_dd_dollars']:.2f}, mark-to-market)
   Avg MFE:         {metrics['avg_mfe']:.1f} pips
   Avg MAE:         {metrics['avg_mae']:.1f} pips
   Final Equity:    ${simulator.equity:.2f}
