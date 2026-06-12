@@ -350,6 +350,79 @@ def test_execute_order_aborts_when_order_check_fails(monkeypatch) -> None:
     assert order.status == "REJECTED"
 
 
+def _orphan_position(sl: float, current: float = 1.1020) -> SimpleNamespace:
+    now = int(datetime.now(timezone.utc).timestamp())
+    return SimpleNamespace(
+        magic=314159,
+        ticket=909,
+        symbol="EURUSD",
+        type=0,  # BUY
+        volume=0.05,
+        price_open=1.1000,
+        price_current=current,
+        sl=sl,
+        tp=1.1040,
+        time=now - 10 * 60,  # 10 min old — no time/stale exits
+    )
+
+
+def _patch_manage_env(monkeypatch, gatekeeper, position) -> tuple:
+    partial_closes: list = []
+    sl_modifies: list = []
+    monkeypatch.setattr(gatekeeper_mod.mt5, "positions_get", lambda: [position])
+    monkeypatch.setattr(
+        gatekeeper_mod.mt5,
+        "symbol_info_tick",
+        lambda symbol: SimpleNamespace(
+            time=int(datetime.now(timezone.utc).timestamp()), ask=1.1021, bid=1.1020
+        ),
+    )
+    monkeypatch.setattr(gatekeeper, "_get_pip_value", lambda symbol: 0.0001)
+    monkeypatch.setattr(
+        gatekeeper, "_partial_close",
+        lambda pos, volume: partial_closes.append((pos.ticket, volume)) or True,
+    )
+    monkeypatch.setattr(
+        gatekeeper, "_modify_sl",
+        lambda ticket, symbol, new_sl: sl_modifies.append((ticket, new_sl)) or True,
+    )
+    # Pin the session so the session-exit rule can't fire during the test
+    import helix_v3.scanner.market_scanner as scanner_mod
+    monkeypatch.setattr(scanner_mod, "_get_session_name", lambda: "LONDON")
+    return partial_closes, sl_modifies
+
+
+def test_orphan_adoption_at_breakeven_does_not_refire_t1(monkeypatch) -> None:
+    """Regression: a post-T1 position (SL at entry) got take_profit_1=entry
+    reconstructed on restart, firing a second 50% partial close every time."""
+    gatekeeper = _gatekeeper()
+    gatekeeper._risk_cfg = gatekeeper_mod.settings.risk
+    position = _orphan_position(sl=1.1000)  # breakeven SL = post-T1
+    partial_closes, _ = _patch_manage_env(monkeypatch, gatekeeper, position)
+
+    gatekeeper.manage_open_positions()
+
+    adopted = gatekeeper._active_orders[909]
+    assert adopted.status == "T1_HIT"
+    assert partial_closes == []  # no second partial close
+
+
+def test_orphan_adoption_pre_t1_reconstructs_t1_from_sl_distance(monkeypatch) -> None:
+    gatekeeper = _gatekeeper()
+    gatekeeper._risk_cfg = gatekeeper_mod.settings.risk
+    # SL 15 pips below entry, price barely moved — normal pre-T1 position
+    position = _orphan_position(sl=1.0985, current=1.1002)
+    partial_closes, _ = _patch_manage_env(monkeypatch, gatekeeper, position)
+
+    gatekeeper.manage_open_positions()
+
+    adopted = gatekeeper._active_orders[909]
+    assert adopted.status == "FILLED"
+    assert abs(adopted.take_profit_1 - 1.1015) < 1e-9
+    assert abs(adopted.sl_pips - 15.0) < 1e-6
+    assert partial_closes == []
+
+
 def _orchestrator(direction: Direction = Direction.SELL) -> tuple:
     """Bare orchestrator with a recording guard and one active GBPJPY order."""
     orchestrator = HelixOrchestratorV2.__new__(HelixOrchestratorV2)

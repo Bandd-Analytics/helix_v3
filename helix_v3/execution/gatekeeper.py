@@ -615,16 +615,34 @@ class MT5ExecutionGatekeeper:
                     stop_loss=pos.sl, take_profit_1=0, take_profit_2=pos.tp,
                     sl_pips=0, risk_reward=0, ticket=ticket, status="FILLED",
                 )
-                # Reconstruct T1 from SL/TP
                 pip_size = self._get_pip_value(pos.symbol)
                 sl_dist = abs(pos.price_open - pos.sl)
-                if direction == Direction.BUY:
-                    order.take_profit_1 = pos.price_open + sl_dist
+                # SL at/past breakeven (in the profit direction) means T1
+                # already fired or the trade is trailing. Reconstructing
+                # take_profit_1 = entry here re-fired a 50% partial close on
+                # EVERY restart.
+                breakeven_tol = pip_size  # within 1 pip of entry = breakeven
+                sl_at_or_past_entry = pos.sl != 0 and (
+                    (direction == Direction.BUY and pos.sl >= pos.price_open - breakeven_tol)
+                    or (direction == Direction.SELL and pos.sl <= pos.price_open + breakeven_tol)
+                )
+                if sl_at_or_past_entry:
+                    order.status = "T1_HIT"
+                    order.take_profit_1 = pos.price_open
+                    order.sl_pips = 0.0
+                    logger.info(
+                        "Adopted post-T1 position: %s ticket=%d (SL at/past breakeven, resuming trail)",
+                        pos.symbol, ticket,
+                    )
                 else:
-                    order.take_profit_1 = pos.price_open - sl_dist
-                order.sl_pips = sl_dist / pip_size
+                    # Pre-T1: reconstruct T1 at 1:1 RR from the SL distance
+                    if direction == Direction.BUY:
+                        order.take_profit_1 = pos.price_open + sl_dist
+                    else:
+                        order.take_profit_1 = pos.price_open - sl_dist
+                    order.sl_pips = sl_dist / pip_size
+                    logger.info("Adopted orphaned position: %s ticket=%d", pos.symbol, ticket)
                 self._active_orders[ticket] = order
-                logger.info("Adopted orphaned position: %s ticket=%d", pos.symbol, ticket)
 
             pip_size = self._get_pip_value(pos.symbol)
             pp = get_pair_profile(pos.symbol)
