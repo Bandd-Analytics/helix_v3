@@ -4,6 +4,12 @@ Generated: 2026-06-09T15:36:08.183888+00:00
 
 This is an observation basket only. It does not promote validation-library records, place trades, or approve live execution.
 
+Follow-up audit:
+
+- Rank #1 GBPJPY early-week L3 stop-hunt was audited in
+  [GBPJPY_EARLY_WEEK_L3_STOP_HUNT_HARDENING.md](./GBPJPY_EARLY_WEEK_L3_STOP_HUNT_HARDENING.md).
+  Decision remains `DEMO_ALERT`, not live-auto-entry.
+
 | Rank | Mode | Pair | Dir | Tier | RRS | N | Fav% | AvgExit | PF | Payoff | Splits | Session | Day | Setup |
 |---:|---|---|---|---|---|---:|---:|---:|---:|---:|---:|---|---|---|
 | 1 | DEMO_ALERT | GBPJPY | BUY | DEMO_CANDIDATE | R_RUNNER | 10 | 90.0% | +18.4 | 69.22 | 7.69 | 3/3 | STOP_HUNT | Monday | `THE_33_MW|BUY|EARLY_WEEK|L3|STOP_HUNT|AR_VALID|HUNT_PAIR_RANGE|PUSH3_...` |
