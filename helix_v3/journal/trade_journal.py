@@ -407,15 +407,35 @@ class TradeJournal:
     def sync_from_mt5(self) -> Dict[str, int]:
         """Sync journal with MT5 positions and deal history.
 
-        - Updates P&L on open trades
-        - Detects and records closed trades from MT5 deal history
+        - Back-fills broker positions the journal doesn't know (Tier 3.4)
+        - Detects and records closed trades from MT5 deal history,
+          summing ALL deals per position (entry commission + every
+          partial leg's profit/commission/swap)
         Returns dict with counts of actions taken.
         """
         import MetaTrader5 as mt5
 
-        stats = {"updated": 0, "closed": 0}
+        stats = {"updated": 0, "closed": 0, "backfilled": 0}
 
-        # Get all open journal trades without exit
+        positions = mt5.positions_get()
+
+        # Tier 3.4: a broker position missing from the journal (journaling
+        # failed at entry, adopted orphan, manual trade with our magic)
+        # would otherwise NEVER get its close recorded. Back-fill a minimal
+        # row first so the close-detection below owns it from now on.
+        known_tickets = {
+            r["ticket"]
+            for r in self._conn.execute(
+                "SELECT ticket FROM trades WHERE ticket IS NOT NULL"
+            ).fetchall()
+        }
+        if positions:
+            for pos in positions:
+                if pos.magic == 314159 and pos.ticket not in known_tickets:
+                    self._backfill_position(pos)
+                    stats["backfilled"] += 1
+
+        # Get all open journal trades without exit (includes back-fills)
         open_trades = self._conn.execute(
             "SELECT id, ticket, symbol, direction, entry_price, lot_size "
             "FROM trades WHERE closed_at IS NULL AND ticket IS NOT NULL"
@@ -424,7 +444,6 @@ class TradeJournal:
         open_tickets = {row["ticket"] for row in open_trades}
 
         # Check which are still open in MT5
-        positions = mt5.positions_get()
         mt5_open_tickets = set()
         if positions:
             for pos in positions:
@@ -440,9 +459,6 @@ class TradeJournal:
             if not deals or len(deals) < 2:
                 continue
 
-            # The closing deal is the last one
-            close_deal = deals[-1]
-
             row = self._conn.execute(
                 "SELECT direction, entry_price, lot_size, symbol FROM trades WHERE ticket = ?",
                 (ticket,),
@@ -455,7 +471,25 @@ class TradeJournal:
             entry = row["entry_price"]
             symbol = row["symbol"]
 
-            exit_price = close_deal.price
+            # Tier 3.4: sum ALL deals of the position. The old code read
+            # only the LAST deal — a T1 partial leg's profit/commission/
+            # swap and the entry deal's commission were silently dropped,
+            # misstating every trade that took a partial.
+            gross = float(sum(d.profit for d in deals))
+            commission = float(sum(d.commission for d in deals))
+            swap_val = float(sum(d.swap for d in deals))
+
+            # Exit price = lot-weighted average over the closing legs
+            out_deals = [
+                d for d in deals
+                if getattr(d, "entry", None) == mt5.DEAL_ENTRY_OUT
+            ] or [deals[-1]]
+            out_vol = float(sum(d.volume for d in out_deals))
+            if out_vol > 0:
+                exit_price = sum(d.price * d.volume for d in out_deals) / out_vol
+            else:
+                exit_price = float(out_deals[-1].price)
+
             pip_size_info = mt5.symbol_info(symbol)
             if pip_size_info:
                 point = pip_size_info.point
@@ -468,13 +502,7 @@ class TradeJournal:
             else:
                 pips = (entry - exit_price) / pip_size
 
-            gross = close_deal.profit
-            commission = close_deal.commission
-            swap_val = close_deal.swap
-
-            reason = "SL" if close_deal.comment and "sl" in close_deal.comment.lower() else \
-                     "TP" if close_deal.comment and "tp" in close_deal.comment.lower() else \
-                     "MANUAL"
+            reason = self._classify_close_reason(out_deals[-1])
 
             info = mt5.account_info()
             eq_after = info.equity if info else None
@@ -492,6 +520,73 @@ class TradeJournal:
             stats["closed"] += 1
 
         return stats
+
+    # Final-deal classification (Tier 3.4): broker REASON codes first, then
+    # OUR OWN close comments — never broker comment substrings ("sl" matched
+    # inside arbitrary broker text and mislabeled closes).
+    _HELIX_CLOSE_LABELS = (
+        ("HelixV3_T1_partial", "T1_PARTIAL"),  # legacy comment, before _T1
+        ("HelixV3_T1", "T1_PARTIAL"),
+        ("HelixV3_news", "NEWS_EXIT"),
+        ("HelixV3_maxdur", "TIME_EXIT"),
+        ("HelixV3_stale", "STALE_EXIT"),
+        ("HelixV3_session", "SESSION_EXIT"),
+        ("HelixV3_emergency", "EMERGENCY"),
+        ("HelixV3_close", "HELIX_CLOSE"),
+    )
+
+    @classmethod
+    def _classify_close_reason(cls, deal) -> str:
+        import MetaTrader5 as mt5
+
+        reason = getattr(deal, "reason", None)
+        if reason == getattr(mt5, "DEAL_REASON_SL", 4):
+            return "SL"
+        if reason == getattr(mt5, "DEAL_REASON_TP", 5):
+            return "TP"
+        if reason == getattr(mt5, "DEAL_REASON_SO", 6):
+            return "STOP_OUT"
+
+        comment = str(getattr(deal, "comment", "") or "")
+        for prefix, label in cls._HELIX_CLOSE_LABELS:
+            if comment.startswith(prefix):
+                return label
+        return "MANUAL"
+
+    def _backfill_position(self, pos) -> None:
+        """Minimal journal row for a broker position we don't know (Tier 3.4).
+
+        Entry context is unknowable after the fact — the row is flagged
+        setup_type=BACKFILL so analytics can separate it; what matters is
+        that the eventual close gets recorded with full deal accounting.
+        """
+        from helix_v3.core.market_time import server_epoch_to_utc
+
+        direction = "BUY" if pos.type == 0 else "SELL"
+        try:
+            opened_at = server_epoch_to_utc(float(pos.time)).isoformat()
+        except Exception:
+            opened_at = datetime.now(timezone.utc).isoformat()
+
+        self._conn.execute(
+            """INSERT OR IGNORE INTO trades
+               (ticket, symbol, timeframe, direction, setup_type, lot_size,
+                entry_price, stop_loss, take_profit_1, take_profit_2,
+                sl_pips, risk_reward, opened_at, notes)
+               VALUES (?, ?, 'M15', ?, 'BACKFILL', ?, ?, ?, ?, ?, 0, 0, ?, ?)""",
+            (
+                pos.ticket, pos.symbol, direction, pos.volume,
+                pos.price_open, pos.sl or 0.0, pos.tp or 0.0, pos.tp or 0.0,
+                opened_at,
+                "Back-filled from broker — journal had no record of this position",
+            ),
+        )
+        self._conn.commit()
+        logger.warning(
+            "JOURNAL BACKFILL: %s %s ticket=%d %.2f lots @ %.5f — "
+            "position existed on broker without a journal row",
+            direction, pos.symbol, pos.ticket, pos.volume, pos.price_open,
+        )
 
     # ------------------------------------------------------------------
     # Queries & Analytics

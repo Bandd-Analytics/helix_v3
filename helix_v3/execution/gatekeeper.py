@@ -852,7 +852,7 @@ class MT5ExecutionGatekeeper:
                         pos.symbol, ticket, profit_pips, news_ev.currency,
                         news_ev.title, news_ev.time_utc.strftime("%H:%M UTC"),
                     )
-                    self._partial_close(pos, pos.volume)
+                    self._partial_close(pos, pos.volume, comment="HelixV3_news")
                     actions.append(
                         f"NEWS EXIT: {pos.symbol} {order.direction.value} ticket={ticket} "
                         f"{profit_pips:+.1f} pips before {news_ev.currency} {news_ev.title}"
@@ -879,7 +879,7 @@ class MT5ExecutionGatekeeper:
                     "MAX DURATION EXIT: %s ticket=%d after %.0f min (limit=%d) pips=%+.1f",
                     pos.symbol, ticket, duration_min, max_dur, profit_pips,
                 )
-                self._partial_close(pos, pos.volume)
+                self._partial_close(pos, pos.volume, comment="HelixV3_maxdur")
                 actions.append(
                     f"TIME EXIT: {pos.symbol} {order.direction.value} ticket={ticket} after {duration_min:.0f}min pips={profit_pips:+.1f}"
                 )
@@ -900,7 +900,7 @@ class MT5ExecutionGatekeeper:
                     "STALE EXIT (Phase 2): %s ticket=%d | %+.1f pips after %.0f min (limit=%d) — closing",
                     pos.symbol, ticket, profit_pips, duration_min, stale_phase2,
                 )
-                self._partial_close(pos, pos.volume)
+                self._partial_close(pos, pos.volume, comment="HelixV3_stale")
                 actions.append(
                     f"STALE EXIT: {pos.symbol} {order.direction.value} ticket={ticket} {profit_pips:+.1f} pips after {duration_min:.0f}min"
                 )
@@ -939,7 +939,7 @@ class MT5ExecutionGatekeeper:
                     "STALE EXIT: %s ticket=%d | %+.1f pips after %.0f min (not in profit) — closing",
                     pos.symbol, ticket, profit_pips, duration_min,
                 )
-                self._partial_close(pos, pos.volume)
+                self._partial_close(pos, pos.volume, comment="HelixV3_stale")
                 actions.append(
                     f"STALE EXIT: {pos.symbol} {order.direction.value} ticket={ticket} {profit_pips:+.1f} pips after {duration_min:.0f}min"
                 )
@@ -956,7 +956,7 @@ class MT5ExecutionGatekeeper:
                         "SESSION EXIT: %s ticket=%d closing before %s | pips=%+.1f",
                         pos.symbol, ticket, close_session, profit_pips,
                     )
-                    self._partial_close(pos, pos.volume)
+                    self._partial_close(pos, pos.volume, comment="HelixV3_session")
                     actions.append(
                         f"SESSION EXIT: {pos.symbol} {order.direction.value} ticket={ticket} before {close_session} pips={profit_pips:+.1f}"
                     )
@@ -969,7 +969,7 @@ class MT5ExecutionGatekeeper:
                     pos.volume * self._risk_cfg.partial_close_ratio, 2
                 )
                 if close_volume >= 0.01:
-                    self._partial_close(pos, close_volume)
+                    self._partial_close(pos, close_volume, comment="HelixV3_T1")
                     order.status = "T1_HIT"
                     just_hit_t1 = True
 
@@ -1062,7 +1062,12 @@ class MT5ExecutionGatekeeper:
 
         return actions
 
-    def _partial_close(self, position, volume: float) -> bool:
+    def _partial_close(
+        self, position, volume: float, comment: str = "HelixV3_close"
+    ) -> bool:
+        """Close (part of) a position. `comment` identifies WHICH Helix rule
+        closed it — the journal classifies exits from our own comments
+        instead of broker comment substrings (Tier 3.4)."""
         close_type = (
             mt5.ORDER_TYPE_SELL
             if position.type == mt5.ORDER_TYPE_BUY
@@ -1083,7 +1088,7 @@ class MT5ExecutionGatekeeper:
             "price": price,
             "deviation": self._deviation_points(position.symbol),
             "magic": 314159,
-            "comment": "HelixV3_T1_partial",
+            "comment": comment,
             "type_time": mt5.ORDER_TIME_GTC,
             "type_filling": self._filling_mode(position.symbol),
         }
@@ -1203,7 +1208,7 @@ class MT5ExecutionGatekeeper:
         for pos in positions:
             if pos.magic != 314159:
                 continue
-            if self._partial_close(pos, pos.volume):
+            if self._partial_close(pos, pos.volume, comment="HelixV3_emergency"):
                 closed += 1
                 logger.info("Emergency closed: %s ticket=%d", pos.symbol, pos.ticket)
 

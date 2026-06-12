@@ -115,7 +115,10 @@ def test_manage_open_positions_uses_wall_clock_when_mt5_time_is_unavailable(monk
     monkeypatch.setattr(gatekeeper_mod.mt5, "positions_get", lambda: [position])
     monkeypatch.setattr(gatekeeper_mod.mt5, "symbol_info_tick", lambda symbol: None)
     monkeypatch.setattr(gatekeeper, "_get_pip_value", lambda symbol: 0.0001)
-    monkeypatch.setattr(gatekeeper, "_partial_close", lambda pos, volume: closed.append((pos.ticket, volume)) or True)
+    monkeypatch.setattr(
+        gatekeeper, "_partial_close",
+        lambda pos, volume, **kw: closed.append((pos.ticket, volume)) or True,
+    )
 
     actions = gatekeeper.manage_open_positions()
 
