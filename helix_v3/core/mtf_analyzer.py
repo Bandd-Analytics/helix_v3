@@ -440,14 +440,15 @@ class MTFAnalyzer:
         hunt_dir = Direction.NEUTRAL
         hunt_pips = 0.0
 
-        # Scan all post-Asian bars for maximum breach
+        # Scan all post-Asian bars for maximum breach (clamped at 0 — a
+        # "negative breach" is no breach, not a small one)
         max_breach_above = 0.0
         max_breach_below = 0.0
         if not post_asian.empty:
             max_high = float(post_asian["High"].max())
             min_low = float(post_asian["Low"].min())
-            max_breach_above = (max_high - ar_high) / pip_size
-            max_breach_below = (ar_low - min_low) / pip_size
+            max_breach_above = max(0.0, (max_high - ar_high) / pip_size)
+            max_breach_below = max(0.0, (ar_low - min_low) / pip_size)
 
         # Hard stop hunt: classic 25-50 pip breach
         if pp.stop_hunt_min_pips <= max_breach_above <= pp.stop_hunt_max_pips:
@@ -462,30 +463,54 @@ class MTFAnalyzer:
         # M/W detection — this determines the DIRECTION per MMM
         # W-bottom = BUY (double bottom, MM hunted lows, true trend is up)
         # M-top = SELL (double top, MM hunted highs, true trend is down)
+        #
+        # Re-specified per audit Tier 2.2 — the old detector was an
+        # unanchored 5-bar fractal with a fixed 20-pip tolerance that fired
+        # on noise nearly every scan. A qualifying pattern now needs:
+        #   1. amplitude floor (pair-scaled) — the bounce must be real
+        #   2. anchoring — the hunted leg must reach the Asian boundary
+        #   3. neckline confirmation — price must have broken back through
+        #   4. recency — the second leg within the last 8 bars (2h on M15)
         last_20 = df.iloc[-20:]
         m_w = False
         m_w_direction = Direction.NEUTRAL
         m_w_highs = last_20["High"].values
         m_w_lows = last_20["Low"].values
+        current = float(df.iloc[-1]["Close"])
 
-        # Check BOTH W-bottom and M-top, use the most recent one
-        # (Previously W-bottom was checked first and blocked M-top, causing BUY bias)
-        w_idx = -1  # Index of most recent W-bottom
-        m_idx = -1  # Index of most recent M-top
+        trough_tol = pp.stop_hunt_min_pips * pip_size            # leg-equality tolerance
+        amplitude_floor = max(5.0, pp.stop_hunt_min_pips * 0.25) * pip_size
+        anchor_tol = pp.stop_hunt_min_pips * 0.25 * pip_size
+        recency_bars = 8
 
-        # W-bottom: two troughs with peak between (V-shape in lows)
-        for i in range(len(m_w_lows) - 3, 1, -1):  # Scan from recent to old
+        w_idx = -1  # Index of most recent qualifying W-bottom (middle bump)
+        m_idx = -1  # Index of most recent qualifying M-top (middle valley)
+        n = len(m_w_lows)
+        oldest_mid = max(1, n - recency_bars - 2)
+
+        # W-bottom: two troughs (i-2, i+2) with bump between (scan recent->old)
+        for i in range(n - 3, oldest_mid, -1):
             if m_w_lows[i] > m_w_lows[i - 2] and m_w_lows[i] > m_w_lows[i + 2]:
-                trough_diff = abs(m_w_lows[i - 2] - m_w_lows[i + 2]) / pip_size
-                if trough_diff < 20:
+                troughs_equal = abs(m_w_lows[i - 2] - m_w_lows[i + 2]) <= trough_tol
+                deepest = min(m_w_lows[i - 2], m_w_lows[i + 2])
+                neckline = m_w_highs[i]
+                amplitude = neckline - deepest
+                anchored = deepest <= ar_low + anchor_tol
+                confirmed = current > neckline
+                if troughs_equal and amplitude >= amplitude_floor and anchored and confirmed:
                     w_idx = i
                     break
 
-        # M-top: two peaks with valley between (inverted-V in highs)
-        for i in range(len(m_w_highs) - 3, 1, -1):  # Scan from recent to old
+        # M-top: two peaks (i-2, i+2) with valley between (scan recent->old)
+        for i in range(n - 3, oldest_mid, -1):
             if m_w_highs[i] < m_w_highs[i - 2] and m_w_highs[i] < m_w_highs[i + 2]:
-                peak_diff = abs(m_w_highs[i - 2] - m_w_highs[i + 2]) / pip_size
-                if peak_diff < 20:
+                peaks_equal = abs(m_w_highs[i - 2] - m_w_highs[i + 2]) <= trough_tol
+                highest = max(m_w_highs[i - 2], m_w_highs[i + 2])
+                neckline = m_w_lows[i]
+                amplitude = highest - neckline
+                anchored = highest >= ar_high - anchor_tol
+                confirmed = current < neckline
+                if peaks_equal and amplitude >= amplitude_floor and anchored and confirmed:
                     m_idx = i
                     break
 
@@ -515,29 +540,43 @@ class MTFAnalyzer:
         # DIRECTION LOGIC — M/W pattern overrides stop hunt side
         # Per MMM: the M/W formation tells you the TRUE direction.
         # The stop hunt just confirms liquidity was grabbed.
-        current = float(df.iloc[-1]["Close"])
+        #
+        # Per audit Tier 2.1: hunt_detected always requires a real POSITIVE
+        # breach of the Asian boundary. A soft hunt is a small breach
+        # (>= 1 pip, <= pair max) of the boundary the pattern hunted —
+        # an M/W with zero breach is a pattern, not a hunt. Breaches deeper
+        # than stop_hunt_max_pips stay rejected here too, otherwise the
+        # pattern branch would readmit what the hard gate just refused.
+
+        def _soft_breach(breach: float) -> bool:
+            return 1.0 <= breach <= pp.stop_hunt_max_pips
 
         if m_w and m_w_direction != Direction.NEUTRAL:
-            # M/W pattern determines direction — this is the primary signal
             if not hunt_detected:
+                # W-bottom hunts the lows, M-top hunts the highs — the
+                # breach must be on the side the pattern claims was hunted
+                pattern_breach = (
+                    max_breach_below if m_w_direction == Direction.BUY
+                    else max_breach_above
+                )
+                if _soft_breach(pattern_breach):
+                    hunt_detected = True
+                    hunt_pips = pattern_breach
+            if hunt_detected:
+                # M/W overrides the breach side: the breach is the fake
+                # move, the pattern is the true direction
+                hunt_dir = m_w_direction
+        elif not hunt_detected and rrt:
+            # Soft hunt via RRT alone: direction from breach side, same
+            # semantics as the hard gate (highs hunted = SELL, lows = BUY)
+            if max_breach_above >= max_breach_below and _soft_breach(max_breach_above):
                 hunt_detected = True
-                hunt_pips = max(max_breach_above, max_breach_below)
-            hunt_dir = m_w_direction
-        elif hunt_detected and m_w:
-            # Hunt was detected by breach, but M/W should override direction
-            hunt_dir = m_w_direction
-        elif not hunt_detected and (m_w or rrt):
-            # Soft hunt: any breach + pattern confirmation
-            if max_breach_above >= 1.0 or max_breach_below >= 1.0:
+                hunt_pips = max_breach_above
+                hunt_dir = Direction.SELL
+            elif max_breach_below > max_breach_above and _soft_breach(max_breach_below):
                 hunt_detected = True
-                hunt_pips = max(max_breach_above, max_breach_below)
-                # Use M/W direction if available, otherwise infer from price position
-                if m_w_direction != Direction.NEUTRAL:
-                    hunt_dir = m_w_direction
-                elif current > ar_high:
-                    hunt_dir = Direction.BUY
-                elif current < ar_low:
-                    hunt_dir = Direction.SELL
+                hunt_pips = max_breach_below
+                hunt_dir = Direction.BUY
 
         # Count pushes in stop hunt zone (3 pushes expected)
         push_count = 0
