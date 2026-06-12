@@ -42,3 +42,10 @@ mt5/indicators/*.ex5
 
 # Runtime singleton locks
 logs/*.lock
+.claude/*.lock
+
+# JVM crash logs
+hs_err_pid*.log
+
+# Temporary recycle bin (tools/trash.py)
+trash/

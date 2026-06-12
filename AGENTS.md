@@ -9,7 +9,7 @@ User-facing timestamps should be in EAT (UTC+3). Treat this as a live-trading co
 ## Safety Rules
 
 - Do not place, modify, or close live MT5 trades unless the user explicitly asks for live execution.
-- Do not start the live orchestrator casually. The live commands are `start_helix.py`, `python -m helix_v3.orchestrator`, and `python -m helix_v3.orchestrator_v2`.
+- Do not start the live orchestrator casually. The live commands are `start_helix.py` and `python -m helix_v3.orchestrator_v2` (V1 orchestrator was retired to `trash/` on 2026-06-12).
 - Do not edit `.env` unless the user explicitly asks. Update `.env.example` for configuration documentation.
 - Do not print API keys, MT5 passwords, auth tokens, `~/.codex/auth.json`, or full credential-bearing logs.
 - Prefer offline backtests, scanner replay, and unit tests before touching execution logic.

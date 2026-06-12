@@ -135,8 +135,9 @@ Enterprise-grade Market Maker Method (MMM) algorithmic execution system trading 
 ### Orchestrator
 | File | Purpose |
 |------|---------|
-| `helix_v3/orchestrator.py` | V1 pipeline (flat quant engine per TF — legacy, kept as fallback) |
 | `helix_v3/orchestrator_v2.py` | **V2 PRIMARY** — Unified pipeline: MTF analysis -> advisory scoring -> validation library lookup -> vision consensus -> gatekeeper -> execute -> record to replay store -> auto-promote at EOD |
+| `tools/trash.py` / `tools/trash_review.py` | Temporary recycle bin: `put`/`list`/`restore`, reviewer classifies (referenced/junk/unsure) and permanently deletes junk after 2h grace. V1 orchestrator lives here now. |
+| `docs/AUDIT_FIX_PLAN.md` | Tiered remediation roadmap from the 2026-06-12 quantitative audit (Tier 0 = live-loss bugs, no live sessions until complete) |
 
 ### Tests & Tools
 | File | Purpose |
@@ -242,10 +243,9 @@ Set via `CONSENSUS_MODE` in `.env`.
 
 # Training & validation
 .venv/Scripts/python.exe -m helix_v3.training.rule_validator                      # Validate MMM rules vs history
-
-# Legacy
-.venv/Scripts/python.exe -m helix_v3.orchestrator           # V1 legacy (flat quant, no MTF)
 ```
+
+Note: the V1 legacy orchestrator was moved to `trash/` on 2026-06-12 (restorable via `python tools/trash.py restore 0001`). `start_helix.py` and the `helix` console script now launch V2.
 
 ## Key Dependencies
 - MetaTrader5, numpy, pandas, matplotlib, mplfinance, httpx, python-dotenv, PyMuPDF

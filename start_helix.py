@@ -16,7 +16,7 @@ print(f"Log: {LOG_FILE}")
 
 with open(LOG_FILE, "a") as log:
     proc = subprocess.Popen(
-        [str(VENV_PYTHON), "-m", "helix_v3.orchestrator"],
+        [str(VENV_PYTHON), "-m", "helix_v3.orchestrator_v2"],
         cwd=str(BASE),
         stdout=log,
         stderr=subprocess.STDOUT,

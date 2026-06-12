@@ -27,6 +27,7 @@ DEFAULT_REPLAY_DB = Path(settings.log_dir) / "vision_backtests.db"
 DEFAULT_PACKET_ROOT = Path("data/mmm_training/vision_review_packets")
 
 FEATURE_COLUMNS = {
+    "feature_cluster_index_150m": "INTEGER",
     "feature_hunt_to_ar_ratio": "REAL",
     "feature_candles_since_hunt_extreme": "INTEGER",
     "feature_close_to_ar_low_pips": "REAL",
@@ -40,8 +41,14 @@ FEATURE_COLUMNS = {
     "feature_prior_8_candle_expansion_pips": "REAL",
     "feature_prior_8_candle_directional_move_pips": "REAL",
     "feature_bars_since_first_ar_edge_break": "INTEGER",
+    "feature_higher_low_after_hunt": "INTEGER",
+    "feature_close_vs_ema_fast_pips": "REAL",
     "feature_ema50_ema200_spread_pips": "REAL",
     "feature_ema200_slope_8_pips": "REAL",
+    "feature_reclaim_ar_mid_within_3": "INTEGER",
+    "feature_first_2_bar_mae_pips": "REAL",
+    "feature_first_3_bar_mfe_pips": "REAL",
+    "feature_first_3_bar_mfe_mae_ratio": "REAL",
     "feature_tdi_rsi_minus_signal": "REAL",
     "feature_updated_at": "TEXT",
 }
@@ -72,6 +79,7 @@ def backfill_packet_features(
     try:
         _ensure_feature_columns(conn)
         updated = 0
+        cluster_indexes = _cluster_indexes(rows)
         for symbol, symbol_rows in _rows_by_symbol(rows).items():
             start = min(_parse_time(row["snapshot_at"]) for row in symbol_rows)
             end = max(_parse_time(row["snapshot_at"]) for row in symbol_rows)
@@ -95,6 +103,7 @@ def backfill_packet_features(
                 )
                 if not features:
                     continue
+                features["feature_cluster_index_150m"] = cluster_indexes.get(int(row["id"]))
                 _update_features(conn, int(row["id"]), features)
                 updated += 1
         conn.commit()
@@ -138,7 +147,7 @@ def compute_ohlc_features(
     lod = float(session["Low"].min())
 
     recent = past.tail(64)
-    hunt_extreme, candles_since_hunt = _hunt_extreme(recent, direction)
+    hunt_extreme, candles_since_hunt, hunt_position = _hunt_extreme(recent, direction)
     distance_from_hunt = _directional_distance(direction, close, hunt_extreme, pip_size)
 
     prior_8 = past.tail(8)
@@ -150,10 +159,14 @@ def compute_ohlc_features(
         pip_size,
     )
 
-    ema50, ema200 = _ema_values(past)
+    ema_fast, ema50, ema200 = _ema_values(past)
     ema200_slope = None
     if len(ema200) >= 9:
         ema200_slope = _directional_distance(direction, float(ema200.iloc[-1]), float(ema200.iloc[-9]), pip_size)
+    future_3 = frame[frame.index > snap].head(3)
+    future_2 = future_3.head(2)
+    first_2_mae = _early_mae(direction, close, future_2, pip_size)
+    first_3_mfe = _early_mfe(direction, close, future_3, pip_size)
 
     return {
         "feature_hunt_to_ar_ratio": _safe_ratio(stop_hunt_pips, ar_pips),
@@ -180,6 +193,15 @@ def compute_ohlc_features(
             asian_high,
             asian_low,
         ),
+        "feature_higher_low_after_hunt": int(
+            _higher_low_after_hunt(recent, direction, hunt_position, hunt_extreme, pip_size)
+        ),
+        "feature_close_vs_ema_fast_pips": _directional_distance(
+            direction,
+            close,
+            float(ema_fast.iloc[-1]),
+            pip_size,
+        ),
         "feature_ema50_ema200_spread_pips": _directional_distance(
             direction,
             float(ema50.iloc[-1]),
@@ -187,6 +209,12 @@ def compute_ohlc_features(
             pip_size,
         ),
         "feature_ema200_slope_8_pips": ema200_slope,
+        "feature_reclaim_ar_mid_within_3": int(
+            _reclaims_mid_within(direction, future_3, ar_mid)
+        ),
+        "feature_first_2_bar_mae_pips": first_2_mae,
+        "feature_first_3_bar_mfe_pips": first_3_mfe,
+        "feature_first_3_bar_mfe_mae_ratio": _safe_ratio(first_3_mfe, first_2_mae),
         "feature_tdi_rsi_minus_signal": (
             tdi_rsi - tdi_signal if tdi_rsi is not None and tdi_signal is not None else None
         ),
@@ -218,7 +246,7 @@ def _load_target_rows(config: FeatureBackfillConfig) -> list[dict[str, Any]]:
                 params.extend([symbol, normalized_key])
             clauses.append("(" + " OR ".join(packet_clauses) + ")")
         rows = conn.execute(
-            f"""SELECT f.*
+            f"""SELECT f.*, s.normalized_key
             FROM flashcards f
             JOIN replay_db.mmm_setup_signatures s
               ON s.source_id = f.id
@@ -253,6 +281,32 @@ def _rows_by_symbol(rows: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]
     for row in rows:
         grouped.setdefault(str(row["symbol"]), []).append(row)
     return grouped
+
+
+def _cluster_indexes(rows: list[dict[str, Any]], window_minutes: int = 150) -> dict[int, int]:
+    grouped: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
+    for row in rows:
+        key = (
+            str(row.get("symbol") or ""),
+            str(row.get("entry_direction") or ""),
+            str(row.get("normalized_key") or ""),
+        )
+        grouped.setdefault(key, []).append(row)
+
+    indexes: dict[int, int] = {}
+    window = timedelta(minutes=window_minutes)
+    for group_rows in grouped.values():
+        cluster_start: Optional[datetime] = None
+        cluster_index = 0
+        for row in sorted(group_rows, key=lambda item: _parse_time(item["snapshot_at"])):
+            snapshot = _parse_time(row["snapshot_at"])
+            if cluster_start is None or snapshot - cluster_start > window:
+                cluster_start = snapshot
+                cluster_index = 1
+            else:
+                cluster_index += 1
+            indexes[int(row["id"])] = cluster_index
+    return indexes
 
 
 def _fetch_m15_window(
@@ -291,14 +345,72 @@ def _update_features(conn: sqlite3.Connection, flashcard_id: int, fields: dict[s
     )
 
 
-def _hunt_extreme(recent: pd.DataFrame, direction: Direction) -> tuple[float, int]:
+def _hunt_extreme(recent: pd.DataFrame, direction: Direction) -> tuple[float, int, int]:
     if direction == Direction.SELL:
         index_position = int(recent["High"].to_numpy().argmax())
         value = float(recent["High"].iloc[index_position])
     else:
         index_position = int(recent["Low"].to_numpy().argmin())
         value = float(recent["Low"].iloc[index_position])
-    return value, len(recent) - 1 - index_position
+    return value, len(recent) - 1 - index_position, index_position
+
+
+def _higher_low_after_hunt(
+    recent: pd.DataFrame,
+    direction: Direction,
+    hunt_position: int,
+    hunt_extreme: float,
+    pip_size: float,
+) -> bool:
+    after_hunt = recent.iloc[hunt_position + 1:]
+    if after_hunt.empty:
+        return False
+    buffer = 2.0 * pip_size
+    if direction == Direction.SELL:
+        candidates = after_hunt[
+            (after_hunt["High"] <= hunt_extreme - buffer)
+            & (after_hunt["Close"] < after_hunt["Open"])
+        ]
+    else:
+        candidates = after_hunt[
+            (after_hunt["Low"] >= hunt_extreme + buffer)
+            & (after_hunt["Close"] > after_hunt["Open"])
+        ]
+    return not candidates.empty
+
+
+def _reclaims_mid_within(direction: Direction, future: pd.DataFrame, ar_mid: float) -> bool:
+    if future.empty:
+        return False
+    if direction == Direction.SELL:
+        return bool((future["Close"] <= ar_mid).any())
+    return bool((future["Close"] >= ar_mid).any())
+
+
+def _early_mfe(
+    direction: Direction,
+    entry_close: float,
+    future: pd.DataFrame,
+    pip_size: float,
+) -> Optional[float]:
+    if future.empty:
+        return None
+    if direction == Direction.SELL:
+        return max(0.0, (entry_close - float(future["Low"].min())) / pip_size)
+    return max(0.0, (float(future["High"].max()) - entry_close) / pip_size)
+
+
+def _early_mae(
+    direction: Direction,
+    entry_close: float,
+    future: pd.DataFrame,
+    pip_size: float,
+) -> Optional[float]:
+    if future.empty:
+        return None
+    if direction == Direction.SELL:
+        return max(0.0, (float(future["High"].max()) - entry_close) / pip_size)
+    return max(0.0, (entry_close - float(future["Low"].min())) / pip_size)
 
 
 def _bars_since_first_ar_edge_break(
@@ -341,9 +453,13 @@ def _directional_distance(
     return (current - reference) / pip_size
 
 
-def _ema_values(past: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
+def _ema_values(past: pd.DataFrame) -> tuple[pd.Series, pd.Series, pd.Series]:
     close = past["Close"].astype(float)
-    return close.ewm(span=50, adjust=False).mean(), close.ewm(span=200, adjust=False).mean()
+    return (
+        close.ewm(span=13, adjust=False).mean(),
+        close.ewm(span=50, adjust=False).mean(),
+        close.ewm(span=200, adjust=False).mean(),
+    )
 
 
 def _fallback_range(past: pd.DataFrame) -> tuple[float, float]:

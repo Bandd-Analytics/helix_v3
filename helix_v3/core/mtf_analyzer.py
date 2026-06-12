@@ -454,24 +454,41 @@ class MTFAnalyzer:
         m_w_highs = last_20["High"].values
         m_w_lows = last_20["Low"].values
 
-        # Check W-bottom first (two troughs with peak between)
-        for i in range(2, len(m_w_lows) - 2):
+        # Check BOTH W-bottom and M-top, use the most recent one
+        # (Previously W-bottom was checked first and blocked M-top, causing BUY bias)
+        w_idx = -1  # Index of most recent W-bottom
+        m_idx = -1  # Index of most recent M-top
+
+        # W-bottom: two troughs with peak between (V-shape in lows)
+        for i in range(len(m_w_lows) - 3, 1, -1):  # Scan from recent to old
             if m_w_lows[i] > m_w_lows[i - 2] and m_w_lows[i] > m_w_lows[i + 2]:
                 trough_diff = abs(m_w_lows[i - 2] - m_w_lows[i + 2]) / pip_size
                 if trough_diff < 20:
-                    m_w = True
-                    m_w_direction = Direction.BUY
+                    w_idx = i
                     break
 
-        # Check M-top (two peaks with valley between)
-        if not m_w:
-            for i in range(2, len(m_w_highs) - 2):
-                if m_w_highs[i] < m_w_highs[i - 2] and m_w_highs[i] < m_w_highs[i + 2]:
-                    peak_diff = abs(m_w_highs[i - 2] - m_w_highs[i + 2]) / pip_size
-                    if peak_diff < 20:
-                        m_w = True
-                        m_w_direction = Direction.SELL
-                        break
+        # M-top: two peaks with valley between (inverted-V in highs)
+        for i in range(len(m_w_highs) - 3, 1, -1):  # Scan from recent to old
+            if m_w_highs[i] < m_w_highs[i - 2] and m_w_highs[i] < m_w_highs[i + 2]:
+                peak_diff = abs(m_w_highs[i - 2] - m_w_highs[i + 2]) / pip_size
+                if peak_diff < 20:
+                    m_idx = i
+                    break
+
+        # Use the most recent pattern (higher index = more recent bar)
+        if w_idx >= 0 and m_idx >= 0:
+            if m_idx >= w_idx:
+                m_w = True
+                m_w_direction = Direction.SELL
+            else:
+                m_w = True
+                m_w_direction = Direction.BUY
+        elif w_idx >= 0:
+            m_w = True
+            m_w_direction = Direction.BUY
+        elif m_idx >= 0:
+            m_w = True
+            m_w_direction = Direction.SELL
 
         # RRT detection
         rrt = self._detect_rrt(df.iloc[-4:])

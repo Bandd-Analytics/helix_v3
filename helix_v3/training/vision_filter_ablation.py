@@ -223,6 +223,7 @@ def _load_rows(
                 f.h1_session,
                 f.h4_level,
                 f.rrt_detected,
+                f.feature_cluster_index_150m,
                 f.feature_hunt_to_ar_ratio,
                 f.feature_candles_since_hunt_extreme,
                 f.feature_close_to_ar_low_pips,
@@ -236,8 +237,14 @@ def _load_rows(
                 f.feature_prior_8_candle_expansion_pips,
                 f.feature_prior_8_candle_directional_move_pips,
                 f.feature_bars_since_first_ar_edge_break,
+                f.feature_higher_low_after_hunt,
+                f.feature_close_vs_ema_fast_pips,
                 f.feature_ema50_ema200_spread_pips,
                 f.feature_ema200_slope_8_pips,
+                f.feature_reclaim_ar_mid_within_3,
+                f.feature_first_2_bar_mae_pips,
+                f.feature_first_3_bar_mfe_pips,
+                f.feature_first_3_bar_mfe_mae_ratio,
                 f.feature_tdi_rsi_minus_signal
             FROM mmm_setup_signatures s
             JOIN mmm_event_outcomes o
@@ -399,6 +406,51 @@ def _variants() -> list[FilterVariant]:
             lambda row: (_float(row.get("tdi_rsi")) or 0.0) >= 50.0
             and _feature(row, "feature_close_to_ar_low_pips") is not None
             and float(row["feature_close_to_ar_low_pips"]) >= 0.0,
+        ),
+        FilterVariant(
+            "feature_tdi_quality_gte_1",
+            "Require bullish TDI cross/MBL or bullish divergence quality tier.",
+            lambda row: _tdi_quality(row) >= 1,
+        ),
+        FilterVariant(
+            "feature_post_hunt_reclaim",
+            "Require entry close to reclaim AR low and at least 35% of hunt depth.",
+            _feature_post_hunt_reclaim,
+        ),
+        FilterVariant(
+            "feature_higher_low_w_confirmation",
+            "Require a higher-low candle after the hunt and close above fast EMA.",
+            lambda row: _feature_bool(row, "feature_higher_low_after_hunt")
+            and (_feature(row, "feature_close_vs_ema_fast_pips") or -999.0) >= 0.0,
+        ),
+        FilterVariant(
+            "feature_shark_fin_cluster_wait",
+            "For shark-fin-only entries, reject the first 150m cluster trigger unless price reclaimed.",
+            _feature_shark_fin_cluster_wait,
+        ),
+        FilterVariant(
+            "feature_confirmation_timing_or_quality",
+            "Allow TDI-quality entries, later same-cluster entries, or confirmed post-hunt reclaim.",
+            _feature_confirmation_timing_or_quality,
+        ),
+        FilterVariant(
+            "mgmt_first_2_bar_mae_le_10",
+            "Post-entry management hypothesis: abort if first 2 bars exceed 10p MAE.",
+            lambda row: _feature(row, "feature_first_2_bar_mae_pips") is not None
+            and float(row["feature_first_2_bar_mae_pips"]) <= 10.0,
+        ),
+        FilterVariant(
+            "mgmt_reclaim_ar_mid_within_3",
+            "Post-entry management hypothesis: require AR-mid reclaim within first 3 bars.",
+            lambda row: _feature_bool(row, "feature_reclaim_ar_mid_within_3"),
+        ),
+        FilterVariant(
+            "mgmt_first_3_mfe_ge_first_2_mae",
+            "Post-entry management hypothesis: early MFE must match or exceed early MAE.",
+            lambda row: _feature(row, "feature_first_3_bar_mfe_pips") is not None
+            and _feature(row, "feature_first_2_bar_mae_pips") is not None
+            and float(row["feature_first_3_bar_mfe_pips"])
+            >= float(row["feature_first_2_bar_mae_pips"]),
         ),
     ]
 
@@ -656,6 +708,76 @@ def _feature_momentum_breakout_exception(row: dict[str, Any]) -> bool:
     if bars_since_break is None or distance_from_hunt is None or asian is None or asian <= 0:
         return False
     return bars_since_break <= 6 and distance_from_hunt >= 0.6 * asian and not _tdi_bearish(row)
+
+
+def _feature_post_hunt_reclaim(row: dict[str, Any]) -> bool:
+    ar_low_reclaim = _feature(row, "feature_close_to_ar_low_pips")
+    distance_from_hunt = _feature(row, "feature_distance_from_hunt_extreme_pips")
+    asian = _float(row.get("asian_range_pips"))
+    stop_hunt = _float(row.get("stop_hunt_pips"))
+    if ar_low_reclaim is None or distance_from_hunt is None:
+        return False
+    ar_threshold = max(5.0, 0.15 * asian) if asian is not None else 5.0
+    hunt_threshold = 0.35 * stop_hunt if stop_hunt is not None else 0.0
+    return ar_low_reclaim >= ar_threshold and distance_from_hunt >= hunt_threshold
+
+
+def _feature_shark_fin_cluster_wait(row: dict[str, Any]) -> bool:
+    if not _tdi_shark_fin_only(row):
+        return True
+    cluster_index = _feature(row, "feature_cluster_index_150m")
+    if cluster_index is not None and cluster_index > 1:
+        return True
+    return _feature_post_hunt_reclaim(row)
+
+
+def _feature_confirmation_timing_or_quality(row: dict[str, Any]) -> bool:
+    cluster_index = _feature(row, "feature_cluster_index_150m")
+    if _tdi_quality(row) >= 1:
+        return True
+    if cluster_index is not None and cluster_index > 1:
+        return True
+    return _feature_post_hunt_reclaim(row) and _feature_bool(row, "feature_higher_low_after_hunt")
+
+
+def _tdi_quality(row: dict[str, Any]) -> int:
+    signals = str(row.get("tdi_signals") or "").upper()
+    if "SIGNAL_CROSS_BEARISH" in signals and "DIVERGENCE_BULLISH" not in signals:
+        return -1
+    if "SIGNAL_CROSS_BULLISH" in signals or "MBL_CROSS_BULLISH" in signals:
+        return 2
+    if "DIVERGENCE_BULLISH" in signals or "BULLISH_DIVERGENCE" in signals:
+        return 1
+    if "SHARK" in signals:
+        return 0
+    rsi = _float(row.get("tdi_rsi"))
+    signal = _float(row.get("tdi_signal"))
+    if rsi is not None and signal is not None and rsi > signal:
+        return 1
+    return 0
+
+
+def _tdi_shark_fin_only(row: dict[str, Any]) -> bool:
+    signals = str(row.get("tdi_signals") or "").upper()
+    if "SHARK" not in signals:
+        return False
+    quality_markers = (
+        "SIGNAL_CROSS_BULLISH",
+        "MBL_CROSS_BULLISH",
+        "DIVERGENCE_BULLISH",
+        "BULLISH_DIVERGENCE",
+    )
+    return not any(marker in signals for marker in quality_markers)
+
+
+def _feature_bool(row: dict[str, Any], name: str) -> bool:
+    value = row.get(name)
+    if value is None:
+        return False
+    try:
+        return bool(int(value))
+    except (TypeError, ValueError):
+        return bool(value)
 
 
 def _tdi_bearish(row: dict[str, Any]) -> bool:

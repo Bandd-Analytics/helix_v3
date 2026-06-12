@@ -223,3 +223,49 @@ def test_vision_review_packet_builder_can_include_non_w_bottom_candidates(tmp_pa
     assert default_candidates == []
     assert len(all_shape_candidates) == 1
     assert all_shape_candidates[0]["normalized_key"] == rrt_key
+
+
+def test_vision_review_packet_builder_filters_exact_setup_key(tmp_path) -> None:
+    pair_root = tmp_path / "pair_research"
+    output_root = tmp_path / "packets"
+    pair_dir = pair_root / "GBPJPY"
+    pair_dir.mkdir(parents=True)
+    target_key = "THE_33_MW|BUY|EARLY_WEEK|L3|STOP_HUNT|AR_VALID|W_BOTTOM|TDI_CONFIRM"
+    other_key = "THE_33_MW|BUY|EARLY_WEEK|L3|STOP_HUNT|AR_VALID|W_BOTTOM|TDI_NONE"
+    (pair_dir / "setup_performance.json").write_text(
+        json.dumps(
+            [
+                {
+                    "symbol": "GBPJPY",
+                    "direction": "BUY",
+                    "normalized_key": other_key,
+                    "total": 20,
+                    "favorable_rate": 95.0,
+                    "avg_exit_pips": 30.0,
+                },
+                {
+                    "symbol": "GBPJPY",
+                    "direction": "BUY",
+                    "normalized_key": target_key,
+                    "total": 10,
+                    "favorable_rate": 90.0,
+                    "avg_exit_pips": 18.4,
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    candidates = _load_setup_candidates(
+        PacketConfig(
+            pair_research_root=pair_root,
+            output_root=output_root,
+            symbols=("GBPJPY",),
+            min_total=10,
+            setup_key=target_key,
+        ),
+        "GBPJPY",
+    )
+
+    assert len(candidates) == 1
+    assert candidates[0]["normalized_key"] == target_key

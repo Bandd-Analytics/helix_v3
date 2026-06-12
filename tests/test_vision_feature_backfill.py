@@ -48,6 +48,10 @@ def test_compute_ohlc_features_extracts_directional_metrics() -> None:
     assert features["feature_candles_since_hunt_extreme"] == 29
     assert features["feature_distance_from_hunt_extreme_pips"] > 0
     assert features["feature_prior_8_candle_expansion_pips"] > 0
+    assert features["feature_higher_low_after_hunt"] == 1
+    assert features["feature_close_vs_ema_fast_pips"] is not None
+    assert features["feature_reclaim_ar_mid_within_3"] == 0
+    assert features["feature_first_2_bar_mae_pips"] is None
     assert features["feature_ema50_ema200_spread_pips"] is not None
     assert features["feature_tdi_rsi_minus_signal"] == 5.0
 

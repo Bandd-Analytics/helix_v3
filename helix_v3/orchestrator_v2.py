@@ -17,6 +17,7 @@ import asyncio
 import signal
 import time
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Dict, List, Optional, Set
 
 from config.settings import settings
@@ -58,7 +59,7 @@ except ImportError:
 
 try:
     from helix_v3.backtest.validation_library import ValidationLibrary
-    from helix_v3.backtest.mmm_event_replay import replay_setup_from_mtf, ReplaySetup
+    from helix_v3.backtest.mmm_event_replay import replay_setup_from_mtf
     _HAS_VALIDATION = True
 except ImportError:
     _HAS_VALIDATION = False
@@ -69,7 +70,7 @@ except ImportError:
     PROMPT_VERSION = "mmm_vision_v2"
 
 try:
-    from helix_v3.backtest.setup_intelligence import rrs_grade as _compute_rrs_grade
+    __import__("helix_v3.backtest.setup_intelligence")
     _HAS_SETUP_INTEL = True
 except ImportError:
     _HAS_SETUP_INTEL = False
@@ -549,7 +550,6 @@ class HelixOrchestratorV2:
             # Without keys, the quantitative pipeline (MTF + advisory + RRS) is the edge.
             chart_path = None
             # The 2-year backtest (PF 1.35, +$686) ran without vision consensus.
-            import os
             _has_api_key = bool(
                 getattr(self.validator, '_api_cfg', None)
                 and (self.validator._api_cfg.anthropic_key or self.validator._api_cfg.openai_key)
@@ -774,6 +774,41 @@ class HelixOrchestratorV2:
             return "openai", "legacy_consensus"
         return "local", "local_verdict"
 
+    def _record_guard_loss_from_action(self, action: str) -> None:
+        """Record same-direction loss bans from trade-management action text."""
+        action_lower = action.lower()
+        loss_markers = ("sl", "stop", "loss", "stale", "time exit", "session exit")
+        if not any(marker in action_lower for marker in loss_markers):
+            return
+
+        for sym in self._symbols:
+            if sym not in action:
+                continue
+
+            direction = ""
+            for order in self.gatekeeper._active_orders.values():
+                if order.symbol == sym:
+                    direction = order.direction.value
+                    break
+
+            if not direction:
+                try:
+                    row = self.gatekeeper.journal._conn.execute(
+                        "SELECT direction FROM trades WHERE symbol=? ORDER BY id DESC LIMIT 1",
+                        (sym,),
+                    ).fetchone()
+                    if row:
+                        direction = row[0]
+                except Exception:
+                    logger.debug("GUARD: journal direction lookup failed for %s", sym)
+
+            if direction:
+                self.guard.record_loss(sym, direction)
+                logger.info("GUARD: Recorded loss for %s %s", sym, direction)
+            else:
+                logger.warning("GUARD: Could not determine direction for %s loss", sym)
+            return
+
     async def _scan_cycle(self) -> None:
         """Run one scan cycle across all symbols."""
         # Manage existing positions and sync journal
@@ -791,9 +826,9 @@ class HelixOrchestratorV2:
                     if self.replay_store and _HAS_VALIDATION and sym in self._live_replay_setups:
                         try:
                             rs = self._live_replay_setups.pop(sym)
-                            from helix_v3.backtest.mmm_event_replay import build_setup_signature, outcome_from_closed_trade
+                            from helix_v3.backtest.mmm_event_replay import build_setup_signature
                             sig = build_setup_signature(rs)
-                            sig_id = self.replay_store.record_signature(sig)
+                            self.replay_store.record_signature(sig)
                             # Build a minimal trade-like object from the action string
                             # Full outcome recording requires trade data from journal
                             logger.info("REPLAY: Recorded signature for %s exit", sym)
@@ -801,14 +836,7 @@ class HelixOrchestratorV2:
                             logger.debug("Replay record failed for %s: %s", sym, e)
                     break
             # Track losses for persistent re-entry guard
-            action_lower = action.lower()
-            if "sl" in action_lower or "stop" in action_lower or "loss" in action_lower or "stale" in action_lower:
-                for sym in self._symbols:
-                    if sym in action:
-                        direction = "SELL" if "sell" in action_lower else "BUY" if "buy" in action_lower else ""
-                        if direction:
-                            self.guard.record_loss(sym, direction)
-                        break
+            self._record_guard_loss_from_action(action)
 
         # 15-minute market scan
         now = time.monotonic()
@@ -910,15 +938,15 @@ class HelixOrchestratorV2:
             week_desc = "Friday wind-down. Take profits, tighten stops. No new exposure before the weekend."
 
         lines = [
-            f"HELIX V3 — THE MMM STORY",
+            "HELIX V3 — THE MMM STORY",
             f"{'='*30}",
             f"{dow} {eat.strftime('%d %b %Y')} | {eat.strftime('%H:%M')} EAT",
-            f"",
+            "",
             f"WEEKLY: {week_phase}",
-            f"{week_desc}",
-            f"",
+            week_desc,
+            "",
             f"SESSION: {session} ({session_eat})",
-            f"{session_desc}",
+            session_desc,
         ]
 
         # Per-pair narrative — group by what's interesting
@@ -930,7 +958,6 @@ class HelixOrchestratorV2:
             a = self._last_analysis[sym]
             m15 = a.fifteen_min
             h4 = a.four_hour
-            h1 = a.one_hour
             wk = a.weekly
 
             level = h4.level_count
@@ -968,7 +995,7 @@ class HelixOrchestratorV2:
             elif ar > 0:
                 pair_lines.append(f"  Today: Asian range {ar:.0f}p. No stop hunt yet.")
             else:
-                pair_lines.append(f"  Today: No clear Asian structure.")
+                pair_lines.append("  Today: No clear Asian structure.")
 
             # Confluence verdict
             if a.trade_valid:
@@ -982,13 +1009,13 @@ class HelixOrchestratorV2:
                 dead.append(sym)
 
         if active_setups:
-            lines.append(f"\nACTIVE SETUPS")
+            lines.append("\nACTIVE SETUPS")
             lines.append("-" * 25)
             for s in active_setups:
                 lines.append(s)
 
         if watching:
-            lines.append(f"\nWATCHING")
+            lines.append("\nWATCHING")
             lines.append("-" * 25)
             for s in watching:
                 lines.append(s)

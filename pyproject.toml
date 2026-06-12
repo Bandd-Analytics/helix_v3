@@ -24,7 +24,7 @@ dev = [
 ]
 
 [project.scripts]
-helix = "helix_v3.orchestrator:main"
+helix = "helix_v3.orchestrator_v2:main"
 
 [tool.setuptools.packages.find]
 include = ["helix_v3*", "config*"]

@@ -11,9 +11,8 @@ from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
 import MetaTrader5 as mt5
-import numpy as np
 
-from config.pair_profiles import PairProfile, get_pair_profile
+from config.pair_profiles import get_pair_profile
 from config.settings import settings
 from helix_v3.core.types import (
     ConsensusResult,
@@ -278,14 +277,27 @@ class MT5ExecutionGatekeeper:
                 sl = entry + (fallback_pips * pip_size)
 
         sl_pips = abs(entry - sl) / pip_size
+
+        # --- SL FLOOR: widen actual SL if too tight (prevents suicide stops) ---
+        if sl_pips < profile.min_sl_pips:
+            logger.warning(
+                "SL FLOOR ENFORCED %s: structural SL %.1f pips < min %.1f — widening SL",
+                symbol, sl_pips, profile.min_sl_pips,
+            )
+            sl_pips = profile.min_sl_pips
+            if direction == Direction.BUY:
+                sl = entry - (sl_pips * pip_size)
+            else:
+                sl = entry + (sl_pips * pip_size)
+
         lot_size = self.calculate_lot_size(symbol, sl_pips)
 
         # TP levels — calibrated from 90-day validation data
         # T1: 1:1 RR (locks in profit, SL to breakeven)
-        # T2: min(expected_level_move, 3x SL) — targets realistic move, not blind multiple
+        # T2: min(expected_level_move, 2.5x SL) — targets realistic move, not blind multiple
         risk_distance = abs(entry - sl)
         level_move_dist = profile.expected_level_move_pips * pip_size
-        tp2_dist = min(level_move_dist, risk_distance * 3.0)
+        tp2_dist = min(level_move_dist, risk_distance * 2.5)
         tp2_dist = max(tp2_dist, risk_distance * 1.5)  # Never less than 1.5:1 RR
 
         if direction == Direction.BUY:
@@ -441,8 +453,13 @@ class MT5ExecutionGatekeeper:
             return []
 
         actions: List[str] = []
+        # Robust server time: try MT5 tick time, fall back to wall clock
         now_ts = mt5.symbol_info_tick(settings.trading.symbols[0])
         server_time = now_ts.time if now_ts else 0
+        if server_time == 0:
+            # Fallback to UTC wall clock — prevents silent skip of all exit checks
+            server_time = int(datetime.now(timezone.utc).timestamp())
+            logger.warning("Using wall clock for position management (MT5 tick time unavailable)")
 
         for pos in positions:
             if pos.magic != 314159:
@@ -492,7 +509,7 @@ class MT5ExecutionGatekeeper:
                 )
                 self._partial_close(pos, pos.volume)
                 actions.append(
-                    f"TIME EXIT: {pos.symbol} ticket={ticket} after {duration_min:.0f}min pips={profit_pips:+.1f}"
+                    f"TIME EXIT: {pos.symbol} {order.direction.value} ticket={ticket} after {duration_min:.0f}min pips={profit_pips:+.1f}"
                 )
                 continue
 
@@ -513,7 +530,7 @@ class MT5ExecutionGatekeeper:
                 )
                 self._partial_close(pos, pos.volume)
                 actions.append(
-                    f"STALE EXIT: {pos.symbol} ticket={ticket} {profit_pips:+.1f} pips after {duration_min:.0f}min"
+                    f"STALE EXIT: {pos.symbol} {order.direction.value} ticket={ticket} {profit_pips:+.1f} pips after {duration_min:.0f}min"
                 )
                 continue
 
@@ -552,7 +569,7 @@ class MT5ExecutionGatekeeper:
                 )
                 self._partial_close(pos, pos.volume)
                 actions.append(
-                    f"STALE EXIT: {pos.symbol} ticket={ticket} {profit_pips:+.1f} pips after {duration_min:.0f}min"
+                    f"STALE EXIT: {pos.symbol} {order.direction.value} ticket={ticket} {profit_pips:+.1f} pips after {duration_min:.0f}min"
                 )
                 continue
             # NOTE: If profit_pips > 0 after stale threshold, trade STAYS OPEN and trails via rule 5
@@ -569,7 +586,7 @@ class MT5ExecutionGatekeeper:
                     )
                     self._partial_close(pos, pos.volume)
                     actions.append(
-                        f"SESSION EXIT: {pos.symbol} ticket={ticket} before {close_session} pips={profit_pips:+.1f}"
+                        f"SESSION EXIT: {pos.symbol} {order.direction.value} ticket={ticket} before {close_session} pips={profit_pips:+.1f}"
                     )
                     continue
 

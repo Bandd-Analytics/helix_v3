@@ -12,32 +12,29 @@ Usage:
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
-import numpy as np
 import pandas as pd
 
-from config.pair_profiles import get_pair_profile, get_tradeable_symbols, PAIR_PROFILES
-from config.settings import settings
+from config.pair_profiles import get_pair_profile, get_tradeable_symbols
 from helix_v3.backtest.data_store import HistoricalDataStore
-from helix_v3.core.mtf_analyzer import MTFAnalyzer, MTFAnalysis
+from helix_v3.core.mtf_analyzer import MTFAnalyzer
 from helix_v3.core.quant_engine import MMMQuantitativeEngine
-from helix_v3.core.tdi import compute_tdi, compute_pivots, compute_adr, compute_daily_hilo
+from helix_v3.core.tdi import compute_tdi
 from helix_v3.core.patterns import scan_patterns
 from helix_v3.core.advisory_confidence import (
     AdvisorySetup,
     advisory_setup_from_mtf,
     score_advisory_setup,
 )
-from helix_v3.core.types import Direction, QuantSignal, SessionBounds
+from helix_v3.core.types import Direction
 from helix_v3.utils.logger import get_logger
 
 try:
     from helix_v3.backtest.mmm_event_replay import (
         MMMReplayStore,
-        ReplaySetup,
         build_setup_signature,
         outcome_from_closed_trade,
         replay_setup_from_mtf,
@@ -145,8 +142,14 @@ class TradeSimulator:
         profile = get_pair_profile(symbol)
         sl_pips = abs(entry_price - sl_price) / pip_size
 
-        # Apply SL floor (matching live gatekeeper fix)
-        effective_sl = max(sl_pips, profile.min_sl_pips)
+        # Apply SL floor — widen actual SL if too tight (prevents suicide stops)
+        if sl_pips < profile.min_sl_pips:
+            sl_pips = profile.min_sl_pips
+            if direction == Direction.BUY:
+                sl_price = entry_price - (sl_pips * pip_size)
+            else:
+                sl_price = entry_price + (sl_pips * pip_size)
+        effective_sl = sl_pips
 
         # Lot sizing: Equity * Risk% / (SL_pips * pip_value_per_lot)
         risk_amount = self.equity * profile.max_risk_pct
@@ -162,11 +165,11 @@ class TradeSimulator:
 
         # TP levels — calibrated from validation data
         # T1: 1:1 RR (unchanged — locks in profit)
-        # T2: min(expected_level_move, 3x SL) — targets realistic move, not blind multiple
+        # T2: min(expected_level_move, 2.5x SL) — targets realistic move, not blind multiple
         risk_dist = abs(entry_price - sl_price)
         level_move_dist = profile.expected_level_move_pips * pip_size
-        # T2 distance = the smaller of level move or 3x SL (whichever is reachable)
-        tp2_dist = min(level_move_dist, risk_dist * 3.0)
+        # T2 distance = the smaller of level move or 2.5x SL (whichever is reachable)
+        tp2_dist = min(level_move_dist, risk_dist * 2.5)
         # But never less than 1.5x SL (minimum RR worth holding for)
         tp2_dist = max(tp2_dist, risk_dist * 1.5)
 
@@ -827,7 +830,7 @@ def main(argv: Optional[list] = None) -> None:
     print(f"Starting equity: ${args.equity:.2f}")
     print(f"Min confluence: {args.min_confluence}")
     if args.validation or args.compare:
-        print(f"Validation library: ACTIVE (only proven setups)")
+        print("Validation library: ACTIVE (only proven setups)")
     print()
 
     # Load data from MT5
@@ -927,7 +930,7 @@ def main(argv: Optional[list] = None) -> None:
             records = lib.top_records(limit=5)
             print(f"\n  VALIDATION LIBRARY: promoted {promoted} patterns")
             if records:
-                print(f"  Top proven patterns:")
+                print("  Top proven patterns:")
                 for r in records:
                     print(f"    {r.setup_family:<20} {r.symbol or 'CROSS':<8} "
                           f"win={r.favorable_rate:.1f}% n={r.total} "

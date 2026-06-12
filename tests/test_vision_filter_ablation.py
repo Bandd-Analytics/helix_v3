@@ -109,3 +109,5 @@ def test_pair_research_ablation_writes_report(tmp_path) -> None:
     assert "Best RRS" in report
     assert "PF" in report
     assert "Payoff" in report
+    assert "feature_shark_fin_cluster_wait" in report
+    assert "mgmt_first_2_bar_mae_le_10" in report

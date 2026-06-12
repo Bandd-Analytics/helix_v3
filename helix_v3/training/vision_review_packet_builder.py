@@ -43,6 +43,7 @@ class PacketConfig:
     losers_per_setup: int = 8
     copy_images: bool = True
     require_w_bottom: bool = True
+    setup_key: Optional[str] = None
 
 
 def build_review_packets(config: PacketConfig) -> list[Path]:
@@ -120,6 +121,10 @@ def _load_setup_candidates(config: PacketConfig, symbol: str) -> list[dict[str, 
         if int(row.get("total") or 0) >= config.min_total
         and float(row.get("favorable_rate") or 0.0) >= config.min_favorable_rate
         and float(row.get("avg_exit_pips") or 0.0) >= config.min_avg_exit_pips
+        and (
+            config.setup_key is None
+            or str(row.get("normalized_key") or "") == config.setup_key
+        )
         and (
             not config.require_w_bottom
             or "W_BOTTOM" in str(row.get("normalized_key") or "")
@@ -587,6 +592,10 @@ def main(argv: Optional[list[str]] = None) -> None:
     parser.add_argument("--max-setups-per-pair", type=int, default=3)
     parser.add_argument("--winners-per-setup", type=int, default=8)
     parser.add_argument("--losers-per-setup", type=int, default=8)
+    parser.add_argument(
+        "--setup-key",
+        help="Build packets only for this exact normalized setup key",
+    )
     parser.add_argument("--no-copy-images", action="store_true")
     parser.add_argument(
         "--include-non-w-bottom",
@@ -610,6 +619,7 @@ def main(argv: Optional[list[str]] = None) -> None:
             losers_per_setup=args.losers_per_setup,
             copy_images=not args.no_copy_images,
             require_w_bottom=not args.include_non_w_bottom,
+            setup_key=args.setup_key,
         )
     )
     print(f"Wrote {len(packets)} vision review packet(s) to {args.output_root}")

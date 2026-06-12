@@ -1,7 +1,8 @@
 """Pair-gated risk and trade management profiles.
 
 Calibrated from MMM Book (Steve Mauro) methodology:
-- 90 min universal stale exit if NOT in profit (M/W formation window is 30-90 min)
+- 90 min stale exit if NOT in profit for standard pairs (M/W formation window is 30-90 min)
+- Extended pairs tighten SL at 90 min and exit at the pair-specific limit if still not in profit
 - If IN profit, trail SL to secure gains — never exit a winning trade early
 - Stop hunt range 25-50 pips (pair-specific based on volatility)
 - L1/L2 average move ~75 pips from peak to consolidation
@@ -104,8 +105,8 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         stale_exit_minutes=90,            # Low-vol: exit at 90 (validated 64.3%)
         stale_max_pips=0.0,               # Must be in profit by 90 min
         max_duration_minutes=240,          # 4h max
-        trail_activation_pips=15.0,        # BE after 15 pips (conservative EUR)
-        trail_distance_pips=12.0,          # Tight trail — EUR doesn't whipsaw much
+        trail_activation_pips=12.0,        # Lowered from 15: catch runners earlier
+        trail_distance_pips=10.0,          # Tightened from 12: lock in more profit
         sl_buffer_pips=3.0,
         min_sl_pips=15.0,                  # EUR is tight — but never less than 15
         stop_hunt_min_pips=20.0,           # EUR hunts are tighter
@@ -124,8 +125,8 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         stale_exit_minutes=90,            # Low-vol: exit at 90 (validated 62.0%)
         stale_max_pips=0.0,
         max_duration_minutes=240,
-        trail_activation_pips=20.0,        # GBP needs more room
-        trail_distance_pips=15.0,
+        trail_activation_pips=15.0,        # Lowered from 20: catch runners earlier
+        trail_distance_pips=12.0,          # Tightened from 15
         sl_buffer_pips=3.0,
         min_sl_pips=20.0,
         stop_hunt_min_pips=25.0,           # Standard MMM range
@@ -144,8 +145,8 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         stale_exit_minutes=90,            # Low-vol: exit at 90 (validated 69.6%)
         stale_max_pips=0.0,
         max_duration_minutes=240,
-        trail_activation_pips=12.0,        # AUD is slower
-        trail_distance_pips=10.0,
+        trail_activation_pips=10.0,        # Lowered from 12: AUD is slower but catch moves
+        trail_distance_pips=8.0,           # Tightened from 10
         sl_buffer_pips=3.0,
         min_sl_pips=12.0,                  # AUD is slow — tighter floor OK
         stop_hunt_min_pips=15.0,           # AUD hunts are smaller
@@ -169,8 +170,8 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         stale_exit_minutes=150,            # CALIBRATED: was 90, holding helps (37.9% exit-correct)
         stale_max_pips=0.0,               # Must be in profit
         max_duration_minutes=300,          # 5h — crosses can trend longer
-        trail_activation_pips=30.0,        # Wide ATR needs room
-        trail_distance_pips=22.0,
+        trail_activation_pips=25.0,        # Lowered from 30: catch runs earlier
+        trail_distance_pips=18.0,          # Tightened from 22
         sl_buffer_pips=5.0,               # Wider — spiky pair
         min_sl_pips=25.0,                  # Spiky — needs room
         stop_hunt_min_pips=30.0,
@@ -190,8 +191,8 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         stale_exit_minutes=135,            # CALIBRATED: was 90, holding helps (45.8% exit-correct)
         stale_max_pips=0.0,               # Must be in profit
         max_duration_minutes=240,
-        trail_activation_pips=25.0,        # GJ can run 150+ pips
-        trail_distance_pips=18.0,
+        trail_activation_pips=20.0,        # Lowered from 25: GJ runs hard, catch earlier
+        trail_distance_pips=15.0,          # Tightened from 18
         sl_buffer_pips=5.0,               # Wider for JPY volatility
         min_sl_pips=25.0,                  # GJ is aggressive — never less than 25
         stop_hunt_min_pips=30.0,           # GJ stop hunts are aggressive
@@ -278,8 +279,8 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         stale_exit_minutes=90,            # Low-vol: exit at 90 (validated 86.5% — strongest)
         stale_max_pips=0.0,
         max_duration_minutes=240,
-        trail_activation_pips=10.0,        # Very low vol — small moves matter
-        trail_distance_pips=8.0,
+        trail_activation_pips=8.0,         # Lowered from 10: catch small moves earlier
+        trail_distance_pips=6.0,           # Tightened from 8
         sl_buffer_pips=3.0,
         min_sl_pips=10.0,                  # Ultra-low vol — tightest floor
         stop_hunt_min_pips=15.0,           # Tight ranges, small hunts
@@ -301,8 +302,8 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         stale_exit_minutes=90,            # Low-vol behavior (77.7% — validated)
         stale_max_pips=0.0,
         max_duration_minutes=240,
-        trail_activation_pips=22.0,
-        trail_distance_pips=16.0,
+        trail_activation_pips=18.0,        # Lowered from 22: catch runs earlier
+        trail_distance_pips=14.0,          # Tightened from 16
         sl_buffer_pips=4.0,
         min_sl_pips=20.0,
         stop_hunt_min_pips=25.0,
@@ -321,8 +322,8 @@ PAIR_PROFILES: Dict[str, PairProfile] = {
         stale_exit_minutes=90,            # Low-vol: exit at 90 (validated 69.2%)
         stale_max_pips=0.0,
         max_duration_minutes=240,
-        trail_activation_pips=15.0,
-        trail_distance_pips=12.0,
+        trail_activation_pips=12.0,        # Lowered from 15: catch moves earlier
+        trail_distance_pips=10.0,          # Tightened from 12
         sl_buffer_pips=3.0,
         min_sl_pips=15.0,
         stop_hunt_min_pips=20.0,
