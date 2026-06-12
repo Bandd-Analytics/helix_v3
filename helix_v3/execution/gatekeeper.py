@@ -20,6 +20,7 @@ from helix_v3.core.types import (
     ExecutionOrder,
     QuantSignal,
 )
+from helix_v3.core.exposure import OpenRisk, exposure_violation
 from helix_v3.core.news_calendar import get_news_calendar
 from helix_v3.core.volatility import d1_atr_pips_mt5
 from helix_v3.execution.risk_state import RiskState, _trading_day
@@ -267,6 +268,57 @@ class MT5ExecutionGatekeeper:
             return False
         return True
 
+    def _position_risk_pct(self, pos, equity: float) -> float:
+        """Loss fraction if this open position's CURRENT stop is hit.
+
+        A stop at/past breakeven risks nothing; no stop at all is scored
+        at the pair's full intended risk (conservative).
+        """
+        try:
+            if pos.sl == 0:
+                return get_pair_profile(pos.symbol).max_risk_pct
+            if pos.type == mt5.POSITION_TYPE_BUY and pos.sl >= pos.price_open:
+                return 0.0
+            if pos.type == mt5.POSITION_TYPE_SELL and pos.sl <= pos.price_open:
+                return 0.0
+            pip_size = self._get_pip_value(pos.symbol)
+            dist_pips = abs(pos.price_open - pos.sl) / pip_size
+            loss = dist_pips * self._get_pip_cost(pos.symbol, pos.volume)
+            return loss / equity if equity > 0 else 0.0
+        except Exception as e:
+            logger.error("Position risk calc failed for %s: %s", pos.symbol, e)
+            return get_pair_profile(pos.symbol).max_risk_pct
+
+    def _check_currency_exposure(self, symbol: str, direction: Direction) -> bool:
+        """Per-currency NET exposure cap across open positions (Tier 2.6).
+
+        3 GBP longs at 0.8% = one GBP news candle = 2.4% correlated loss.
+        Cap = MAX_CCY_EXPOSURE_MULT x max_risk_per_trade (default 2x1% = 2%).
+        """
+        if direction not in (Direction.BUY, Direction.SELL):
+            return True
+        try:
+            equity = self._get_account_equity()
+            opens = []
+            for pos in (mt5.positions_get() or []):
+                pos_dir = (
+                    Direction.BUY if pos.type == mt5.POSITION_TYPE_BUY else Direction.SELL
+                )
+                opens.append(OpenRisk(pos.symbol, pos_dir, self._position_risk_pct(pos, equity)))
+        except Exception as e:
+            logger.error("Exposure check failed for %s: %s — allowing entry", symbol, e)
+            return True
+
+        cap_pct = (
+            settings.risk.max_currency_exposure_mult * settings.risk.max_risk_per_trade
+        )
+        new_risk = get_pair_profile(symbol).max_risk_pct
+        reason = exposure_violation(symbol, direction, new_risk, opens, cap_pct)
+        if reason is not None:
+            logger.warning("CURRENCY EXPOSURE BLOCK: %s — %s", symbol, reason)
+            return False
+        return True
+
     def _check_news_blackout(self, symbol: str) -> bool:
         """No entries within the high-impact news window (Tier 2.5).
 
@@ -305,6 +357,8 @@ class MT5ExecutionGatekeeper:
         if not self._check_spread(symbol):
             return None
         if not self._check_news_blackout(symbol):
+            return None
+        if not self._check_currency_exposure(symbol, consensus.direction):
             return None
 
         direction = consensus.direction

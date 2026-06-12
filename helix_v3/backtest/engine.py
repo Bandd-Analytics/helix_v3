@@ -20,6 +20,7 @@ from typing import Dict, List, Optional
 import pandas as pd
 
 from config.pair_profiles import PairProfile, get_pair_profile, get_tradeable_symbols
+from helix_v3.core.exposure import OpenRisk, exposure_violation
 from helix_v3.backtest.data_store import HistoricalDataStore
 from helix_v3.core.mtf_analyzer import MTFAnalyzer
 from helix_v3.core.quant_engine import MMMQuantitativeEngine
@@ -500,6 +501,8 @@ class BacktestRunner:
         # (e.g. --news-csv). None = no blackout in this backtest run.
         self._news_calendar = None
         self._news_blocks = 0
+        # Currency exposure cap (Tier 2.6)
+        self._exposure_blocks = 0
         if news_events:
             from helix_v3.core.news_calendar import NewsCalendar
 
@@ -812,6 +815,32 @@ class BacktestRunner:
         pip_size_calc = point * 10 if digits in (3, 5) else point
         pip_value_per_lot = (pip_size_calc / point) * tick_value if point > 0 else 10.0
 
+        # Currency exposure cap (Tier 2.6) — same NET-per-currency rule the
+        # live gatekeeper enforces. Risk per open trade = loss at its
+        # current stop (breakeven stop = 0).
+        from config.settings import settings as _settings
+        eq = self.simulator.mtm_equity
+        opens = []
+        for t in self.simulator.open_trades:
+            if t.direction == Direction.BUY:
+                dist = max(0.0, t.entry_price - t.current_sl)
+            else:
+                dist = max(0.0, t.current_sl - t.entry_price)
+            loss = (dist / t.pip_size) * t.pip_value_per_lot * t.remaining_lots
+            opens.append(OpenRisk(t.symbol, t.direction, loss / eq if eq > 0 else 0.0))
+        cap_pct = (
+            _settings.risk.max_currency_exposure_mult * _settings.risk.max_risk_per_trade
+        )
+        violation = exposure_violation(symbol, direction, profile.max_risk_pct, opens, cap_pct)
+        if violation is not None:
+            self._exposure_blocks += 1
+            if self.verbose:
+                logger.debug(
+                    "[%s] %s EXPOSURE BLOCK: %s",
+                    bar_time.strftime("%m-%d %H:%M"), symbol, violation,
+                )
+            return
+
         trade = self.simulator.open_trade(
             symbol=symbol,
             direction=direction,
@@ -1106,6 +1135,8 @@ def main(argv: Optional[list] = None) -> None:
 
     if runner._news_calendar is not None:
         print(f"\n  NEWS BLACKOUT: {runner._news_blocks} entry checks blocked")
+    if runner._exposure_blocks:
+        print(f"\n  CURRENCY EXPOSURE: {runner._exposure_blocks} entries blocked")
 
     # Promotion into the LIVE library is opt-in (Tier 1.3): silently promoting
     # a run's own outcomes built the self-reinforcing loop the audit flagged.

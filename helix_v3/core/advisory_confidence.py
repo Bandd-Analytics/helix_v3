@@ -190,7 +190,11 @@ def score_advisory_setup(
 
     convergence = summarize_peer_convergence(setup, peers)
     if convergence.score >= 50.0:
-        boost = min(12.0, convergence.score * 0.12)
+        # Capped at +4 per audit Tier 2.6 (was +12): cross-pair "themes" are
+        # CORRELATED positions — rewarding them stacks the same currency bet.
+        # The hard portfolio cap lives in core/exposure.py; this stays a
+        # mild confirmation signal, not an invitation to concentrate.
+        boost = min(4.0, convergence.score * 0.04)
         score += boost
         reasons.append(
             f"cross-pair convergence {convergence.score:.0f} "

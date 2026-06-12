@@ -55,6 +55,9 @@ class RiskConfig:
     # defensive management (close if red, breakeven if green).
     news_blackout_enabled: bool = os.getenv("NEWS_BLACKOUT", "true").lower() == "true"
     news_blackout_minutes: int = int(os.getenv("NEWS_BLACKOUT_MIN", "30"))
+    # Currency exposure cap (audit Tier 2.6): max NET risk per currency
+    # across open positions, as a multiple of max_risk_per_trade.
+    max_currency_exposure_mult: float = float(os.getenv("MAX_CCY_EXPOSURE_MULT", "2.0"))
 
 
 @dataclass(frozen=True)
