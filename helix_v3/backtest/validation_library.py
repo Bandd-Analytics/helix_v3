@@ -153,7 +153,16 @@ class ValidationLibrary:
         min_favorable_rate: float = 55.0,
         min_avg_exit_pips: float = 0.0,
         min_symbols: int = 2,
+        before: Optional[datetime] = None,
     ) -> int:
+        """Rebuild library records from replay outcomes.
+
+        `before` enables WALK-FORWARD partitioning (audit Tier 1.3): only
+        outcomes with snapshot_at strictly before the cutoff contribute.
+        Without it, a backtest promotes patterns from its own evaluation
+        window and then trades them on the same bars — memorization
+        presented as edge.
+        """
         # Build new records first so we can diff
         replay_conn = sqlite3.connect(str(self._replay_db_path))
         replay_conn.row_factory = sqlite3.Row
@@ -163,6 +172,7 @@ class ValidationLibrary:
                 min_total=min_total,
                 min_favorable_rate=min_favorable_rate,
                 min_avg_exit_pips=min_avg_exit_pips,
+                before=before,
             )
             new_records.extend(
                 self._build_cross_pair_records(
@@ -171,6 +181,7 @@ class ValidationLibrary:
                     min_favorable_rate=min_favorable_rate,
                     min_avg_exit_pips=min_avg_exit_pips,
                     min_symbols=min_symbols,
+                    before=before,
                 )
             )
         finally:
@@ -274,6 +285,7 @@ class ValidationLibrary:
         min_favorable_rate: float = 55.0,
         min_avg_exit_pips: float = 0.0,
         min_symbols: int = 2,
+        before: Optional[datetime] = None,
     ) -> int:
         replay_conn = sqlite3.connect(str(self._replay_db_path))
         replay_conn.row_factory = sqlite3.Row
@@ -283,6 +295,7 @@ class ValidationLibrary:
                 min_total=min_total,
                 min_favorable_rate=min_favorable_rate,
                 min_avg_exit_pips=min_avg_exit_pips,
+                before=before,
             )
             records.extend(
                 self._build_cross_pair_records(
@@ -291,6 +304,7 @@ class ValidationLibrary:
                     min_favorable_rate=min_favorable_rate,
                     min_avg_exit_pips=min_avg_exit_pips,
                     min_symbols=min_symbols,
+                    before=before,
                 )
             )
         finally:
@@ -493,9 +507,11 @@ class ValidationLibrary:
         min_total: int,
         min_favorable_rate: float,
         min_avg_exit_pips: float,
+        before: Optional[datetime] = None,
     ) -> list[ValidationRecord]:
+        where, params = _before_clause(before)
         rows = replay_conn.execute(
-            """SELECT
+            f"""SELECT
                 s.symbol,
                 s.direction,
                 s.normalized_key,
@@ -512,9 +528,10 @@ class ValidationLibrary:
             FROM mmm_setup_signatures s
             JOIN mmm_event_outcomes o
               ON o.source = s.source AND o.source_id = s.source_id
+            {where}
             GROUP BY s.symbol, s.direction, s.normalized_key, s.setup_family, s.primary_theme
             HAVING total >= ?""",
-            (min_total,),
+            (*params, min_total),
         ).fetchall()
         return [
             record for row in rows
@@ -537,9 +554,11 @@ class ValidationLibrary:
         min_favorable_rate: float,
         min_avg_exit_pips: float,
         min_symbols: int,
+        before: Optional[datetime] = None,
     ) -> list[ValidationRecord]:
+        where, params = _before_clause(before)
         rows = replay_conn.execute(
-            """SELECT
+            f"""SELECT
                 '' AS symbol,
                 s.direction,
                 s.normalized_key,
@@ -557,9 +576,10 @@ class ValidationLibrary:
             FROM mmm_setup_signatures s
             JOIN mmm_event_outcomes o
               ON o.source = s.source AND o.source_id = s.source_id
+            {where}
             GROUP BY s.direction, s.normalized_key, s.setup_family, s.primary_theme
             HAVING total >= ?""",
-            (min_total,),
+            (*params, min_total),
         ).fetchall()
         records: list[ValidationRecord] = []
         for row in rows:
@@ -652,6 +672,19 @@ class ValidationLibrary:
                 if str(value).isdigit()
             ],
         )
+
+
+def _before_clause(before: Optional[datetime]) -> tuple[str, tuple]:
+    """WHERE fragment limiting outcomes to strictly before the cutoff.
+
+    snapshot_at is stored as UTC isoformat, so lexicographic comparison is
+    chronological.
+    """
+    if before is None:
+        return "", ()
+    if before.tzinfo is None:
+        before = before.replace(tzinfo=timezone.utc)
+    return "WHERE o.snapshot_at < ?", (before.astimezone(timezone.utc).isoformat(),)
 
 
 def _entry_rules_from_key(normalized_key: str, direction: str, symbols: list[str]) -> dict[str, Any]:

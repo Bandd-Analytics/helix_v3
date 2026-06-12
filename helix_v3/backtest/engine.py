@@ -508,6 +508,12 @@ class BacktestRunner:
         self._replay_store = MMMReplayStore() if _HAS_REPLAY else None
         # Track ReplaySetup per trade for outcome recording (keyed by "SYMBOL_entry_time")
         self._trade_setups: Dict[str, object] = {}  # "SYMBOL_timestamp" -> ReplaySetup
+        # Monotonic source-id for replay records. len(closed_trades) at entry
+        # time collided for concurrent trades AND across runs (the tables are
+        # UNIQUE(source, source_id) with INSERT OR REPLACE — collisions
+        # silently overwrote earlier outcomes). Seed with ms epoch so every
+        # run owns a distinct id range.
+        self._next_source_id = int(datetime.now(timezone.utc).timestamp() * 1000)
         # Validation library for filtering entries
         self._validation_lib = None
         self._validation_blocks = 0
@@ -515,14 +521,28 @@ class BacktestRunner:
         self._graveyard_warnings = 0
         if use_validation and _HAS_REPLAY:
             try:
+                from pathlib import Path
+
+                from config.settings import settings
                 from helix_v3.backtest.validation_library import ValidationLibrary
-                self._validation_lib = ValidationLibrary()
-                count = self._validation_lib._conn.execute(
-                    "SELECT COUNT(*) FROM validation_setups"
-                ).fetchone()[0]
-                logger.info("Validation library loaded: %d proven setups", count)
+
+                # WALK-FORWARD: build a partitioned library that only knows
+                # outcomes from strictly BEFORE the evaluation window, with a
+                # 1-week embargo. Querying the live library here let the
+                # backtest trade patterns promoted from these exact bars.
+                wf_path = Path(settings.log_dir) / "validation_library_walkforward.db"
+                for suffix in ("", "-wal", "-shm"):
+                    Path(str(wf_path) + suffix).unlink(missing_ok=True)
+                cutoff = data_store.start_date - timedelta(days=7)
+                self._validation_lib = ValidationLibrary(db_path=wf_path)
+                count = self._validation_lib.rebuild_from_replay(before=cutoff)
+                logger.info(
+                    "Walk-forward validation library: %d setups from outcomes "
+                    "before %s (1-week embargo before window start)",
+                    count, cutoff.strftime("%Y-%m-%d"),
+                )
             except Exception as e:
-                logger.warning("Failed to load validation library: %s", e)
+                logger.warning("Failed to build walk-forward validation library: %s", e)
 
     def run(self) -> None:
         """Execute the backtest."""
@@ -783,10 +803,11 @@ class BacktestRunner:
             trade.advisory_score = advisory.final_score
             # Store replay setup for outcome recording when trade closes
             if _HAS_REPLAY:
+                self._next_source_id += 1
                 rs = replay_setup_from_mtf(
                     analysis, snapshot_at=bar_time,
                     tdi_result=tdi_result, patterns=pat_scan,
-                    source="backtest", source_id=len(self.simulator.closed_trades),
+                    source="backtest", source_id=self._next_source_id,
                 )
                 trade_key = f"{symbol}_{bar_time.isoformat()}"
                 self._trade_setups[trade_key] = rs
@@ -900,6 +921,10 @@ def main(argv: Optional[list] = None) -> None:
                         help="Commission per lot per round trip in account currency")
     parser.add_argument("--validation", action="store_true",
                         help="Only enter setups matched by validation library (proven patterns)")
+    parser.add_argument("--promote", action="store_true",
+                        help="After the run, promote this run's outcomes into the LIVE "
+                             "validation library (off by default: a backtest must not "
+                             "silently feed the gate it will be tested against)")
     parser.add_argument("--compare", action="store_true",
                         help="Run twice (with and without validation) and compare results")
     args = parser.parse_args(argv)
@@ -1018,8 +1043,9 @@ def main(argv: Optional[list] = None) -> None:
               f"{runner._validation_blocks} blocks, "
               f"{runner._graveyard_warnings} graveyard warnings")
 
-    # Auto-promote proven patterns to validation library
-    if _HAS_REPLAY:
+    # Promotion into the LIVE library is opt-in (Tier 1.3): silently promoting
+    # a run's own outcomes built the self-reinforcing loop the audit flagged.
+    if _HAS_REPLAY and args.promote:
         try:
             from helix_v3.backtest.validation_library import ValidationLibrary
             lib = ValidationLibrary()
@@ -1037,6 +1063,9 @@ def main(argv: Optional[list] = None) -> None:
             lib.close()
         except Exception as e:
             logger.warning("Validation library promotion failed: %s", e)
+    elif _HAS_REPLAY:
+        print("\n  (Outcomes recorded to replay store; live-library promotion "
+              "skipped — pass --promote to opt in.)")
 
 
 if __name__ == "__main__":
