@@ -106,6 +106,54 @@ class MT5ExecutionGatekeeper:
         return (pip_size / tick_size) * tick_value * lot_size
 
     # ------------------------------------------------------------------
+    # Order-Send Portability (Tier 3.3)
+    # ------------------------------------------------------------------
+
+    DEVIATION_PIPS = 1.0  # slippage budget floor; actual budget >= pair spread
+
+    def _filling_mode(self, symbol: str) -> int:
+        """Filling mode the symbol actually supports (IOC was hardcoded).
+
+        symbol_info.filling_mode is a bitmask (1 = FOK, 2 = IOC). Prefer
+        IOC — partial fills reconcile fine in execute_order — then FOK,
+        else RETURN.
+        """
+        try:
+            flags = int(getattr(self._get_symbol_info(symbol), "filling_mode", 0))
+        except Exception:
+            return mt5.ORDER_FILLING_IOC
+        if flags & 2:
+            return mt5.ORDER_FILLING_IOC
+        if flags & 1:
+            return mt5.ORDER_FILLING_FOK
+        return mt5.ORDER_FILLING_RETURN
+
+    def _deviation_points(self, symbol: str) -> int:
+        """Slippage allowance in POINTS from a pip-denominated budget.
+
+        The hardcoded 10 points meant 1 pip on EURUSD but 10 pips on
+        XAUUSD. The budget is now pips — max(DEVIATION_PIPS, the pair's
+        spread limit) — converted per symbol.
+        """
+        try:
+            info = self._get_symbol_info(symbol)
+            pip = self._get_pip_value(symbol)
+            budget_pips = max(
+                self.DEVIATION_PIPS, get_pair_profile(symbol).max_spread_pips
+            )
+            return max(1, int(round(budget_pips * pip / info.point)))
+        except Exception:
+            return 10
+
+    def _min_stop_distance(self, symbol: str) -> float:
+        """Broker minimum stop distance as a PRICE delta (trade_stops_level)."""
+        try:
+            info = self._get_symbol_info(symbol)
+            return max(0, int(getattr(info, "trade_stops_level", 0))) * float(info.point)
+        except Exception:
+            return 0.0
+
+    # ------------------------------------------------------------------
     # Drawdown Circuit Breaker
     # ------------------------------------------------------------------
 
@@ -536,6 +584,35 @@ class MT5ExecutionGatekeeper:
 
             return ticket
 
+        # Tier 3.3: respect the broker's minimum stop distance — widen an
+        # SL/TP that sits inside trade_stops_level instead of burning an
+        # order_check reject (order_check remains the final authority).
+        min_dist = self._min_stop_distance(order.symbol)
+        if min_dist > 0:
+            digits = int(info.digits)
+            if order.direction == Direction.BUY:
+                sl_limit = order.entry_price - min_dist
+                tp_limit = order.entry_price + min_dist
+                if order.stop_loss > sl_limit:
+                    logger.warning(
+                        "STOPS LEVEL: widening %s SL %.5f -> %.5f (min distance)",
+                        order.symbol, order.stop_loss, sl_limit,
+                    )
+                    order.stop_loss = round(sl_limit, digits)
+                if order.take_profit_2 < tp_limit:
+                    order.take_profit_2 = round(tp_limit, digits)
+            else:
+                sl_limit = order.entry_price + min_dist
+                tp_limit = order.entry_price - min_dist
+                if order.stop_loss < sl_limit:
+                    logger.warning(
+                        "STOPS LEVEL: widening %s SL %.5f -> %.5f (min distance)",
+                        order.symbol, order.stop_loss, sl_limit,
+                    )
+                    order.stop_loss = round(sl_limit, digits)
+                if order.take_profit_2 > tp_limit:
+                    order.take_profit_2 = round(tp_limit, digits)
+
         request = {
             "action": mt5.TRADE_ACTION_DEAL,
             "symbol": order.symbol,
@@ -544,11 +621,11 @@ class MT5ExecutionGatekeeper:
             "price": order.entry_price,
             "sl": order.stop_loss,
             "tp": order.take_profit_2,  # Initial TP at T2 level
-            "deviation": 10,  # Max slippage in points
+            "deviation": self._deviation_points(order.symbol),  # pips -> points (Tier 3.3)
             "magic": 314159,
             "comment": "HelixV3_MMM",
             "type_time": mt5.ORDER_TIME_GTC,
-            "type_filling": mt5.ORDER_FILLING_IOC,
+            "type_filling": self._filling_mode(order.symbol),  # broker-supported (Tier 3.3)
         }
 
         # Margin / validity pre-check — catches NO_MONEY and invalid stops
@@ -886,6 +963,7 @@ class MT5ExecutionGatekeeper:
                     continue
 
             # --- 4. T1 Partial Close at 1:1 RR ---
+            just_hit_t1 = False
             if hit_t1 and order.status in ("FILLED", "STALE_TIGHTENED"):
                 close_volume = round(
                     pos.volume * self._risk_cfg.partial_close_ratio, 2
@@ -893,9 +971,12 @@ class MT5ExecutionGatekeeper:
                 if close_volume >= 0.01:
                     self._partial_close(pos, close_volume)
                     order.status = "T1_HIT"
+                    just_hit_t1 = True
 
-                    # Move SL to breakeven
-                    self._modify_sl(pos.ticket, pos.symbol, entry)
+                    # Move SL to breakeven — retry once immediately; the
+                    # persistent enforcement below (4.5) catches the rest.
+                    if not self._modify_sl(pos.ticket, pos.symbol, entry):
+                        self._modify_sl(pos.ticket, pos.symbol, entry)
                     logger.info(
                         "T1 HIT: %s ticket=%d closed %.2f lots, SL -> breakeven",
                         pos.symbol, ticket, close_volume,
@@ -917,7 +998,39 @@ class MT5ExecutionGatekeeper:
                     except Exception as e:
                         logger.error("Journal T1 record failed: %s", e)
 
-            # --- 5. Trailing Stop Loss ---
+            # --- 4.5 Breakeven enforcement (Tier 3.3) ---
+            # A post-T1 position without a breakeven stop is naked risk on a
+            # remainder that already paid out once. Retry every cycle; if it
+            # keeps failing, alert ONCE (and announce when it's restored).
+            if order.status == "T1_HIT" and not just_hit_t1:
+                be_missing = (
+                    (order.direction == Direction.BUY and pos.sl < entry)
+                    or (order.direction == Direction.SELL
+                        and (pos.sl > entry or pos.sl == 0))
+                )
+                if be_missing:
+                    alerted = getattr(self, "_be_alert_tickets", None)
+                    if alerted is None:
+                        alerted = self._be_alert_tickets = set()
+                    if self._modify_sl(ticket, pos.symbol, entry):
+                        if ticket in alerted:
+                            alerted.discard(ticket)
+                            actions.append(
+                                f"BE RESTORED: {pos.symbol} ticket={ticket} "
+                                f"post-T1 stop back at breakeven"
+                            )
+                    elif ticket not in alerted:
+                        alerted.add(ticket)
+                        logger.critical(
+                            "POST-T1 POSITION WITHOUT BREAKEVEN: %s ticket=%d "
+                            "sl=%.5f entry=%.5f — modify failing, retrying every cycle",
+                            pos.symbol, ticket, pos.sl, entry,
+                        )
+                        actions.append(
+                            f"BE FAILED: {pos.symbol} ticket={ticket} post-T1 stop "
+                            f"NOT at breakeven (sl={pos.sl:.5f}) — retrying, check manually"
+                        )
+
             # --- 5. Trailing Stop Loss (pair-gated) ---
             if settings.risk.trailing_stop_enabled and order.status == "T1_HIT":
                 activation = pp.trail_activation_pips
@@ -968,11 +1081,11 @@ class MT5ExecutionGatekeeper:
             "type": close_type,
             "position": position.ticket,
             "price": price,
-            "deviation": 10,
+            "deviation": self._deviation_points(position.symbol),
             "magic": 314159,
             "comment": "HelixV3_T1_partial",
             "type_time": mt5.ORDER_TIME_GTC,
-            "type_filling": mt5.ORDER_FILLING_IOC,
+            "type_filling": self._filling_mode(position.symbol),
         }
 
         result = mt5.order_send(request)
@@ -987,12 +1100,84 @@ class MT5ExecutionGatekeeper:
         return False
 
     def _modify_sl(self, ticket: int, symbol: str, new_sl: float) -> bool:
+        """Modify a position's stop, portably and safely (Tier 3.3).
+
+        - Preserves the existing TP in the request — TRADE_ACTION_SLTP
+          with tp omitted CLEARS the take profit, so every trail/BE move
+          was silently wiping TP2.
+        - Respects trade_stops_level: a stop inside the broker minimum is
+          clamped to the closest allowed price, and skipped entirely if
+          clamping would LOOSEN the existing stop.
+        - Respects freeze_level: a stop about to trigger is left alone.
+        - Rounds to the symbol's digits (the fixed 5 was wrong for
+          JPY/gold/indices).
+        On any pre-check lookup failure, falls back to the raw modify.
+        """
+        digits = 5
+        current_tp = 0.0
+        try:
+            info = self._get_symbol_info(symbol)
+            digits = int(info.digits)
+            point = float(info.point)
+            stops_dist = max(0, int(getattr(info, "trade_stops_level", 0))) * point
+            freeze_dist = max(0, int(getattr(info, "trade_freeze_level", 0))) * point
+            plist = mt5.positions_get(ticket=ticket)
+            pos = plist[0] if plist else None
+            tick = mt5.symbol_info_tick(symbol)
+            if pos is not None:
+                current_tp = float(pos.tp or 0.0)
+                if tick is not None:
+                    if pos.type == mt5.POSITION_TYPE_BUY:
+                        market = float(tick.bid)
+                        if (
+                            freeze_dist > 0 and pos.sl > 0
+                            and 0 <= market - pos.sl <= freeze_dist
+                        ):
+                            logger.debug(
+                                "SL modify skipped %s ticket=%d: stop inside freeze level",
+                                symbol, ticket,
+                            )
+                            return False
+                        limit = market - stops_dist
+                        if stops_dist > 0 and new_sl > limit:
+                            if pos.sl > 0 and limit <= pos.sl:
+                                logger.debug(
+                                    "SL modify skipped %s ticket=%d: clamped stop "
+                                    "would not improve (stops level)", symbol, ticket,
+                                )
+                                return False
+                            new_sl = limit
+                    else:
+                        market = float(tick.ask)
+                        if (
+                            freeze_dist > 0 and pos.sl > 0
+                            and 0 <= pos.sl - market <= freeze_dist
+                        ):
+                            logger.debug(
+                                "SL modify skipped %s ticket=%d: stop inside freeze level",
+                                symbol, ticket,
+                            )
+                            return False
+                        limit = market + stops_dist
+                        if stops_dist > 0 and new_sl < limit:
+                            if pos.sl > 0 and limit >= pos.sl:
+                                logger.debug(
+                                    "SL modify skipped %s ticket=%d: clamped stop "
+                                    "would not improve (stops level)", symbol, ticket,
+                                )
+                                return False
+                            new_sl = limit
+        except Exception as e:
+            logger.debug("SL modify pre-check unavailable for %s: %s", symbol, e)
+
         request = {
             "action": mt5.TRADE_ACTION_SLTP,
             "position": ticket,
             "symbol": symbol,
-            "sl": round(new_sl, 5),
+            "sl": round(new_sl, digits),
         }
+        if current_tp > 0:
+            request["tp"] = round(current_tp, digits)
 
         result = mt5.order_send(request)
         if result and result.retcode == mt5.TRADE_RETCODE_DONE:
