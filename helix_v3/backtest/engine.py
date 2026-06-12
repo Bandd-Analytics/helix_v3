@@ -21,6 +21,7 @@ import pandas as pd
 
 from config.pair_profiles import PairProfile, get_pair_profile, get_tradeable_symbols
 from helix_v3.core.exposure import OpenRisk, exposure_violation
+from helix_v3.core.regime import assess_regime
 from helix_v3.backtest.data_store import HistoricalDataStore
 from helix_v3.core.mtf_analyzer import MTFAnalyzer
 from helix_v3.core.quant_engine import MMMQuantitativeEngine
@@ -503,6 +504,10 @@ class BacktestRunner:
         self._news_blocks = 0
         # Currency exposure cap (Tier 2.6)
         self._exposure_blocks = 0
+        # Regime filter (Tier 2.8)
+        from config.settings import settings as _settings
+        self._regime_enabled = _settings.risk.regime_filter_enabled
+        self._regime_blocks = 0
         if news_events:
             from helix_v3.core.news_calendar import NewsCalendar
 
@@ -661,6 +666,20 @@ class BacktestRunner:
         if self._news_calendar is not None:
             if self._news_calendar.blackout(symbol, bar_time) is not None:
                 self._news_blocks += 1
+                return
+
+        # Regime filter (Tier 2.8) — MMM conditions present on this symbol?
+        # Reads D1 as-of decision time through the BacktestEngine; the
+        # verdict is cached per D1 bar so this is one check per day.
+        if self._regime_enabled:
+            regime = assess_regime(self.engine, symbol)
+            if not regime.mmm_present:
+                self._regime_blocks += 1
+                if self.verbose:
+                    logger.debug(
+                        "[%s] %s REGIME SKIP: %s",
+                        bar_time.strftime("%m-%d %H:%M"), symbol, regime.reason,
+                    )
                 return
 
         # Re-entry guard
@@ -1137,6 +1156,8 @@ def main(argv: Optional[list] = None) -> None:
         print(f"\n  NEWS BLACKOUT: {runner._news_blocks} entry checks blocked")
     if runner._exposure_blocks:
         print(f"\n  CURRENCY EXPOSURE: {runner._exposure_blocks} entries blocked")
+    if runner._regime_blocks:
+        print(f"\n  REGIME FILTER: {runner._regime_blocks} symbol-bars skipped (MMM conditions absent)")
 
     # Promotion into the LIVE library is opt-in (Tier 1.3): silently promoting
     # a run's own outcomes built the self-reinforcing loop the audit flagged.

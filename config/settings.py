@@ -58,6 +58,9 @@ class RiskConfig:
     # Currency exposure cap (audit Tier 2.6): max NET risk per currency
     # across open positions, as a multiple of max_risk_per_trade.
     max_currency_exposure_mult: float = float(os.getenv("MAX_CCY_EXPOSURE_MULT", "2.0"))
+    # Regime filter (audit Tier 2.8): skip symbols whose D1 vol/trendiness
+    # say MMM conditions are absent. Thresholds live in core/regime.py.
+    regime_filter_enabled: bool = os.getenv("REGIME_FILTER", "true").lower() == "true"
 
 
 @dataclass(frozen=True)

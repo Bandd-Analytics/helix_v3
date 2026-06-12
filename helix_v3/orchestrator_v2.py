@@ -36,6 +36,7 @@ from helix_v3.core.tdi import (
 )
 from helix_v3.core.patterns import scan_patterns
 from helix_v3.core.reentry_guard import ReentryGuard
+from helix_v3.core.regime import assess_regime
 from helix_v3.execution.gatekeeper import MT5ExecutionGatekeeper
 from helix_v3.journal.flashcards import FlashcardSystem
 from helix_v3.notifications.whatsapp import WhatsAppNotifier
@@ -320,6 +321,15 @@ class HelixOrchestratorV2:
             if guard_block and guard_block_buy:
                 # Both directions blocked = symbol fully blocked
                 return
+
+            # Step 0.5: Regime filter (Tier 2.8) — are MMM conditions even
+            # present on this symbol today? Decided BEFORE any pair-level
+            # logic; changes at most once per D1 bar (cached).
+            if settings.risk.regime_filter_enabled:
+                regime = assess_regime(self.engine, symbol)
+                if not regime.mmm_present:
+                    logger.info("REGIME SKIP %s: %s", symbol, regime.reason)
+                    return
 
             # Step 1: Full MTF analysis (the core difference from v1)
             analysis = self.mtf.analyze(symbol)

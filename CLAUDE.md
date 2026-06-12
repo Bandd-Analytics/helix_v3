@@ -166,6 +166,7 @@ Enterprise-grade Market Maker Method (MMM) algorithmic execution system trading 
 4. **15-Min (M15)**: Asian range < 50 pips? Stop hunt 25-50p with 3 pushes? M/W? RRT?
 
 ### Entry Requirements (V2 — unified pipeline)
+- Regime filter (Tier 2.8): D1 vol percentile in [P10, P95] AND 20-day efficiency ratio <= 0.50 — otherwise the symbol is skipped before any pair-level logic (`core/regime.py`, toggle `REGIME_FILTER`)
 - Asian range < pair-specific max (accumulation valid)
 - M/W formation detected: **W-bottom = BUY, M-top = SELL** (PRIMARY direction signal)
 - Stop hunt confirmed (even 1-5 pip breach if M/W confirms — "soft hunt")
