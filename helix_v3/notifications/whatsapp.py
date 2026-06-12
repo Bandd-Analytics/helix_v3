@@ -126,87 +126,28 @@ class WhatsAppNotifier:
             return False
 
     def send_with_chart(self, message: str, chart_path: str) -> bool:
-        """Send a WhatsApp message with an annotated chart image.
+        """Send the message text-only on WhatsApp.
 
-        Uploads the chart to Twilio Media then sends as MMS.
-        Falls back to text-only if image upload fails.
+        Charts previously went through tmpfiles.org — a public,
+        unauthenticated host — exposing annotated entry/SL/TP levels to
+        anyone (audit Tier 0.8). Twilio sandbox cannot take inline media, so
+        until a private media bucket exists WhatsApp is text-only; Telegram's
+        native photo upload remains the channel for chart images.
         """
         if not self._enabled:
             return False
 
-        import httpx
         from pathlib import Path
 
-        img = Path(chart_path)
-        if not img.exists():
-            logger.warning("Chart not found for WhatsApp: %s, sending text only", chart_path)
-            return self._send(message)
-
-        # Step 1: Upload image to Twilio Media
-        try:
-            upload_url = (
-                f"https://api.twilio.com/2010-04-01/Accounts/"
-                f"{self._account_sid}/Messages.json"
+        if Path(chart_path).exists():
+            logger.info(
+                "WhatsApp chart suppressed (no private media host): %s — sending text only",
+                chart_path,
             )
-
-            # Twilio accepts MediaUrl or inline media
-            # For sandbox, we send the image as a base64 data URI isn't supported,
-            # so we upload to a public temp host first
-            media_url = self._upload_to_tmphost(img)
-
-            if media_url:
-                response = httpx.post(
-                    upload_url,
-                    auth=(self._account_sid, self._auth_token),
-                    data={
-                        "From": f"whatsapp:{self._from_number}",
-                        "To": f"whatsapp:{self._to_number}",
-                        "Body": message,
-                        "MediaUrl": media_url,
-                    },
-                    timeout=30.0,
-                )
-
-                if response.status_code in (200, 201):
-                    sid = response.json().get("sid", "")
-                    logger.info("WhatsApp+image sent (SID: %s)", sid)
-                    return True
-                else:
-                    logger.warning("Image send failed (%d), falling back to text", response.status_code)
-                    return self._send(message)
-            else:
-                logger.warning("Image upload failed, sending text only")
-                return self._send(message)
-
-        except Exception as e:
-            logger.error("WhatsApp image send error: %s", e)
-            return self._send(message)
-
-    def _upload_to_tmphost(self, image_path) -> Optional[str]:
-        """Upload image to tmpfiles.org (free, no auth, 1h expiry) for Twilio MediaUrl."""
-        import httpx
-
-        try:
-            with open(image_path, "rb") as f:
-                response = httpx.post(
-                    "https://tmpfiles.org/api/v1/upload",
-                    files={"file": (image_path.name, f, "image/png")},
-                    timeout=30.0,
-                )
-
-            if response.status_code == 200:
-                data = response.json()
-                url = data.get("data", {}).get("url", "")
-                if url:
-                    # tmpfiles.org returns viewer URL, convert to direct download
-                    direct_url = url.replace("tmpfiles.org/", "tmpfiles.org/dl/")
-                    logger.info("Image uploaded: %s", direct_url)
-                    return direct_url
-
-        except Exception as e:
-            logger.error("Image upload failed: %s", e)
-
-        return None
+            message = f"{message}\n[Chart available via Telegram]"
+        else:
+            logger.warning("Chart not found for WhatsApp: %s, sending text only", chart_path)
+        return self._send(message)
 
     # ------------------------------------------------------------------
     # Trade Setup Alert
