@@ -81,7 +81,10 @@ def test_build_order_widens_tight_structural_stop_to_pair_floor(monkeypatch) -> 
 
 def test_manage_open_positions_uses_wall_clock_when_mt5_time_is_unavailable(monkeypatch) -> None:
     gatekeeper = _gatekeeper()
-    now = int(datetime.now(timezone.utc).timestamp())
+    # position.time is SERVER-stamped in real MT5 — the wall-clock fallback
+    # must be expressed in the same clock (market_time.utc_now_server_epoch)
+    from helix_v3.core.market_time import utc_now_server_epoch
+    now = utc_now_server_epoch()
     position = SimpleNamespace(
         magic=314159,
         ticket=101,

@@ -40,6 +40,13 @@ import numpy as np
 import pandas as pd
 
 from config.pair_profiles import PairProfile, get_pair_profile
+from helix_v3.core.market_time import (
+    PHASE_ACCUMULATION,
+    PHASE_NYC_REVERSAL,
+    PHASE_STOP_HUNT,
+    PHASE_TRUE_TREND,
+    asian_session_mask,
+)
 from helix_v3.core.quant_engine import MMMQuantitativeEngine
 from helix_v3.core.types import Direction, EMAVector
 from helix_v3.utils.logger import get_logger
@@ -343,15 +350,15 @@ class MTFAnalyzer:
         hod_locked = float(recent_3["High"].max()) < hod * 0.999
         lod_locked = float(recent_3["Low"].min()) > lod * 1.001
 
-        # Session phase
+        # Session phase (hour boundaries from the market_time canon)
         hour_utc = self._current_utc().hour
-        if 1 <= hour_utc < 5:
+        if PHASE_ACCUMULATION[0] <= hour_utc < PHASE_ACCUMULATION[1]:
             session = SessionPhase.ACCUMULATION
-        elif 5 <= hour_utc < 8:
+        elif PHASE_STOP_HUNT[0] <= hour_utc < PHASE_STOP_HUNT[1]:
             session = SessionPhase.STOP_HUNT
-        elif 8 <= hour_utc < 13:
+        elif PHASE_TRUE_TREND[0] <= hour_utc < PHASE_TRUE_TREND[1]:
             session = SessionPhase.TRUE_TREND
-        elif 13 <= hour_utc < 17:
+        elif PHASE_NYC_REVERSAL[0] <= hour_utc < PHASE_NYC_REVERSAL[1]:
             session = SessionPhase.NYC_REVERSAL
         else:
             session = SessionPhase.RETURN_TO_ACCUM
@@ -391,14 +398,15 @@ class MTFAnalyzer:
         df = self._engine.fetch_rates(symbol, "M15", count=200)
         pip_size = self._engine._get_pip_value(symbol)
 
-        # Asian range (21:00-02:00 EST = 02:00-07:00 UTC)
-        est_offset = timedelta(hours=-5)
-        hours_est = (df.index + est_offset).hour
-
-        asian_mask = (hours_est >= 21) | (hours_est < 2)
-        today = df.index[-1].date()
-        today_mask = df.index.date >= (today - timedelta(days=1))
-        asian = df[asian_mask & today_mask]
+        # Asian range: canonical 00:30-07:30 UTC window (market_time canon).
+        # Date-precise: only the MOST RECENT Asian session — the old mask could
+        # blend two sessions' highs/lows into one phantom range.
+        asian_bars = df[asian_session_mask(df.index)]
+        if not asian_bars.empty:
+            latest_day = asian_bars.index[-1].date()
+            asian = asian_bars[asian_bars.index.date == latest_day]
+        else:
+            asian = asian_bars
 
         if not asian.empty:
             ar_high = float(asian["High"].max())
@@ -420,7 +428,13 @@ class MTFAnalyzer:
         #   - "hard" hunt: breach >= stop_hunt_min_pips (classic 25-50p)
         #   - "soft" hunt: any breach of Asian boundary + M/W or RRT confirmation
 
-        post_asian = df[~asian_mask | (~today_mask)]
+        # Bars strictly AFTER the latest Asian session — a stop hunt can only
+        # breach a range that already exists. (The old mask also swept in days
+        # of pre-Asian history, counting old extremes as "breaches".)
+        if not asian.empty:
+            post_asian = df[df.index > asian.index[-1]]
+        else:
+            post_asian = df.iloc[0:0]
 
         hunt_detected = False
         hunt_dir = Direction.NEUTRAL

@@ -90,21 +90,9 @@ CREATE INDEX IF NOT EXISTS idx_scans_readiness ON market_scans(trade_readiness);
 
 
 def _get_session_name() -> str:
-    """Determine current trading session based on UTC time."""
-    hour = datetime.now(timezone.utc).hour
-    if 21 <= hour or hour < 2:
-        return "ASIAN_EARLY"
-    elif 2 <= hour < 7:
-        return "ASIAN_LATE"
-    elif 7 <= hour < 8:
-        return "LONDON_PREMARKET"
-    elif 8 <= hour < 12:
-        return "LONDON"
-    elif 12 <= hour < 16:
-        return "NY_OVERLAP"
-    elif 16 <= hour < 21:
-        return "NY_LATE"
-    return "UNKNOWN"
+    """Current trading session label (delegates to the market_time canon)."""
+    from helix_v3.core.market_time import session_name_at
+    return session_name_at(datetime.now(timezone.utc))
 
 
 class MarketScanner:

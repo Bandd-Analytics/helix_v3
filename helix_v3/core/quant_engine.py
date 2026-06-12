@@ -15,6 +15,7 @@ import pandas as pd
 
 from config.settings import settings
 from helix_v3.core.instruments import fallback_pip_size, pip_size_from_digits
+from helix_v3.core.market_time import asian_session_mask, server_index_to_utc
 from helix_v3.core.types import (
     Direction,
     EMAVector,
@@ -106,6 +107,9 @@ class MMMQuantitativeEngine:
         df = pd.DataFrame(rates)
         df["time"] = pd.to_datetime(df["time"], unit="s", utc=True)
         df.set_index("time", inplace=True)
+        # MT5 stamps bars in broker server time (GMT+2/+3, US-DST switching).
+        # Convert to true UTC here so every downstream session window is real.
+        df.index = server_index_to_utc(df.index)
         df.rename(
             columns={
                 "open": "Open",
@@ -132,24 +136,11 @@ class MMMQuantitativeEngine:
         self, symbol: str, lookback_days: int = 20
     ) -> Optional[SessionBounds]:
         df_m15 = self.fetch_rates(symbol, "M15", count=lookback_days * 96 + 200)
-
-        est_offset = timedelta(hours=-5)
         df_m15 = df_m15.copy()
-        df_m15["hour_est"] = (df_m15.index + est_offset).hour
 
-        asian_start = self._cfg.asian_session_start
-        asian_end = self._cfg.asian_session_end
-
-        # Current session mask: 21:00-02:00 EST (wraps midnight)
-        if asian_start > asian_end:
-            current_mask = (df_m15["hour_est"] >= asian_start) | (
-                df_m15["hour_est"] < asian_end
-            )
-        else:
-            current_mask = (df_m15["hour_est"] >= asian_start) & (
-                df_m15["hour_est"] < asian_end
-            )
-
+        # Canonical Asian window (00:30-07:30 UTC, MMM Book p.8) on a true-UTC
+        # index — replaces the hardcoded EST offset that ignored broker time.
+        current_mask = asian_session_mask(df_m15.index)
         asian_bars = df_m15[current_mask]
         if asian_bars.empty:
             logger.warning("No Asian session bars found for %s", symbol)

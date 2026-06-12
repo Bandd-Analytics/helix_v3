@@ -14,6 +14,7 @@ import pandas as pd
 
 from config.settings import settings
 from helix_v3.core.instruments import fallback_pip_size, pip_size_from_digits
+from helix_v3.core.market_time import server_index_to_utc
 from helix_v3.utils.logger import get_logger
 
 logger = get_logger("backtest_data_store")
@@ -105,7 +106,10 @@ class HistoricalDataStore:
         warmup = WARMUP_BARS.get(tf_name, 200)
         fetch_start = self._start - timedelta(minutes=tf_minutes * warmup)
 
-        rates = mt5.copy_rates_range(symbol, tf_mt5, fetch_start, self._end)
+        # MT5 matches the range against SERVER-stamped times (GMT+2/+3);
+        # pad the end so the server->UTC shift can't clip the window's edge.
+        fetch_end = self._end + timedelta(hours=3)
+        rates = mt5.copy_rates_range(symbol, tf_mt5, fetch_start, fetch_end)
         if rates is None or len(rates) == 0:
             logger.warning(
                 "No data for %s %s (%s to %s)",
@@ -117,6 +121,8 @@ class HistoricalDataStore:
         df = pd.DataFrame(rates)
         df["time"] = pd.to_datetime(df["time"], unit="s", utc=True)
         df.set_index("time", inplace=True)
+        # Server-stamped -> true UTC (same canon as live quant_engine)
+        df.index = server_index_to_utc(df.index)
         df.rename(
             columns={
                 "open": "Open",

@@ -596,8 +596,10 @@ class MT5ExecutionGatekeeper:
         now_ts = mt5.symbol_info_tick(settings.trading.symbols[0])
         server_time = now_ts.time if now_ts else 0
         if server_time == 0:
-            # Fallback to UTC wall clock — prevents silent skip of all exit checks
-            server_time = int(datetime.now(timezone.utc).timestamp())
+            # Fallback to wall clock expressed as a SERVER-stamped epoch —
+            # position.time is server-stamped, so raw utcnow() would be 2-3h off
+            from helix_v3.core.market_time import utc_now_server_epoch
+            server_time = utc_now_server_epoch()
             logger.warning("Using wall clock for position management (MT5 tick time unavailable)")
 
         for pos in positions:

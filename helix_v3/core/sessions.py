@@ -28,18 +28,22 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 
-
-# Session boundaries in minutes-from-midnight GMT
-ASIA_START = 0 * 60 + 30       # 00:30
-ASIA_END = 7 * 60 + 30         # 07:30
-LONDON_START = 7 * 60 + 30     # 07:30
-LONDON_END = 13 * 60 + 30      # 13:30
-US_START = 13 * 60 + 30        # 13:30
-US_END = 22 * 60 + 0           # 22:00
-LONDON_GAP_START = 7 * 60 + 0  # 07:00
-LONDON_GAP_END = 8 * 60 + 0    # 08:00
-NY_GAP_START = 13 * 60 + 0     # 13:00
-NY_GAP_END = 14 * 60 + 0       # 14:00
+# Session boundaries come from the single canon in core/market_time.py.
+# Callers must pass DataFrames with TRUE-UTC indexes (quant_engine and the
+# backtest data store both convert MT5 server stamps at ingest).
+from helix_v3.core.market_time import (
+    ASIA_END,
+    ASIA_START,
+    DAY_RESET_MINUTES as _DAY_RESET_MINUTES,
+    LONDON_END,
+    LONDON_GAP_END,
+    LONDON_GAP_START,
+    LONDON_START,
+    NY_GAP_END,
+    NY_GAP_START,
+    US_END,
+    US_START,
+)
 
 # Session-open "box" windows (first volatile push after open)
 # Matches Pine: London 07:30-08:45, NY 13:30-14:45 (75 minutes / 5 M15 bars)
@@ -51,8 +55,8 @@ NY_BOX_END = US_START + 75               # 14:45
 # Rolling window for average Asian range
 ASIAN_AVG_WINDOW = 20
 
-# Trading day reset at 22:00 GMT (17:00 ET)
-DAY_RESET_MINUTES = 22 * 60
+# Trading day reset at 22:00 GMT (17:00 ET) — re-exported from market_time
+DAY_RESET_MINUTES = _DAY_RESET_MINUTES
 
 
 @dataclass
