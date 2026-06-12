@@ -20,6 +20,7 @@ from helix_v3.core.types import (
     ExecutionOrder,
     QuantSignal,
 )
+from helix_v3.execution.risk_state import RiskState, _trading_day
 from helix_v3.journal.trade_journal import TradeJournal
 from helix_v3.utils.logger import get_logger
 
@@ -41,6 +42,11 @@ class MT5ExecutionGatekeeper:
         self._risk_cfg = settings.risk
         self._active_orders: Dict[int, ExecutionOrder] = {}
         self.journal = TradeJournal()
+        self.risk_state = RiskState()
+        # Optional: called once per trading day with the trip reason
+        # (the orchestrator wires this to the notifier).
+        self.kill_switch_callback = None
+        self._kill_notified_day: str = ""
 
     # ------------------------------------------------------------------
     # Account & Symbol Info
@@ -90,20 +96,36 @@ class MT5ExecutionGatekeeper:
     # ------------------------------------------------------------------
 
     def check_drawdown_limit(self) -> bool:
+        """Kill switch: realized + floating losses vs persisted HWM and daily anchor.
+
+        The old (balance - equity) / balance formula reset to ~0 the moment a
+        loss was realized, so the account could bleed indefinitely. RiskState
+        measures total drawdown from the balance high-water mark and daily
+        loss from the day's anchor balance, both persisted to SQLite.
+        """
         equity = self._get_account_equity()
         balance = self._get_account_balance()
 
-        if balance == 0:
-            return False
-
-        drawdown = (balance - equity) / balance
-        if drawdown >= self._risk_cfg.max_drawdown_pct:
-            logger.critical(
-                "DRAWDOWN CIRCUIT BREAKER: %.2f%% >= %.2f%% limit. Blocking all new trades.",
-                drawdown * 100, self._risk_cfg.max_drawdown_pct * 100,
-            )
+        ok, reason = self.risk_state.check(balance=balance, equity=equity)
+        if not ok:
+            logger.critical("KILL SWITCH: %s — blocking all new trades.", reason)
+            self._notify_kill(reason)
             return False
         return True
+
+    def _notify_kill(self, reason: str) -> None:
+        """Send the kill-switch alert at most once per trading day."""
+        day = _trading_day()
+        if self._kill_notified_day == day:
+            return
+        self._kill_notified_day = day
+        if self.kill_switch_callback:
+            try:
+                self.kill_switch_callback(
+                    f"HELIX V3 KILL SWITCH\n{'='*25}\n{reason}\nAll new entries blocked."
+                )
+            except Exception as e:
+                logger.error("Kill-switch notification failed: %s", e)
 
     # ------------------------------------------------------------------
     # Position Count Check

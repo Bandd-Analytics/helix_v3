@@ -36,6 +36,7 @@ class APIConfig:
 class RiskConfig:
     max_risk_per_trade: float = float(os.getenv("MAX_RISK_PER_TRADE", "0.01"))
     max_drawdown_pct: float = float(os.getenv("MAX_DRAWDOWN_PCT", "0.08"))
+    max_daily_loss_pct: float = float(os.getenv("MAX_DAILY_LOSS_PCT", "0.04"))
     max_concurrent_positions: int = int(os.getenv("MAX_CONCURRENT_POSITIONS", "3"))
     sl_buffer_pips: float = 3.0
     partial_close_ratio: float = 0.50

@@ -267,6 +267,8 @@ class HelixOrchestratorV2:
         # Track replay setups for open trades (keyed by symbol)
         self._live_replay_setups: Dict[str, object] = {}
         self.notifier = self._create_notifier()
+        # Kill-switch trips alert once per trading day
+        self.gatekeeper.kill_switch_callback = self.notifier._send
         self._running = False
         # Filter to tradeable pairs only (respects PairProfile.tradeable flag)
         from config.pair_profiles import get_pair_profile
