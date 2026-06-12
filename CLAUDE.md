@@ -145,7 +145,7 @@ Enterprise-grade Market Maker Method (MMM) algorithmic execution system trading 
 | `tests/full_market_scan.py` | Full 13-pair scan with all indicators, generates charts + notifications |
 | `tests/fresh_scan.py` | Quick scan with narrative output for manual review |
 | `tests/compare_orchestrators.py` | V1 vs V2 side-by-side evaluation |
-| `tests/live_test.py` | Integration test (dry-run, no trades) |
+| `tools/manual/live_test.py` | Manual integration test (dry-run, no trades) — connects to live MT5, run by hand only, never via pytest |
 | `tests/test_reentry_guard.py` | Tests ban scope and cooldown logic |
 | `tests/test_advisory_confidence.py` | Tests scoring, TDI states, convergence, hard blockers |
 | `tests/test_mmm_event_replay.py` | Tests event path labeling |

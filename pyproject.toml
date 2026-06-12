@@ -29,6 +29,12 @@ helix = "helix_v3.orchestrator_v2:main"
 [tool.setuptools.packages.find]
 include = ["helix_v3*", "config*"]
 
+[tool.pytest.ini_options]
+# Only collect from tests/, only test_*.py files. Live-firing manual scripts
+# live in tools/manual/ and must never be collected against a real terminal.
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+
 [tool.ruff]
 target-version = "py312"
 line-length = 100

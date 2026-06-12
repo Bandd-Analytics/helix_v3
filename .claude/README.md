@@ -41,6 +41,6 @@ Data Ingestion (MT5) -> Quant Pre-Filter -> Chart Export -> Vision Consensus -> 
 
 ## Running
 ```bash
-.venv/Scripts/python.exe -m helix_v3.orchestrator  # Start live system
-.venv/Scripts/python.exe tests/live_test.py          # Run integration test
+.venv/Scripts/python.exe -m helix_v3.orchestrator_v2   # Start live system (V2)
+.venv/Scripts/python.exe tools/manual/live_test.py     # Manual integration test (live MT5, never via pytest)
 ```
