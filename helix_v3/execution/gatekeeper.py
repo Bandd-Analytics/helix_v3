@@ -348,6 +348,61 @@ class MT5ExecutionGatekeeper:
             if order.direction == Direction.BUY
             else mt5.ORDER_TYPE_SELL
         )
+        pos_type = 0 if order.direction == Direction.BUY else 1
+
+        info = self._get_symbol_info(order.symbol)
+        vol_min = info.volume_min
+
+        # Snapshot Helix tickets on this symbol BEFORE the first send. Any new
+        # magic-314159 position in our direction afterwards is a fill from THIS
+        # order — an order_send that returns None or DONE_PARTIAL may still
+        # have reached the server, and blindly resending full volume was the
+        # double-fill bug.
+        pre_existing = {
+            p.ticket
+            for p in (mt5.positions_get(symbol=order.symbol) or [])
+            if p.magic == 314159
+        }
+
+        def _new_fills() -> list:
+            positions = mt5.positions_get(symbol=order.symbol) or []
+            return [
+                p for p in positions
+                if p.magic == 314159 and p.type == pos_type and p.ticket not in pre_existing
+            ]
+
+        def _finalize(ticket: int) -> int:
+            order.ticket = ticket
+            order.status = "FILLED"
+            self._active_orders[ticket] = order
+            logger.info(
+                "ORDER FILLED: ticket=%d %s %s %.2f",
+                ticket, order.direction.value, order.symbol, order.lot_size,
+            )
+
+            # Auto-journal the trade
+            if signal and consensus:
+                try:
+                    equity = self._get_account_equity()
+                    pip_val = self._get_pip_cost(order.symbol, order.lot_size)
+                    spread = None
+                    tick_now = mt5.symbol_info_tick(order.symbol)
+                    if tick_now:
+                        spread = (tick_now.ask - tick_now.bid) / self._get_pip_value(order.symbol)
+                    self.journal.record_entry(
+                        order=order,
+                        signal=signal,
+                        consensus=consensus,
+                        consensus_mode=consensus_mode,
+                        equity_before=equity,
+                        spread_at_entry=spread,
+                        pip_value=pip_val,
+                        chart_path=chart_path,
+                    )
+                except Exception as e:
+                    logger.error("Journal entry failed: %s", e)
+
+            return ticket
 
         request = {
             "action": mt5.TRADE_ACTION_DEAL,
@@ -364,7 +419,11 @@ class MT5ExecutionGatekeeper:
             "type_filling": mt5.ORDER_FILLING_IOC,
         }
 
+        remaining = order.lot_size
+
         for attempt in range(1, max_retries + 1):
+            request["volume"] = round(remaining, 2)
+
             # Refresh price before each attempt
             tick = mt5.symbol_info_tick(order.symbol)
             if tick is not None:
@@ -373,44 +432,66 @@ class MT5ExecutionGatekeeper:
                 )
 
             result = mt5.order_send(request)
+
             if result is None:
-                logger.error("order_send returned None on attempt %d", attempt)
+                # The order may have reached the server despite the None —
+                # reconcile against live positions before any resend.
+                logger.error(
+                    "order_send returned None on attempt %d — checking server for fills",
+                    attempt,
+                )
+                fills = _new_fills()
+                filled = round(sum(p.volume for p in fills), 2)
+                outstanding = round(order.lot_size - filled, 2)
+                if filled > 0 and outstanding < vol_min:
+                    logger.warning(
+                        "Order filled despite None result (%.2f lots) — adopting ticket %d",
+                        filled, fills[0].ticket,
+                    )
+                    return _finalize(fills[0].ticket)
+                if filled > 0:
+                    remaining = outstanding
+                    logger.warning(
+                        "Partial fill after None result: %.2f filled, %.2f outstanding",
+                        filled, remaining,
+                    )
                 continue
 
             if result.retcode == mt5.TRADE_RETCODE_DONE:
-                ticket = result.order
-                order.ticket = ticket
-                order.status = "FILLED"
-                self._active_orders[ticket] = order
-                logger.info(
-                    "ORDER FILLED: ticket=%d %s %s %.2f @ %.5f",
-                    ticket, order.direction.value, order.symbol,
-                    order.lot_size, result.price,
+                return _finalize(result.order)
+
+            if result.retcode == mt5.TRADE_RETCODE_DONE_PARTIAL:
+                # A live position EXISTS — resending full volume would stack
+                # exposure. Resend only the unfilled remainder, if any.
+                fills = _new_fills()
+                filled = round(sum(p.volume for p in fills), 2)
+                if filled <= 0:
+                    filled = round(getattr(result, "volume", 0.0), 2)
+                outstanding = round(order.lot_size - filled, 2)
+                if outstanding < vol_min:
+                    return _finalize(result.order or (fills[0].ticket if fills else 0))
+                remaining = outstanding
+                logger.warning(
+                    "DONE_PARTIAL on attempt %d: %.2f filled, resending only %.2f remainder",
+                    attempt, filled, remaining,
                 )
+                continue
 
-                # Auto-journal the trade
-                if signal and consensus:
-                    try:
-                        equity = self._get_account_equity()
-                        pip_val = self._get_pip_cost(order.symbol, order.lot_size)
-                        spread = None
-                        tick_now = mt5.symbol_info_tick(order.symbol)
-                        if tick_now:
-                            spread = (tick_now.ask - tick_now.bid) / self._get_pip_value(order.symbol)
-                        self.journal.record_entry(
-                            order=order,
-                            signal=signal,
-                            consensus=consensus,
-                            consensus_mode=consensus_mode,
-                            equity_before=equity,
-                            spread_at_entry=spread,
-                            pip_value=pip_val,
-                            chart_path=chart_path,
-                        )
-                    except Exception as e:
-                        logger.error("Journal entry failed: %s", e)
-
-                return ticket
+            if result.retcode == mt5.TRADE_RETCODE_PLACED:
+                # Accepted by the server, pending execution — NOT a failure.
+                # Never resend; if it fills after we return, orphan adoption
+                # picks it up on the next manage cycle.
+                fills = _new_fills()
+                filled = round(sum(p.volume for p in fills), 2)
+                if filled > 0 and round(order.lot_size - filled, 2) < vol_min:
+                    return _finalize(fills[0].ticket)
+                order.status = "PENDING"
+                logger.warning(
+                    "Order PLACED (pending execution) for %s — not resending; "
+                    "orphan adoption will register the fill if it executes",
+                    order.symbol,
+                )
+                return None
 
             logger.warning(
                 "Order attempt %d/%d failed: retcode=%d comment=%s",

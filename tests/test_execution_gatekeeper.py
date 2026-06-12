@@ -120,6 +120,147 @@ def test_manage_open_positions_uses_wall_clock_when_mt5_time_is_unavailable(monk
     assert actions == ["STALE EXIT: EURUSD BUY ticket=101 +0.0 pips after 91min"]
 
 
+def _exec_order(symbol: str = "EURUSD") -> ExecutionOrder:
+    return ExecutionOrder(
+        symbol=symbol,
+        direction=Direction.BUY,
+        lot_size=0.10,
+        entry_price=1.1000,
+        stop_loss=1.0985,
+        take_profit_1=1.1015,
+        take_profit_2=1.1030,
+        sl_pips=15.0,
+        risk_reward=2.0,
+    )
+
+
+def _patch_exec_env(monkeypatch, gatekeeper) -> None:
+    monkeypatch.setattr(
+        gatekeeper, "_get_symbol_info", lambda symbol: SimpleNamespace(volume_min=0.01)
+    )
+    monkeypatch.setattr(
+        gatekeeper_mod.mt5,
+        "symbol_info_tick",
+        lambda symbol: SimpleNamespace(ask=1.1000, bid=1.0999),
+    )
+
+
+def test_execute_order_adopts_fill_after_none_result_without_resending(monkeypatch) -> None:
+    """order_send returning None can still mean the order reached the server.
+
+    Regression: the old loop blindly resent full volume up to 2 more times.
+    """
+    gatekeeper = _gatekeeper()
+    _patch_exec_env(monkeypatch, gatekeeper)
+    sends: list = []
+    state = {"sent": False}
+
+    def fake_order_send(request):
+        sends.append(dict(request))
+        state["sent"] = True
+        return None  # ...but the position appears server-side
+
+    def fake_positions_get(symbol=None):
+        if state["sent"]:
+            return [SimpleNamespace(ticket=555, magic=314159, type=0, volume=0.10)]
+        return []
+
+    monkeypatch.setattr(gatekeeper_mod.mt5, "order_send", fake_order_send)
+    monkeypatch.setattr(gatekeeper_mod.mt5, "positions_get", fake_positions_get)
+
+    order = _exec_order()
+    ticket = gatekeeper.execute_order(order)
+
+    assert ticket == 555
+    assert len(sends) == 1  # never resent
+    assert order.status == "FILLED"
+    assert gatekeeper._active_orders[555] is order
+
+
+def test_execute_order_resends_only_remainder_after_partial_fill(monkeypatch) -> None:
+    """DONE_PARTIAL leaves a live position — only the remainder may be resent."""
+    gatekeeper = _gatekeeper()
+    _patch_exec_env(monkeypatch, gatekeeper)
+    sends: list = []
+    state = {"filled": 0.0}
+
+    def fake_order_send(request):
+        sends.append(dict(request))
+        if len(sends) == 1:
+            state["filled"] = 0.06
+            return SimpleNamespace(
+                retcode=gatekeeper_mod.mt5.TRADE_RETCODE_DONE_PARTIAL,
+                order=601, volume=0.06, comment="partial",
+            )
+        return SimpleNamespace(
+            retcode=gatekeeper_mod.mt5.TRADE_RETCODE_DONE,
+            order=602, volume=request["volume"], comment="done",
+        )
+
+    def fake_positions_get(symbol=None):
+        if state["filled"]:
+            return [SimpleNamespace(ticket=601, magic=314159, type=0, volume=state["filled"])]
+        return []
+
+    monkeypatch.setattr(gatekeeper_mod.mt5, "order_send", fake_order_send)
+    monkeypatch.setattr(gatekeeper_mod.mt5, "positions_get", fake_positions_get)
+
+    ticket = gatekeeper.execute_order(_exec_order())
+
+    assert [s["volume"] for s in sends] == [0.10, 0.04]
+    assert ticket == 602
+
+
+def test_execute_order_never_resends_after_placed_retcode(monkeypatch) -> None:
+    """PLACED means accepted-pending — resending would risk a double fill."""
+    gatekeeper = _gatekeeper()
+    _patch_exec_env(monkeypatch, gatekeeper)
+    sends: list = []
+
+    def fake_order_send(request):
+        sends.append(dict(request))
+        return SimpleNamespace(
+            retcode=gatekeeper_mod.mt5.TRADE_RETCODE_PLACED,
+            order=0, volume=0.0, comment="placed",
+        )
+
+    monkeypatch.setattr(gatekeeper_mod.mt5, "order_send", fake_order_send)
+    monkeypatch.setattr(gatekeeper_mod.mt5, "positions_get", lambda symbol=None: [])
+
+    order = _exec_order()
+    ticket = gatekeeper.execute_order(order)
+
+    assert ticket is None
+    assert len(sends) == 1
+    assert order.status == "PENDING"
+
+
+def test_execute_order_retries_full_volume_when_nothing_filled(monkeypatch) -> None:
+    gatekeeper = _gatekeeper()
+    _patch_exec_env(monkeypatch, gatekeeper)
+    sends: list = []
+
+    def fake_order_send(request):
+        sends.append(dict(request))
+        if len(sends) == 1:
+            return SimpleNamespace(
+                retcode=gatekeeper_mod.mt5.TRADE_RETCODE_REQUOTE,
+                order=0, volume=0.0, comment="requote",
+            )
+        return SimpleNamespace(
+            retcode=gatekeeper_mod.mt5.TRADE_RETCODE_DONE,
+            order=700, volume=request["volume"], comment="done",
+        )
+
+    monkeypatch.setattr(gatekeeper_mod.mt5, "order_send", fake_order_send)
+    monkeypatch.setattr(gatekeeper_mod.mt5, "positions_get", lambda symbol=None: [])
+
+    ticket = gatekeeper.execute_order(_exec_order())
+
+    assert [s["volume"] for s in sends] == [0.10, 0.10]
+    assert ticket == 700
+
+
 def _orchestrator(direction: Direction = Direction.SELL) -> tuple:
     """Bare orchestrator with a recording guard and one active GBPJPY order."""
     orchestrator = HelixOrchestratorV2.__new__(HelixOrchestratorV2)
