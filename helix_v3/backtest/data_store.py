@@ -135,14 +135,22 @@ class HistoricalDataStore:
     def get_rates(
         self, symbol: str, timeframe: str, as_of: datetime, count: int
     ) -> pd.DataFrame:
-        """Return `count` bars ending at or before `as_of`."""
+        """Return `count` bars fully CLOSED by `as_of`.
+
+        MT5 indexes bars by OPEN time, so `index <= as_of` (the old filter)
+        served the currently-forming bar with its FINAL OHLC — at any M15
+        step the H4 bar leaked up to 3h45m of future data into the MTF gates
+        (audit Tier 1.1). A bar is only visible once open + duration <= as_of.
+        """
         key = (symbol, timeframe)
         df = self._cache.get(key)
         if df is None or df.empty:
             return pd.DataFrame()
 
+        tf_minutes = TIMEFRAMES.get(timeframe, (None, 0))[1]
         as_of_ts = pd.Timestamp(as_of).tz_localize("UTC") if as_of.tzinfo is None else pd.Timestamp(as_of)
-        mask = df.index <= as_of_ts
+        cutoff = as_of_ts - pd.Timedelta(minutes=tf_minutes)
+        mask = df.index <= cutoff
         sliced = df.loc[mask]
         if len(sliced) > count:
             sliced = sliced.iloc[-count:]

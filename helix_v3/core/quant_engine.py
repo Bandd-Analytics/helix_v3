@@ -94,7 +94,10 @@ class MMMQuantitativeEngine:
         if tf is None:
             raise ValueError(f"Unsupported timeframe: {timeframe}")
 
-        rates = mt5.copy_rates_from_pos(symbol, tf, 0, count)
+        # Position 0 is the FORMING bar — its OHLC repaints intrabar, so
+        # patterns/indicators computed on it flicker and peek. Fetch from
+        # position 1 so every consumer sees completed bars only (Tier 1.1).
+        rates = mt5.copy_rates_from_pos(symbol, tf, 1, count)
         if rates is None or len(rates) == 0:
             error = mt5.last_error()
             logger.error("Failed to fetch rates for %s %s: %s", symbol, timeframe, error)

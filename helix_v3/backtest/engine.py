@@ -451,25 +451,30 @@ class BacktestRunner:
 
         for i, bar_time in enumerate(sorted_times):
             dt = bar_time.to_pydatetime().replace(tzinfo=timezone.utc)
-            self.engine.set_current_time(dt)
+            # Decisions happen at the CLOSE of the just-finished M15 bar.
+            # The data store only serves bars fully closed by as_of, so with
+            # as_of = bar close the M15 bar itself is visible (its close is
+            # known) while forming H1/H4/D1 bars are not (Tier 1.1).
+            decision_time = dt + timedelta(minutes=15)
+            self.engine.set_current_time(decision_time)
 
             # Get M15 bars for all symbols at this timestamp
             current_bars: Dict[str, pd.Series] = {}
             for sym in symbols:
-                df = self.data_store.get_rates(sym, "M15", dt, 1)
+                df = self.data_store.get_rates(sym, "M15", decision_time, 1)
                 if not df.empty and df.index[-1] == bar_time:
                     current_bars[sym] = df.iloc[-1]
 
             # Manage open trades first
-            actions = self.simulator.process_bar(dt, current_bars)
+            actions = self.simulator.process_bar(decision_time, current_bars)
             for action in actions:
                 if self.verbose:
                     logger.info("[%s] %s", dt.strftime("%m-%d %H:%M"), action)
                 # Entry cooldown after ANY exit (prevents same-setup churn)
-                self._record_exit(action, dt)
+                self._record_exit(action, decision_time)
                 # Additional loss-specific guard
                 if "SL HIT" in action or "STALE EXIT" in action:
-                    self._record_loss(action, dt)
+                    self._record_loss(action, decision_time)
 
             # Skip if too many open positions
             if len(self.simulator.open_trades) >= self.max_concurrent:
@@ -489,7 +494,7 @@ class BacktestRunner:
                     break
 
                 try:
-                    self._check_entry(sym, dt)
+                    self._check_entry(sym, decision_time)
                 except Exception as e:
                     if self.verbose:
                         logger.debug("Skip %s at %s: %s", sym, dt, e)
@@ -509,7 +514,7 @@ class BacktestRunner:
                 trade.exit_price = float(last_bar["Close"])
             else:
                 trade.exit_price = trade.entry_price
-            trade.exit_time = sorted_times[-1].to_pydatetime().replace(tzinfo=timezone.utc)
+            trade.exit_time = sorted_times[-1].to_pydatetime().replace(tzinfo=timezone.utc) + timedelta(minutes=15)
             trade.exit_reason = "BACKTEST_END"
             trade.status = "CLOSED"
             self.simulator._finalize_trade(trade)
