@@ -71,6 +71,8 @@ class ChartConfig:
     output_dir: Path = Path(os.getenv("CHART_OUTPUT_DIR", str(BASE_DIR / "charts")))
     resolution: int = int(os.getenv("CHART_RESOLUTION", "1024"))
     bar_count: int = int(os.getenv("CHART_BAR_COUNT", "120"))
+    # Rotation (audit Tier 3.5): PNGs older than this are purged daily.
+    retention_days: int = int(os.getenv("CHART_RETENTION_DAYS", "14"))
     dpi: int = 150
     background_color: str = "#0d1117"
     ema_colors: dict = field(default_factory=lambda: {

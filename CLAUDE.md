@@ -63,7 +63,12 @@ Enterprise-grade Market Maker Method (MMM) algorithmic execution system trading 
 | `helix_v3/core/patterns.py` | Context-aware candlestick patterns: spike, hammer, doji, RRT, evening/morning star, high/low test, M/W, half batman. Trade type classification. |
 | `helix_v3/core/sessions.py` | MMM session classification (Asia/London/NYC per Book p.8), per-day Asian range, session boundaries, weekly open range |
 | `helix_v3/core/reentry_guard.py` | SQLite-backed re-entry guard: loss tracking, cooldowns, day bans, 2hr entry cooldown after ANY exit, exposure check. Survives restarts. |
-| `helix_v3/core/advisory_confidence.py` | Setup confidence scoring: grades entries A/B/C/D/AVOID using M/W, TDI, convergence, push count, pair-normalized ranges. Cross-pair theme matching. |
+| `helix_v3/core/advisory_confidence.py` | Setup confidence scoring: grades entries A/B/C/D/AVOID using M/W, TDI, convergence, push count, pair-normalized ranges. Cross-pair theme matching (convergence bonus capped +4, Tier 2.6). |
+| `helix_v3/core/market_time.py` | Canonical timezone module (Tier 1.2): MT5 server↔UTC via US DST, Asian/London/NY session windows defined once, `asian_session_mask`. |
+| `helix_v3/core/volatility.py` | ATR(20,D1) — the universal gate scale (Tier 2.3). `d1_atr_pips` (engine, backtest-safe) + cached `d1_atr_pips_mt5` (gatekeeper). |
+| `helix_v3/core/regime.py` | Two-state regime filter (Tier 2.8): MMM conditions PRESENT/ABSENT from D1 vol percentile [P10,P95] + 20-day efficiency ratio ≤0.50. Runs before pair logic. |
+| `helix_v3/core/exposure.py` | Portfolio currency-exposure cap (Tier 2.6): NET signed risk per currency, default 2× single-trade risk. |
+| `helix_v3/core/news_calendar.py` | High-impact news blackout (Tier 2.5): ForexFactory weekly feed, cached, ±30min window per pair currencies. |
 
 ### Visualization
 | File | Purpose |
@@ -79,7 +84,8 @@ Enterprise-grade Market Maker Method (MMM) algorithmic execution system trading 
 ### Execution
 | File | Purpose |
 |------|---------|
-| `helix_v3/execution/gatekeeper.py` | Pair-gated order execution with 3-layer lot sizing safety (SL floor, account-proportional cap, post-calc risk verification). T1 partial close, trailing SL, stale/time/session exits. |
+| `helix_v3/execution/gatekeeper.py` | Pair-gated order execution with 3-layer lot sizing safety (SL floor, account-proportional cap, post-calc risk verification). T1 partial close, trailing SL, stale/time/session/news exits. Order-send portability (filling mode, deviation in pips, stops/freeze-level validation, BE retry+alert — Tier 3.3). News blackout + currency-exposure gates. |
+| `helix_v3/execution/mt5_watchdog.py` | MT5 connection watchdog (Tier 3.1): reconnect with backoff, dead-man alert after N min without a good broker poll, recovery announce. |
 
 ### Journal & Learning
 | File | Purpose |
@@ -95,8 +101,10 @@ Enterprise-grade Market Maker Method (MMM) algorithmic execution system trading 
 ### Notifications
 | File | Purpose |
 |------|---------|
-| `helix_v3/notifications/whatsapp.py` | Twilio WhatsApp alerts: setups, entries, exits, T1 hits, period reports, flashcard charts |
-| `helix_v3/notifications/telegram.py` | Telegram Bot API notifications: drop-in replacement for WhatsApp, free, no message limits |
+| `helix_v3/notifications/base.py` | Single notifier interface (Tier 3.5): `NotifierProtocol` + `create_notifier()`. **Telegram is PRIMARY**, WhatsApp is fallback adapter. |
+| `helix_v3/notifications/dispatch.py` | Fire-and-forget send pool (Tier 3.2): single worker, FIFO, failures logged not raised — notification HTTP never blocks the trade path. |
+| `helix_v3/notifications/whatsapp.py` | Twilio WhatsApp alerts (fallback adapter, text-only since Tier 0.8). Transport split into queueing wrappers + `_sync` impls. |
+| `helix_v3/notifications/telegram.py` | Telegram Bot API notifications (PRIMARY): native photo upload, no limits. Transport split into queueing wrappers + `_sync` impls. |
 | `helix_v3/notifications/auto_scan.py` | Scheduled market scan runner (08:00, 10:00, 15:00, 00:00 EAT) with notifications |
 
 ### AI & Model Routing

@@ -41,8 +41,7 @@ from helix_v3.core.regime import assess_regime
 from helix_v3.execution.mt5_watchdog import MT5Watchdog
 from helix_v3.execution.gatekeeper import MT5ExecutionGatekeeper
 from helix_v3.journal.flashcards import FlashcardSystem
-from helix_v3.notifications.whatsapp import WhatsAppNotifier
-from helix_v3.notifications.telegram import TelegramNotifier
+# Notifier backends are selected via notifications.base.create_notifier (Tier 3.5)
 from helix_v3.scanner.market_scanner import MarketScanner
 from helix_v3.utils.logger import get_logger
 from helix_v3.visualization.annotated_chart import AnnotatedChartGenerator
@@ -299,15 +298,10 @@ class HelixOrchestratorV2:
 
     @staticmethod
     def _create_notifier():
-        """Pick notification backend from NOTIFICATION_BACKEND env var."""
-        import os
-        backend = os.getenv("NOTIFICATION_BACKEND", "whatsapp").lower()
-        if backend == "telegram":
-            notifier = TelegramNotifier()
-            if notifier.enabled:
-                return notifier
-            logger.warning("Telegram not configured, falling back to WhatsApp")
-        return WhatsAppNotifier()
+        """Single notifier interface (Tier 3.5): Telegram primary,
+        WhatsApp adapter — see notifications/base.py."""
+        from helix_v3.notifications.base import create_notifier
+        return create_notifier()
 
     def _setup_signals(self) -> None:
         def _stop(signum, frame):
@@ -900,6 +894,12 @@ class HelixOrchestratorV2:
             self._run_market_scan()
             self._last_market_scan = now
 
+        # Daily chart rotation (Tier 3.5)
+        if now - getattr(self, "_last_chart_rotation", 0) >= 86400:
+            from helix_v3.utils.chart_rotation import rotate_charts
+            rotate_charts()
+            self._last_chart_rotation = now
+
         # MTF analysis per symbol (NOT per timeframe — one top-down pass each)
         for symbol in self._symbols:
             await self._process_symbol(symbol)
@@ -1353,6 +1353,11 @@ class HelixOrchestratorV2:
         )
         if _HAS_ROLE_REPORT:
             logger.info("\n%s", format_role_report())
+
+        # Chart rotation (Tier 3.5): purge stale PNGs at startup, then daily.
+        from helix_v3.utils.chart_rotation import rotate_charts
+        rotate_charts()
+        self._last_chart_rotation = time.monotonic()
 
         # Fast position-management task (Tier 3.2): trailing/T1/stale exits
         # on their own clock, never waiting for charts/vision/notifications.
