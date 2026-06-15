@@ -85,10 +85,18 @@ none) — to collect **genuine forward out-of-sample outcomes** so the negative 
 The only honest road to profit. Reuse `signature_audit.py` + `rule_stats.py`; same gauntlet.
 **Pick ONE domain to start** (decision below) — do not search all at once (multiple-testing).
 
-- [ ] **3a — FX, non-MMM signals.** Trend/momentum (timeframe breakout, MA stacks), carry
-  (swap-ranked longs/shorts), mean-reversion (band fade), cross-sectional currency strength.
-  FX is the cheapest, most liquid universe — best cost profile, lowest overfit surface.
-  *Recommended first* — same instruments we know, fresh signal families, cheap to test.
+- [~] **3a — FX, non-MMM signals.** *(Started 2026-06-15. Harness:
+  `helix_v3/backtest/signal_research.py`, tests `tests/test_signal_research.py`.)* Reusable
+  gauntlet for fresh signals: per-entry ATR brackets, first-touch labels, non-overlap,
+  binomial + expectancy tests, BH, embargoed walk-forward — identical discipline to Phase 1.
+  **First batch (3 families × 7 majors, H4, report `logs/signal_research_h4.md`): VALIDATED
+  = 0.** Donchian breakout + MA cross trade BELOW base rate (no intraday trend on H4 majors);
+  z-score mean-reversion is the least-bad (55–56% fav vs 51–52% base on NZD/GBP) but is
+  sub-BH-significant and collapses out of sample. Same fingerprint as MMM — faint leads, no
+  survivors. **Next, WITHOUT fishing the same price-only signals:** carry (swap-ranked) and
+  cross-sectional currency strength — structurally different families most likely to carry
+  real FX edge; plus D1 timeframe and a vol/regime conditioner. Each new family runs through
+  the same harness; most will die, and that is the process working.
 - [ ] **3b — Management-as-alpha.** The ONLY thing that validated is defensive (exits/sizing).
   Test whether good exits + a cheap neutral entry (e.g. mean-reversion fade) beats costs —
   i.e. the edge lives in *management*, not entry selection. A genuinely different hypothesis.
