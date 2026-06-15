@@ -34,20 +34,26 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
 
 Stop the system from *claiming* a directional edge it doesn't have. Small, concrete code.
 
-- [ ] **1.1 Demote the directional confidence gate to a logger.** `advisory_confidence`
-  blocks D/AVOID on hand-tuned MMM weights that Tier 2.4 disproved — exactly the situation
-  vision was in before Tier 2.7. Keep computing + logging the grade for research; stop
-  letting it gate entries. (Mirror the Tier 2.7 vision demotion in `orchestrator_v2`.)
-- [ ] **1.2 A/B the gate empirically, don't assume.** An unvalidated filter can still cut
-  loss-bleed simply by trading less. Re-run the honest 365-day backtest BOTH ways
-  (gate on / gate off) and keep whichever is less-negative — or neither if both lose after
-  costs. Decide config by the number, not by belief.
-- [ ] **1.3 Re-baseline and accept.** Record the pivoted system's honest 365-day number to a
-  log (as Tier 1.9 did). Expectation: ≈ breakeven minus costs — there is no entry edge to
-  make it positive. Accept it.
-- [ ] **1.4 Document system status.** One short doc: *capital-safe, entry-edge unproven,
-  DEMO ONLY.* The validated gates (regime/news/exposure/kill-switch/timing/order-safety) ARE
-  the system's real value today; directional entries are unproven.
+- [x] **1.1 Demote the directional confidence gate to a logger.** (Done 2026-06-15, commit
+  17453f4.) `advisory_confidence`'s grade is computed + journaled for research but no longer
+  blocks entries, in BOTH the live orchestrator and the backtest engine, behind a new
+  `ADVISORY_GATE` toggle (default false = demoted). Mirrors the Tier 2.7 vision demotion.
+  Tests in `tests/test_advisory_gate_demotion.py`.
+- [x] **1.2 A/B the gate empirically, don't assume.** (Done 2026-06-15. Logs:
+  `logs/ab_gate_off.log` / `logs/ab_gate_on.log`.) Honest 365-day backtest both ways.
+  **Gate OFF (demoted): −$58.10 (−5.8%), 76 trades, 27.6% win, PF 0.67, Sharpe −1.49, DD
+  8.4%. Gate ON (legacy): −$70.99 (−7.1%), 88 trades, 29.5% win, PF 0.71, Sharpe −0.99, DD
+  8.3%.** Both lose and both trip the 8% breaker — no configuration of the directional
+  system is investable. The gate adds no value; demoted keeps marginally more capital with
+  less churn. **Decision: keep the gate OFF (demoted default).** The PF/Sharpe vs net-$
+  split is noise around a clearly-losing system — the gate is not a lever that matters.
+- [x] **1.3 Re-baseline and accept.** (Done 2026-06-15.) **The honest pivoted baseline is
+  −$58.10 / −5.8% over 365 days, PF 0.67, daily-$ Sharpe −1.49, DSR prob 0.00, max MTM DD
+  8.4%, breaker tripped.** Accepted, exactly as Tier 1.9 accepted −7.3%. There is no entry
+  edge; the number is negative by construction and that is the truth of the system today.
+- [x] **1.4 Document system status.** (Done 2026-06-15: `docs/SYSTEM_STATUS.md`.)
+  *Capital-safe, entry-edge unproven, DEMO ONLY.* The validated defensive gates are the
+  system's real value; directional entries are unproven and must not be funded.
 
 ## Track 2 — Close the demo→outcome loop for forward truth (≈1 week)
 
