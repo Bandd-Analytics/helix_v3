@@ -54,35 +54,56 @@ Cheapest honest verdict, reuses `rule_stats.py`. Pure offline analysis over the 
 outcomes; no live wiring. Likely most signatures die (as the rules did) — that is a valid
 and important result, not a failure.
 
-- [ ] **1.1 Verify + lock the labeling.** Confirm `mmm_event_replay.label_mmm_event_path`
-  is **first-touch / path-ordered** (stop wins same-bar ambiguity), NOT MFE>MAE — the exact
-  defect Tier 2.4 found in the old `rule_validator`. If it isn't, relabel the 56k outcomes
-  through the `rule_stats` first-touch labeler. Define `favorable` once and reuse it. This
-  is the correctness foundation; everything downstream is void if labels are path-blind.
-- [ ] **1.2 Coarse signature scheme.** Add a configurable, lower-cardinality projection of
-  the 13-dim `normalized_key` (e.g. `setup_family × direction × tdi_state × hunt_bucket`,
-  with the noisiest dims collapsed) targeting cells of N≥30. Keep the full key for drill-down.
-  Goal: turn 5,766 sparse keys into ~hundreds of well-powered cells.
-- [ ] **1.3 Cross-pair pooling.** Currency-agnostic test of each coarse signature pooled
-  across the 15 symbols (425 keys reach N≥30 pooled). Report pair-level breakdown alongside
-  the pooled verdict so a pooled edge driven by one pair is visible.
-- [ ] **1.4 The audit itself.** For each coarse signature: binomial test of its first-touch
-  favorable rate vs the **empirical unconditional first-touch base rate** (per pair and
-  pooled), on **non-overlapping** samples, with **Benjamini-Hochberg at q=0.10 across the
-  entire signature grid**. Also report expectancy in pips at realistic costs (reuse the
-  Tier 1.5 cost model). Output: a ranked table of signatures with p-value, base rate,
-  lift, expectancy, BH-significance, verdict (VALIDATED / DEAD / INSUFFICIENT_N).
-- [ ] **1.5 Embargoed walk-forward holdout.** Split 2022–2024 (in-sample) vs 2025–2026
-  (holdout) with a ≥1-week embargo. A signature is **VALIDATED only if it survives BH
-  in-sample AND replicates on the holdout** (same direction, still beats base rate). This is
-  the true OOS gate the feature ablation never had.
-- [ ] **1.6 Accept the verdict.** Record the surviving signature set (or the honest "none
-  survive") to a log, exactly as Tier 1.9 / 2.4 accepted their numbers. If a non-empty,
-  cost-positive, holdout-replicated set exists → proceed to Phase 2. If not → the directional
-  edge is disproven at the signature level too, and the project pivots (regime/timing-only
-  execution, or Phase 3 feature search as a last look).
+- [x] **1.1 Verify + lock the labeling.** (Done 2026-06-15.) Confirmed
+  `mmm_event_replay.label_mmm_event_path` is **first-touch / path-ordered**: it walks future
+  bars in time order, simulates full MMM management (SL → T1/breakeven → trail → stale →
+  max-duration), checks SL before targets, and returns `AMBIGUOUS` when SL and a target are
+  both reachable in one OHLC candle. This is NOT the MFE>MAE defect — no relabeling needed.
+  Outcome taxonomy over the 56,225 stored labels: STALE_EXIT 40.6%, LOSS 21.2%,
+  TIME_EXIT_PROFIT 16.3%, BREAKEVEN_AFTER_T1 5.3%, TARGET_2 4.5%, AMBIGUOUS 3.8% (excluded),
+  TRAIL_STOP 3.5%, TIME_EXIT_LOSS 3.1%, … `favorable` = {TARGET_2, TRAIL_STOP,
+  TIME_EXIT_PROFIT}. **Base favorable rate over 53,569 resolved outcomes = 25.5%** — a
+  low-hit-rate / run-the-winners profile (consistent with the −7.3% Tier 1.9 backtest).
+- [x] **1.2 Coarse signature scheme.** (Done 2026-06-15: `helix_v3/backtest/signature_audit.py`.)
+  Positional projection of the 13-dim `normalized_key` onto configurable facets. Five
+  a-priori schemes graded each on its own grid (chosen before looking at results — no
+  forking paths): S0 direction-only (sanity), S1 family×dir×tdi, S2 +mw, S3 +hunt,
+  S4 +session. Turns 5,766 sparse keys into tens–hundreds of N≥30 cells.
+- [x] **1.3 Cross-pair pooling.** (Done.) Every scheme run per-pair AND pooled (POOLED,
+  direction-controlled). Pooled grids reach the largest N (e.g. THE_33_MW BUY cells of
+  n>2000); per-pair grids preserve drill-down.
+- [x] **1.4 The audit itself.** (Done.) Per cell: non-overlapping sampling (greedy by
+  snapshot→exit window), **binomial test** of favorable rate vs the empirical
+  unconditional rate of the same (symbol, direction), AND a one-sided **expectancy test**
+  (mean net-R > 0, normal-approx) to catch asymmetric/fat-tail edges a hit-rate test misses.
+  **Benjamini-Hochberg q=0.10 on BOTH tracks** across each grid. Expectancy in net R-multiples
+  (`(exit_pips − round-trip cost) / sl_pips`, cross-pair comparable). Verdict per cell. Tests
+  in `tests/test_signature_audit.py` (incl. a planted-edge positive control + S0 sanity).
+- [x] **1.5 Embargoed walk-forward holdout.** (Done.) In-sample < 2025-01-01, holdout ≥
+  2025-01-08 (7-day embargo). VALIDATED only if BH-significant (either track) AND positive
+  net-R in-sample AND positive net-R on the holdout with N≥15.
+- [x] **1.6 Accept the verdict.** (Done 2026-06-15. Report: `logs/signature_audit.md`.)
+  **TOTAL VALIDATED = 0 across all 10 grids.** A faint, real hit-rate signal exists (a
+  handful of cells beat base by ~3–8pp at p<0.01, large N) but **every BH-significant cell
+  has NEGATIVE net-R** — the edge is too small for the run-the-winners payoff at any cost.
+  **0 cells are expectancy-BH-significant** (gross or net). The only directionally-consistent
+  positive is **SECOND_LEG_MW BUY** (second-leg M/W *continuation* longs — NOT the primary
+  M/W reversal): gross +0.04…+0.14R that replicates across the embargo (e.g.
+  `SECOND_LEG_MW|BUY|HUNT_PAIR_RANGE|TDI_CONFIRM` +0.08R n133 → +0.07R n155), but it is
+  **sub-BH-significant even gross and goes net-negative after costs.** The S0 direction-only
+  control sits exactly at base rate (0 significant) and the planted-edge test validates —
+  so this is a true negative, not a power failure. **Verdict: no tradeable directional edge
+  exists at the signature level**, extending Tier 2.4's rule verdict to the full signature
+  space. The SECOND_LEG_MW continuation lead is the single most promising direction for any
+  future research, but it does not clear significance or costs today. → Phase 2 has nothing
+  to forward-validate; the project pivots to what IS validated (regime + defensive timing).
 
 ## Phase 2 — Close the demo → outcome → promotion loop (forward validation)
+
+**GATED OUT (2026-06-15): Phase 1 yielded zero survivors — there is nothing to
+forward-validate.** Closing the loop is still worthwhile infrastructure for the day a
+survivor exists, but it is no longer the next step. Left here as the standing design for
+when/if a future signal clears the Phase 1 bar.
 
 Only if Phase 1 yields survivors. Turns the open learning loop into a closed one so
 survivors accrue genuine forward OOS evidence before any real-money consideration.
@@ -101,7 +122,14 @@ survivors accrue genuine forward OOS evidence before any real-money consideratio
   to "tradeable" only after the forward fold independently clears the Phase-1 bar. No
   real-money sizing until a survivor has forward evidence, not just historical.
 
-## Phase 3 — Feature model (conditional)
+## Phase 3 — Feature model (conditional — DECISION PENDING)
+
+Phase 1 did not show strong latent signal — the one positive lead (SECOND_LEG_MW BUY
+continuation) is sub-BH-significant and cost-negative, exactly the regime where an ML model
+most easily manufactures an overfit illusion (the Sharpe-4.37 trap). The disciplined default
+is **skip**. The only argument *for* a focused model is to test whether a sub-population of
+SECOND_LEG_MW BUY is larger than the ~0.1R pooled gross average. **This is a strategic
+go/no-go for the user**, not an automatic step.
 
 Only if Phase 1 shows latent signal that bucketed signatures can't capture (e.g. strong
 univariate lifts that don't isolate into a clean cell). Otherwise skip.
