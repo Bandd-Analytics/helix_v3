@@ -61,14 +61,24 @@ Repurpose the Edge-Discovery Phase 2 infrastructure. Not to promote MMM survivor
 none) — to collect **genuine forward out-of-sample outcomes** so the negative is confirmed
 (or, if we're wrong, refuted) on live demo data, and any latent signal would surface.
 
-- [ ] **2.1 Live/demo outcome recording.** Wire executed demo trades → flashcard/outcome →
-  `mmm_event_replay` store (the missing live write point). Idempotent, server-time stamped.
-- [ ] **2.2 Embargoed promotion wired.** Call `promote_from_replay(before=…)` at EOD so IF
-  anything ever clears the bar, it's promoted honestly (never from its own window).
-- [ ] **2.3 Standing monthly re-audit.** Re-run `signature_audit.py` over the growing dataset
-  (historical + forward demo). A cron/scheduled check, not a one-off.
+- [x] **2.1 Live/demo outcome recording.** (Done 2026-06-15.) `orchestrator_v2._record_live_replay_outcome`
+  joins the setup captured at entry with the closed trade-journal row (synced before the
+  handler runs) by ticket and records a live `MMMEventOutcome` to the replay store — the
+  previously-dead write point. New pure `mmm_event_replay.live_outcome_from_journal_row` maps
+  the journal exit_reason + economics into the SAME replay taxonomy the audit consumes (so
+  live and backtest data are comparable). The replay store writes `vision_backtests.db` — the
+  audit's own source — so forward outcomes feed the audit automatically. Tests in
+  `tests/test_live_replay_outcome.py`.
+- [x] **2.2 Embargoed promotion wired.** (Done 2026-06-15.) The EOD `promote_from_replay` call
+  now passes `before = now − PROMOTION_EMBARGO_DAYS` (default 7), so a pattern can never be
+  promoted from the very trades about to be taken — the Tier 1.3 walk-forward separation now
+  holds live too.
+- [x] **2.3 Standing monthly re-audit.** (Done 2026-06-15.) `_kick_monthly_signature_audit`
+  runs `signature_audit.run_audit` in a daemon thread on the 1st-of-month report tick and
+  notifies the validated-cell count (0 = "remains DEMO ONLY"). Live outcomes accrue into the
+  audit's store, so the monthly check sees forward demo data with no extra plumbing.
 - [ ] **HARD GATE.** No real capital until Track 3 produces a survivor that ALSO replicates
-  on this forward demo data.
+  on this forward demo data. *(Standing — not a code task.)*
 
 ## Track 3 — Find a real entry edge (the substantive work, months)
 

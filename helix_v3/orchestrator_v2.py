@@ -955,21 +955,65 @@ class HelixOrchestratorV2:
             for sym in self._symbols:
                 if sym in action:
                     self.guard.record_exit(sym)
-                    # Record to replay store if we have a setup for this symbol
+                    # Record signature + OUTCOME to the replay store — the
+                    # forward-validation loop (Forward Plan Track 2.1). The
+                    # journal was synced before this handler ran, so the closed
+                    # trade's full accounting is available by ticket.
                     if self.replay_store and _HAS_VALIDATION and sym in self._live_replay_setups:
-                        try:
-                            rs = self._live_replay_setups.pop(sym)
-                            from helix_v3.backtest.mmm_event_replay import build_setup_signature
-                            sig = build_setup_signature(rs)
-                            self.replay_store.record_signature(sig)
-                            # Build a minimal trade-like object from the action string
-                            # Full outcome recording requires trade data from journal
-                            logger.info("REPLAY: Recorded signature for %s exit", sym)
-                        except Exception as e:
-                            logger.debug("Replay record failed for %s: %s", sym, e)
+                        self._record_live_replay_outcome(sym, action)
                     break
             # Track losses for persistent re-entry guard
             self._record_guard_loss_from_action(action)
+
+    def _record_live_replay_outcome(self, sym: str, action: str) -> None:
+        """Record a closed live trade's signature + outcome to the replay store.
+
+        Forward Plan Track 2.1 — the forward-validation loop. The setup was
+        captured at entry; the journal (synced just before this handler) holds
+        the closed trade's full accounting. We join them by ticket and record a
+        live MMMEventOutcome in the SAME taxonomy the signature audit consumes.
+        """
+        from helix_v3.backtest.mmm_event_replay import (
+            build_setup_signature,
+            live_outcome_from_journal_row,
+        )
+        m = re.search(r"ticket=(\d+)", action)
+        ticket = int(m.group(1)) if m else None
+        try:
+            rs = self._live_replay_setups.pop(sym)
+            if ticket is not None:
+                rs.source_id = ticket  # align signature + outcome, unique per trade
+            sig = build_setup_signature(rs)
+            sig_id = self.replay_store.record_signature(sig)
+
+            row = None
+            if ticket is not None:
+                conn = self.gatekeeper.journal._conn
+                cur = conn.execute(
+                    "SELECT * FROM trades WHERE ticket = ? AND closed_at IS NOT NULL",
+                    (ticket,),
+                )
+                fetched = cur.fetchone()
+                if fetched is not None:
+                    row = dict(zip([c[0] for c in cur.description], fetched))
+
+            if row is None:
+                logger.warning(
+                    "REPLAY: signature recorded for %s but no closed journal row "
+                    "for ticket=%s yet — outcome not recorded this cycle", sym, ticket,
+                )
+                return
+
+            outcome = live_outcome_from_journal_row(row, rs)
+            if outcome is None:
+                return
+            self.replay_store.record_outcome(outcome, sig_id)
+            logger.info(
+                "REPLAY: recorded live outcome %s for %s ticket=%s (%+.1f pips)",
+                outcome.outcome, sym, ticket, outcome.exit_pips,
+            )
+        except Exception as e:
+            logger.debug("Live replay outcome record failed for %s: %s", sym, e)
 
     def _run_market_scan(self) -> None:
         """Execute the 15-minute market condition scan with MTF context."""
@@ -1230,14 +1274,26 @@ class HelixOrchestratorV2:
                 )
                 self._reports_sent_today.add(report_key)
 
-                # Auto-promote proven patterns at EOD
+                # Auto-promote proven patterns at EOD — with an embargo
+                # (Forward Plan Track 2.2 / audit Tier 1.3): only promote from
+                # outcomes older than PROMOTION_EMBARGO_DAYS so a pattern is
+                # never promoted from the very trades we are about to take. The
+                # walk-forward separation that the backtest enforces must hold
+                # live too.
                 if self.validation_lib:
                     try:
+                        embargo_days = int(os.getenv("PROMOTION_EMBARGO_DAYS", "7"))
+                        cutoff = datetime.now(timezone.utc) - timedelta(days=embargo_days)
                         promoted = self.validation_lib.promote_from_replay(
                             min_total=5, min_favorable_rate=55.0, min_symbols=1,
+                            before=cutoff,
                         )
                         if promoted > 0:
-                            logger.info("VALIDATION: Promoted %d proven patterns at EOD", promoted)
+                            logger.info(
+                                "VALIDATION: Promoted %d proven patterns at EOD "
+                                "(embargo %dd, before=%s)",
+                                promoted, embargo_days, cutoff.date(),
+                            )
                     except Exception as e:
                         logger.warning("Validation promotion failed at EOD: %s", e)
 
@@ -1286,6 +1342,38 @@ class HelixOrchestratorV2:
                     t1_hit_count=stats["t1_hit_count"],
                 )
                 self._reports_sent_today.add(report_key)
+
+                # Standing monthly signature re-audit (Forward Plan Track 2.3):
+                # live outcomes now accrue into the same store the audit reads,
+                # so re-running it monthly checks whether forward demo data has
+                # surfaced any edge the historical audit didn't. Runs in a
+                # daemon thread so the long sweep never blocks management.
+                self._kick_monthly_signature_audit()
+
+    def _kick_monthly_signature_audit(self) -> None:
+        def _run() -> None:
+            try:
+                from helix_v3.backtest.signature_audit import run_audit
+                db = str(self.replay_store._db_path) if self.replay_store \
+                    else "logs/vision_backtests.db"
+                report = run_audit(db)
+                validated = sum(
+                    1 for cells in report.values() for c in cells
+                    if c.verdict == "VALIDATED"
+                )
+                logger.info("MONTHLY SIGNATURE AUDIT: %d validated cells", validated)
+                self.notifier._send(
+                    f"HELIX V3 MONTHLY SIGNATURE AUDIT\n{'='*25}\n"
+                    f"VALIDATED edge cells: {validated}\n"
+                    + ("No directional edge yet — system remains DEMO ONLY."
+                       if validated == 0 else
+                       f"{validated} cell(s) cleared the bar — review before any funding.")
+                )
+            except Exception as e:
+                logger.warning("Monthly signature audit failed: %s", e)
+
+        import threading
+        threading.Thread(target=_run, daemon=True).start()
 
     def get_analysis_summary(self) -> str:
         """Return a formatted summary of the latest MTF analysis for all symbols."""

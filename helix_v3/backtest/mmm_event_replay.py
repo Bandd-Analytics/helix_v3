@@ -2082,6 +2082,108 @@ def outcome_from_closed_trade(
     )
 
 
+def _live_outcome_label(
+    reason: str, exit_pips: float, t1_hit: bool, tol: float
+) -> str:
+    """Map a live journal exit_reason + economics to the replay taxonomy.
+
+    Keeps live outcomes in the SAME label set the signature audit consumes so
+    forward demo data is directly comparable to the historical backtest data.
+    `favorable` = {TARGET_2, TRAIL_STOP, TIME_EXIT_PROFIT}; everything else is
+    unfavorable. Classification is by economics first (the money is the truth),
+    refined by the exit reason and whether T1 was taken.
+    """
+    reason = (reason or "").upper()
+    if exit_pips > tol:                                   # made money
+        if reason == "TP":
+            return "TARGET_2"
+        return "TRAIL_STOP" if t1_hit else "TIME_EXIT_PROFIT"
+    if exit_pips < -tol:                                  # lost money
+        if reason in ("SL", "STOP_OUT") and not t1_hit:
+            return "LOSS"
+        if reason == "TIME_EXIT":
+            return "TIME_EXIT_LOSS"
+        return "STALE_EXIT"
+    return "BREAKEVEN_AFTER_T1" if t1_hit else "STALE_EXIT"  # ~flat
+
+
+def live_outcome_from_journal_row(
+    row: dict[str, Any],
+    replay_setup: ReplaySetup,
+    *,
+    breakeven_tol_pips: float = 1.0,
+) -> Optional[MMMEventOutcome]:
+    """Build an MMMEventOutcome from a CLOSED trade-journal row (live path).
+
+    Forward-validation loop (Forward Plan Track 2.1): the journal already has
+    full entry + exit accounting after `sync_from_mt5`, so a closed row plus the
+    setup captured at entry is enough to record a live outcome — no MT5 or
+    bar-replay needed. `row` is a plain dict (caller converts the sqlite Row).
+    Returns None for non-terminal rows (still open, or a T1 partial) so the
+    caller never records a half-finished trade.
+    """
+    def _f(key: str, default: float = 0.0) -> float:
+        try:
+            return float(row.get(key))
+        except (TypeError, ValueError):
+            return default
+
+    reason = str(row.get("exit_reason") or "").upper()
+    closed_at = row.get("closed_at")
+    if reason == "T1_PARTIAL" or not closed_at:
+        return None
+
+    entry = _f("entry_price")
+    sl = _f("stop_loss")
+    tp1 = _f("take_profit_1")
+    tp2 = _f("take_profit_2")
+    sl_pips = _f("sl_pips")
+    exit_price = _f("exit_price", entry)
+    exit_pips = _f("pips_gained")
+    t1_hit = bool(_f("t1_hit"))
+    duration_min = _f("duration_minutes")
+
+    pip_size = abs(entry - sl) / sl_pips if sl_pips > 0 and entry and sl else None
+    t1_pips = abs(tp1 - entry) / pip_size if pip_size and tp1 else None
+    t2_pips = abs(tp2 - entry) / pip_size if pip_size and tp2 else None
+
+    outcome = _live_outcome_label(reason, exit_pips, t1_hit, breakeven_tol_pips)
+    event_path = ["ENTRY"] + (["T1_HIT"] if t1_hit else []) + [outcome]
+
+    exit_at = None
+    try:
+        exit_at = _to_utc(closed_at) if isinstance(closed_at, str) else closed_at
+    except Exception:
+        exit_at = None
+
+    return MMMEventOutcome(
+        source=replay_setup.source,
+        source_id=replay_setup.source_id,
+        symbol=replay_setup.symbol,
+        timeframe="M15",
+        snapshot_at=replay_setup.snapshot_at,
+        direction=replay_setup.direction,
+        entry_price=entry,
+        stop_loss_price=sl,
+        t1_price=tp1,
+        t2_price=tp2,
+        sl_pips=sl_pips,
+        t1_pips=t1_pips,
+        t2_pips=t2_pips,
+        exit_at=exit_at,
+        exit_price=exit_price,
+        exit_pips=exit_pips,
+        max_favorable_pips=None,
+        max_adverse_pips=None,
+        t1_hit=t1_hit,
+        minutes_to_t1=None,
+        outcome=outcome,
+        label=f"{outcome}_{int(duration_min)}M",
+        event_path=event_path,
+        notes=f"live exit_reason={reason}",
+    )
+
+
 def setup_from_flashcard_row(row: sqlite3.Row | dict[str, Any]) -> ReplaySetup:
     data = dict(row)
     return ReplaySetup(
