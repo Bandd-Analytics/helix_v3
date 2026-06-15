@@ -729,11 +729,14 @@ class BacktestRunner:
             advisory_setup, self._current_advisory_setups.values(),
         )
 
-        # Block D and AVOID grades
-        if advisory.grade in ("D", "AVOID"):
+        # Advisory grade is a LOGGER, not a gate (Forward Plan Track 1.1) —
+        # Edge Discovery Phase 1 found no directional edge in these weights.
+        # Only blocks when ADVISORY_GATE is explicitly on (Track 1.2 A/B).
+        from config.settings import settings as _adv_settings
+        if advisory.grade in ("D", "AVOID") and _adv_settings.risk.advisory_gate_enabled:
             if self.verbose:
                 logger.debug(
-                    "[%s] %s %s blocked: grade=%s score=%.0f blockers=%s",
+                    "[%s] %s %s blocked: grade=%s score=%.0f blockers=%s (gate on)",
                     bar_time.strftime("%m-%d %H:%M"), direction.value, symbol,
                     advisory.grade, advisory.final_score, advisory.blockers[:3],
                 )

@@ -464,13 +464,24 @@ class HelixOrchestratorV2:
             if advisory.blockers:
                 logger.info("ADVISORY %s blockers: %s", symbol, "; ".join(advisory.blockers))
 
-            # Block D and AVOID grades — these have no edge
+            # Forward Plan Track 1.1: the advisory grade is hand-tuned MMM
+            # weights that Edge Discovery Phase 1 disproved — it has no
+            # measured directional edge, so it is a LOGGER, not a gate (same
+            # demotion as vision in audit Tier 2.7). The grade is still
+            # computed and journaled for research. It only blocks when the
+            # ADVISORY_GATE toggle is explicitly on (for the Track 1.2 A/B).
             if advisory.grade in ("D", "AVOID"):
-                logger.warning(
-                    "ADVISORY BLOCK: %s grade=%s score=%.0f — skipping",
+                if settings.risk.advisory_gate_enabled:
+                    logger.warning(
+                        "ADVISORY BLOCK: %s grade=%s score=%.0f — skipping (gate on)",
+                        symbol, advisory.grade, advisory.final_score,
+                    )
+                    return
+                logger.info(
+                    "ADVISORY %s grade=%s score=%.0f — would block, but gate "
+                    "demoted to logger (no validated edge); proceeding",
                     symbol, advisory.grade, advisory.final_score,
                 )
-                return
 
             # Validation library lookup — check if this pattern has historical backing
             validation_match = None

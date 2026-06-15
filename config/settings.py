@@ -64,6 +64,12 @@ class RiskConfig:
     # Regime filter (audit Tier 2.8): skip symbols whose D1 vol/trendiness
     # say MMM conditions are absent. Thresholds live in core/regime.py.
     regime_filter_enabled: bool = os.getenv("REGIME_FILTER", "true").lower() == "true"
+    # Advisory confidence gate (Forward Plan Track 1.1): the A/B/C/D/AVOID
+    # grade is hand-tuned MMM weights that Edge Discovery Phase 1 disproved
+    # (no directional edge). DEMOTED to a logger by default — the grade is
+    # still computed and journaled for research, but it no longer blocks
+    # entries. Flip ADVISORY_GATE=true only for the Track 1.2 A/B backtest.
+    advisory_gate_enabled: bool = os.getenv("ADVISORY_GATE", "false").lower() == "true"
 
 
 @dataclass(frozen=True)
