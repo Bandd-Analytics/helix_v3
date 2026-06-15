@@ -213,6 +213,48 @@ def _expectancy_p(rs: Sequence[float]) -> Optional[float]:
     return 0.5 * math.erfc(t / math.sqrt(2.0))
 
 
+def _make_cell(
+    signal: str, symbol: str,
+    labels: Sequence[Tuple[datetime, bool, float]], base_rate: float,
+) -> CellResult:
+    in_s = [x for x in labels if x[0] < IN_SAMPLE_END]
+    hold = [x for x in labels if x[0] >= IN_SAMPLE_END]
+    n = len(in_s)
+    k = sum(f for _, f, _ in in_s)
+    rs = [r for _, _, r in in_s]
+    hold_r = [r for _, _, r in hold]
+    p = binomial_p_at_least(k, n, base_rate) if n >= MIN_CELL_N and base_rate > 0 else None
+    return CellResult(
+        signal=signal, symbol=symbol, n=n, favorable=k,
+        fav_rate=(k / n if n else 0.0), base_rate=base_rate, p_value=p,
+        mean_net_r=(sum(rs) / n if n else 0.0), p_expectancy=_expectancy_p(rs),
+        holdout_n=len(hold),
+        holdout_mean_net_r=(sum(hold_r) / len(hold_r)) if hold_r else 0.0,
+    )
+
+
+def _grade(results: List[CellResult]) -> List[CellResult]:
+    """BH on both tracks + walk-forward verdict (shared by all audit paths)."""
+    for r, f in zip(results, benjamini_hochberg([r.p_value for r in results], q=BH_Q)):
+        r.bh_significant = f
+    for r, f in zip(results, benjamini_hochberg([r.p_expectancy for r in results], q=BH_Q)):
+        r.bh_exp_significant = f
+    for r in results:
+        if r.p_value is None:
+            r.verdict = "INSUFFICIENT_N"
+            continue
+        edge = (r.bh_significant and r.mean_net_r > 0) or r.bh_exp_significant
+        replicates = r.holdout_n >= MIN_HOLDOUT_N and r.holdout_mean_net_r > 0
+        r.verdict = "VALIDATED" if (edge and replicates) else "DEAD"
+    return results
+
+
+def _base_rate(df: pd.DataFrame, a: pd.Series, pip: float, cost_r: float) -> float:
+    base = _base_rate_labels(df, a, pip_size=pip, cost_r=cost_r)
+    base_in = [b for b in base if b[0] < IN_SAMPLE_END]
+    return (sum(f for _, f, _ in base_in) / len(base_in)) if base_in else 0.0
+
+
 def audit(
     symbols: Sequence[str] = MAJORS, timeframe: str = DEFAULT_TIMEFRAME,
     n_bars: int = 6000, cost_r: float = COST_R_DEFAULT,
@@ -227,40 +269,75 @@ def audit(
             continue
         a = atr(df)
         pip = pip_size_for(symbol)
-        base = _base_rate_labels(df, a, pip_size=pip, cost_r=cost_r)
-        base_in = [b for b in base if b[0] < IN_SAMPLE_END]
-        base_rate = (sum(f for _, f, _ in base_in) / len(base_in)) if base_in else 0.0
+        base_rate = _base_rate(df, a, pip, cost_r)
         for sig_name, sig_fn in SIGNALS.items():
             labels = _label_entries(df, a, sig_fn(df), pip_size=pip, cost_r=cost_r)
-            in_s = [x for x in labels if x[0] < IN_SAMPLE_END]
-            hold = [x for x in labels if x[0] >= IN_SAMPLE_END]
-            n = len(in_s)
-            k = sum(f for _, f, _ in in_s)
-            rs = [r for _, _, r in in_s]
-            fav_rate = k / n if n else 0.0
-            mean_r = sum(rs) / n if n else 0.0
-            p = binomial_p_at_least(k, n, base_rate) if n >= MIN_CELL_N and base_rate > 0 else None
-            hold_r = [r for _, _, r in hold]
-            results.append(CellResult(
-                signal=sig_name, symbol=symbol, n=n, favorable=k,
-                fav_rate=fav_rate, base_rate=base_rate, p_value=p,
-                mean_net_r=mean_r, p_expectancy=_expectancy_p(rs),
-                holdout_n=len(hold),
-                holdout_mean_net_r=(sum(hold_r) / len(hold_r)) if hold_r else 0.0,
-            ))
+            results.append(_make_cell(sig_name, symbol, labels, base_rate))
+    return _grade(results)
 
-    for r, f in zip(results, benjamini_hochberg([r.p_value for r in results], q=BH_Q)):
-        r.bh_significant = f
-    for r, f in zip(results, benjamini_hochberg([r.p_expectancy for r in results], q=BH_Q)):
-        r.bh_exp_significant = f
-    for r in results:
-        if r.p_value is None:
-            r.verdict = "INSUFFICIENT_N"
+
+def _align_closes(pair_dfs: Dict[str, pd.DataFrame]) -> pd.DataFrame:
+    # Union index — do NOT dropna across pairs (that collapses the window to
+    # the shortest-history pair). Per-bar gaps are handled by the >=4 guard.
+    return pd.DataFrame({s: df["Close"] for s, df in pair_dfs.items()})
+
+
+def cross_sectional_momentum_entries(
+    pair_dfs: Dict[str, pd.DataFrame], lookback: int = 60, top_k: int = 1,
+) -> Dict[str, List[Tuple[int, str]]]:
+    """Each bar: long the top_k highest-momentum pairs, short the lowest.
+
+    Relative (cross-sectional) momentum — structurally different from the
+    per-pair absolute signals. Direction is by RANK, not by an absolute level.
+    """
+    closes = _align_closes(pair_dfs)
+    rets = closes.pct_change(lookback)
+    entries: Dict[str, List[Tuple[int, str]]] = {s: [] for s in pair_dfs}
+    pos = {s: {t: i for i, t in enumerate(pair_dfs[s].index)} for s in pair_dfs}
+    for t, row in rets.iterrows():
+        r = row.dropna()
+        if len(r) < 4:
             continue
-        edge = (r.bh_significant and r.mean_net_r > 0) or r.bh_exp_significant
-        replicates = r.holdout_n >= MIN_HOLDOUT_N and r.holdout_mean_net_r > 0
-        r.verdict = "VALIDATED" if (edge and replicates) else "DEAD"
-    return results
+        ranked = r.sort_values()
+        for s in ranked.index[-top_k:]:          # strongest -> long (continuation)
+            i = pos[s].get(t)
+            if i is not None:
+                entries[s].append((i, "BUY"))
+        for s in ranked.index[:top_k]:            # weakest -> short
+            i = pos[s].get(t)
+            if i is not None:
+                entries[s].append((i, "SELL"))
+    return entries
+
+
+def audit_cross_sectional(
+    symbols: Sequence[str] = MAJORS, timeframe: str = DEFAULT_TIMEFRAME,
+    n_bars: int = 6000, cost_r: float = COST_R_DEFAULT, lookback: int = 60,
+) -> List[CellResult]:
+    import MetaTrader5 as mt5
+    mt5.initialize()
+    pair_dfs = {s: fetch_bars(s, timeframe, n_bars) for s in symbols}
+    pair_dfs = {s: df for s, df in pair_dfs.items() if not df.empty and len(df) >= 200}
+    if len(pair_dfs) < 4:
+        return []
+    entries_by_sym = cross_sectional_momentum_entries(pair_dfs, lookback=lookback)
+    # Cross-sectional momentum is ONE strategy across the universe — pool every
+    # pair's entries into a single cell (per-pair N is too sparse at top_k=1).
+    # The control is the pooled unconditional base rate over the same pairs.
+    pooled_labels: List[Tuple[datetime, bool, float]] = []
+    base_fav, base_n = 0, 0
+    for symbol, df in pair_dfs.items():
+        a = atr(df)
+        pip = pip_size_for(symbol)
+        pooled_labels.extend(
+            _label_entries(df, a, entries_by_sym[symbol], pip_size=pip, cost_r=cost_r)
+        )
+        base = [b for b in _base_rate_labels(df, a, pip_size=pip, cost_r=cost_r)
+                if b[0] < IN_SAMPLE_END]
+        base_fav += sum(f for _, f, _ in base)
+        base_n += len(base)
+    base_rate = base_fav / base_n if base_n else 0.0
+    return _grade([_make_cell(f"xs_mom_{lookback}", "POOLED", pooled_labels, base_rate)])
 
 
 def format_report(results: Sequence[CellResult], timeframe: str) -> str:
@@ -296,6 +373,9 @@ def main() -> None:
     ap.add_argument("--out", default="logs/signal_research.md")
     args = ap.parse_args()
     results = audit(timeframe=args.timeframe, n_bars=args.bars, cost_r=args.cost_r)
+    results += audit_cross_sectional(
+        timeframe=args.timeframe, n_bars=args.bars, cost_r=args.cost_r
+    )
     md = format_report(results, args.timeframe)
     from pathlib import Path
     Path(args.out).write_text(md, encoding="utf-8")

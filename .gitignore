@@ -38,6 +38,11 @@ data/mmm_training/logs/
 data/mmm_training/transcripts/
 *.bin
 
+# Reference books + broker screenshots — local research material, never commit
+# (a 201MB PDF here once blocked the whole push; kept on disk, out of git)
+data/Books/
+data/ICMarketsKE Currency Pairs/
+
 # Compiled MQ5 binaries (build artifacts — source .mq5 is tracked)
 mt5/indicators/*.ex5
 

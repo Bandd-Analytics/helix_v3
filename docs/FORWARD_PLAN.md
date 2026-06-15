@@ -93,10 +93,12 @@ The only honest road to profit. Reuse `signature_audit.py` + `rule_stats.py`; sa
   = 0.** Donchian breakout + MA cross trade BELOW base rate (no intraday trend on H4 majors);
   z-score mean-reversion is the least-bad (55–56% fav vs 51–52% base on NZD/GBP) but is
   sub-BH-significant and collapses out of sample. Same fingerprint as MMM — faint leads, no
-  survivors. **Next, WITHOUT fishing the same price-only signals:** carry (swap-ranked) and
-  cross-sectional currency strength — structurally different families most likely to carry
-  real FX edge; plus D1 timeframe and a vol/regime conditioner. Each new family runs through
-  the same harness; most will die, and that is the process working.
+  survivors. **Cross-sectional momentum added (`audit_cross_sectional`, pooled across majors):
+  n=2018, hit-rate 51% vs 48% base, p=0.002 (significantly above base!) — but netR −0.07 and
+  holdout −0.15 → DEAD.** A real hit-rate edge that doesn't pay after costs — the exact
+  pattern seen everywhere. **Next, WITHOUT fishing the same signals:** carry (swap-ranked) and
+  cross-sectional currency-strength (currency-decomposed, not pair-level); plus D1 timeframe.
+  Each new family runs through the same harness; most will die, and that is the process working.
 - [ ] **3b — Management-as-alpha.** The ONLY thing that validated is defensive (exits/sizing).
   Test whether good exits + a cheap neutral entry (e.g. mean-reversion fade) beats costs —
   i.e. the edge lives in *management*, not entry selection. A genuinely different hypothesis.

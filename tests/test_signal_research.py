@@ -57,6 +57,31 @@ def test_net_r_includes_cost() -> None:
     assert abs(net_r - 0.9) < 1e-6   # +1R target minus 0.1R cost
 
 
+def test_cross_sectional_momentum_ranks_pairs() -> None:
+    # Four pairs (the cross-section needs >=4): A rises most, D falls most.
+    n = 120
+    a = _df(np.linspace(1.10, 1.25, n))          # strongest
+    b = _df(np.linspace(1.10, 1.12, n))          # middle
+    c = _df(np.linspace(1.10, 1.11, n))          # middle
+    d = _df(np.linspace(1.30, 1.18, n))          # weakest
+    entries = sr.cross_sectional_momentum_entries(
+        {"AUSD": a, "BUSD": b, "CUSD": c, "DUSD": d}, lookback=60, top_k=1
+    )
+    # strongest pair gets BUY entries, weakest gets SELL entries
+    assert any(dir_ == "BUY" for _, dir_ in entries["AUSD"])
+    assert any(dir_ == "SELL" for _, dir_ in entries["DUSD"])
+    # middle pairs are never the extreme -> no entries
+    assert entries["BUSD"] == [] and entries["CUSD"] == []
+
+
+def test_grade_marks_insufficient_n() -> None:
+    cells = [sr.CellResult(signal="s", symbol="X", n=10, favorable=5,
+                           fav_rate=0.5, base_rate=0.5, p_value=None,
+                           mean_net_r=0.0, p_expectancy=None)]
+    sr._grade(cells)
+    assert cells[0].verdict == "INSUFFICIENT_N"
+
+
 def test_verdict_requires_significance_and_holdout(monkeypatch) -> None:
     # Build a fake result set: one cell strongly significant + positive holdout.
     cells = [
