@@ -200,6 +200,30 @@ def _base_rate_labels(
     return _label_entries(df, atr_series, entries, pip_size=pip_size, cost_r=cost_r)
 
 
+def _label_holding_return(
+    df: pd.DataFrame, atr_series: pd.Series, entries: Sequence[Tuple[int, str]],
+    *, pip_size: float, cost_r: float, horizon: int,
+) -> List[Tuple[datetime, bool, float]]:
+    """Forward H-bar holding return in the signal direction, net of cost.
+
+    Carry is a slow risk premium, not a timing edge — a short ±ATR bracket
+    would resolve on noise. This measures the realized directional return over
+    `horizon` bars, in R-multiples of the 1xATR stop. favorable = return > 0.
+    """
+    out: List[Tuple[datetime, bool, float]] = []
+    a = atr_series.values
+    close = df["Close"].values
+    for i, direction in entries:
+        j = i + horizon
+        if i < ATR_PERIOD or j >= len(df) or np.isnan(a[i]) or a[i] <= 0:
+            continue
+        move = close[j] - close[i]
+        signed = move if direction == "BUY" else -move
+        r = float(signed / (K_ATR * a[i]) - cost_r)
+        out.append((df.index[i].to_pydatetime(), bool(r > 0), r))
+    return out
+
+
 def _expectancy_p(rs: Sequence[float]) -> Optional[float]:
     import math
     n = len(rs)
@@ -340,6 +364,145 @@ def audit_cross_sectional(
     return _grade([_make_cell(f"xs_mom_{lookback}", "POOLED", pooled_labels, base_rate)])
 
 
+# ---------------------------------------------------------------------------
+# Carry (swap-ranked) — a holding-period premium, tested with holding returns
+# ---------------------------------------------------------------------------
+
+def carry_direction(symbol: str) -> Optional[str]:
+    """The positive-carry side from the broker's overnight swap.
+
+    swap_long/swap_short are the points credited for holding long/short. The
+    carry-favored direction earns the higher (less negative) swap. NOTE: this
+    is the CURRENT swap used as a static proxy over the whole window — a rough
+    stand-in for the historical rate differential, not the real time series.
+    """
+    import MetaTrader5 as mt5
+    info = mt5.symbol_info(symbol)
+    if info is None:
+        return None
+    if info.swap_long == info.swap_short:
+        return None
+    return "BUY" if info.swap_long > info.swap_short else "SELL"
+
+
+def audit_carry(
+    symbols: Sequence[str] = MAJORS, timeframe: str = "D1",
+    n_bars: int = 1500, cost_r: float = COST_R_DEFAULT, holding: int = 20,
+) -> List[CellResult]:
+    """Hold the positive-carry direction for `holding` bars; pool across pairs.
+
+    Run on D1 by default — carry needs a multi-week horizon to matter.
+    """
+    import MetaTrader5 as mt5
+    mt5.initialize()
+    pooled: List[Tuple[datetime, bool, float]] = []
+    base_pos, base_n = 0, 0
+    for symbol in symbols:
+        direction = carry_direction(symbol)
+        if direction is None:
+            continue
+        df = fetch_bars(symbol, timeframe, n_bars)
+        if df.empty or len(df) < holding + ATR_PERIOD + 30:
+            continue
+        a = atr(df)
+        pip = pip_size_for(symbol)
+        entries = [(i, direction) for i in range(ATR_PERIOD, len(df) - holding, holding)]
+        pooled.extend(_label_holding_return(
+            df, a, entries, pip_size=pip, cost_r=cost_r, horizon=holding))
+        # control: unconditional H-bar holding return (BUY) positive rate
+        ctrl = _label_holding_return(
+            df, a, [(i, "BUY") for i in range(ATR_PERIOD, len(df) - holding, holding)],
+            pip_size=pip, cost_r=cost_r, horizon=holding)
+        ctrl_in = [c for c in ctrl if c[0] < IN_SAMPLE_END]
+        base_pos += sum(f for _, f, _ in ctrl_in)
+        base_n += len(ctrl_in)
+    base_rate = base_pos / base_n if base_n else 0.0
+    return _grade([_make_cell(f"carry_h{holding}", "POOLED", pooled, base_rate)])
+
+
+# ---------------------------------------------------------------------------
+# Cross-sectional currency strength (currency-decomposed momentum)
+# ---------------------------------------------------------------------------
+
+STRENGTH_BASKET = [
+    "EURUSD", "GBPUSD", "AUDUSD", "NZDUSD", "USDJPY", "USDCHF", "USDCAD",
+    "EURGBP", "EURJPY", "GBPJPY", "AUDJPY", "EURAUD", "GBPAUD", "EURCHF",
+    "GBPCHF", "AUDNZD", "NZDJPY", "CADJPY", "EURNZD", "GBPNZD", "AUDCAD", "EURCAD",
+]
+
+
+def _split_ccy(symbol: str) -> Tuple[str, str]:
+    return symbol[:3], symbol[3:6]
+
+
+def currency_strength_entries(
+    pair_dfs: Dict[str, pd.DataFrame], lookback: int = 20,
+) -> Dict[str, List[Tuple[int, str]]]:
+    """Each bar: rank currencies by net strength; trade the basket pair that
+    connects the strongest & weakest currency, long the strongest.
+
+    Decomposing pairs into currencies nets USD out of the view — the proper
+    cross-sectional FX momentum factor (vs the pair-level proxy in xs_mom).
+    """
+    closes = pd.DataFrame({s: df["Close"] for s, df in pair_dfs.items()})
+    logret = np.log(closes).diff(lookback)
+    pair_to_idx = {s: {t: i for i, t in enumerate(pair_dfs[s].index)} for s in pair_dfs}
+    parsed = {s: _split_ccy(s) for s in pair_dfs}
+    entries: Dict[str, List[Tuple[int, str]]] = {s: [] for s in pair_dfs}
+
+    for t, row in logret.iterrows():
+        r = row.dropna()
+        if len(r) < 6:
+            continue
+        strength: Dict[str, List[float]] = {}
+        for s, ret in r.items():
+            base, quote = parsed[s]
+            strength.setdefault(base, []).append(ret)
+            strength.setdefault(quote, []).append(-ret)
+        score = {c: sum(v) / len(v) for c, v in strength.items() if v}
+        if len(score) < 4:
+            continue
+        ranked = sorted(score, key=score.get)
+        weak, strong = ranked[0], ranked[-1]
+        sym = f"{strong}{weak}"
+        rev = f"{weak}{strong}"
+        if sym in pair_dfs:
+            i = pair_to_idx[sym].get(t)
+            if i is not None:
+                entries[sym].append((i, "BUY"))      # long strongest/weakest
+        elif rev in pair_dfs:
+            i = pair_to_idx[rev].get(t)
+            if i is not None:
+                entries[rev].append((i, "SELL"))      # short weakest/strongest
+    return entries
+
+
+def audit_currency_strength(
+    timeframe: str = DEFAULT_TIMEFRAME, n_bars: int = 6000,
+    cost_r: float = COST_R_DEFAULT, lookback: int = 20,
+) -> List[CellResult]:
+    import MetaTrader5 as mt5
+    mt5.initialize()
+    pair_dfs = {s: fetch_bars(s, timeframe, n_bars) for s in STRENGTH_BASKET}
+    pair_dfs = {s: df for s, df in pair_dfs.items() if not df.empty and len(df) >= 200}
+    if len(pair_dfs) < 6:
+        return []
+    entries_by_sym = currency_strength_entries(pair_dfs, lookback=lookback)
+    pooled: List[Tuple[datetime, bool, float]] = []
+    base_fav, base_n = 0, 0
+    for symbol, df in pair_dfs.items():
+        a = atr(df)
+        pip = pip_size_for(symbol)
+        pooled.extend(
+            _label_entries(df, a, entries_by_sym[symbol], pip_size=pip, cost_r=cost_r))
+        base = [b for b in _base_rate_labels(df, a, pip_size=pip, cost_r=cost_r)
+                if b[0] < IN_SAMPLE_END]
+        base_fav += sum(f for _, f, _ in base)
+        base_n += len(base)
+    base_rate = base_fav / base_n if base_n else 0.0
+    return _grade([_make_cell(f"ccy_strength_{lookback}", "POOLED", pooled, base_rate)])
+
+
 def format_report(results: Sequence[CellResult], timeframe: str) -> str:
     validated = [r for r in results if r.verdict == "VALIDATED"]
     testable = [r for r in results if r.p_value is not None]
@@ -376,6 +539,10 @@ def main() -> None:
     results += audit_cross_sectional(
         timeframe=args.timeframe, n_bars=args.bars, cost_r=args.cost_r
     )
+    results += audit_currency_strength(
+        timeframe=args.timeframe, n_bars=args.bars, cost_r=args.cost_r
+    )
+    results += audit_carry(cost_r=args.cost_r)   # D1 holding-return, its own bars
     md = format_report(results, args.timeframe)
     from pathlib import Path
     Path(args.out).write_text(md, encoding="utf-8")

@@ -74,6 +74,33 @@ def test_cross_sectional_momentum_ranks_pairs() -> None:
     assert entries["BUSD"] == [] and entries["CUSD"] == []
 
 
+def test_holding_return_label_direction_and_cost() -> None:
+    # clean uptrend, hold 10 bars: BUY favorable, SELL not; cost applied
+    df = _df(np.linspace(1.10, 1.30, 120))
+    a = sr.atr(df)
+    buy = sr._label_holding_return(df, a, [(50, "BUY")], pip_size=0.0001, cost_r=0.05, horizon=10)
+    sell = sr._label_holding_return(df, a, [(50, "SELL")], pip_size=0.0001, cost_r=0.05, horizon=10)
+    assert buy and buy[0][1] is True and buy[0][2] > 0
+    assert sell and sell[0][1] is False and sell[0][2] < 0
+
+
+def test_split_ccy() -> None:
+    assert sr._split_ccy("EURUSD") == ("EUR", "USD")
+    assert sr._split_ccy("GBPJPY") == ("GBP", "JPY")
+
+
+def test_currency_strength_emits_entries() -> None:
+    n = 80
+    rising = _df(np.linspace(1.10, 1.25, n))
+    flat = _df(np.linspace(1.10, 1.105, n))
+    pair_dfs = {
+        "EURUSD": rising, "GBPUSD": flat, "AUDUSD": flat,
+        "USDJPY": rising, "EURJPY": rising, "GBPJPY": flat,
+    }
+    entries = sr.currency_strength_entries(pair_dfs, lookback=20)
+    assert any(len(v) > 0 for v in entries.values())
+
+
 def test_grade_marks_insufficient_n() -> None:
     cells = [sr.CellResult(signal="s", symbol="X", n=10, favorable=5,
                            fav_rate=0.5, base_rate=0.5, p_value=None,

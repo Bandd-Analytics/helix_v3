@@ -95,10 +95,19 @@ The only honest road to profit. Reuse `signature_audit.py` + `rule_stats.py`; sa
   sub-BH-significant and collapses out of sample. Same fingerprint as MMM — faint leads, no
   survivors. **Cross-sectional momentum added (`audit_cross_sectional`, pooled across majors):
   n=2018, hit-rate 51% vs 48% base, p=0.002 (significantly above base!) — but netR −0.07 and
-  holdout −0.15 → DEAD.** A real hit-rate edge that doesn't pay after costs — the exact
-  pattern seen everywhere. **Next, WITHOUT fishing the same signals:** carry (swap-ranked) and
-  cross-sectional currency-strength (currency-decomposed, not pair-level); plus D1 timeframe.
-  Each new family runs through the same harness; most will die, and that is the process working.
+  holdout −0.15 → DEAD.** A real hit-rate edge that doesn't pay after costs. **Carry added**
+  (swap-ranked direction, D1, 20-day HOLDING return — `audit_carry` + `_label_holding_return`,
+  since carry is a slow premium not a bracket-timing edge): n=336, 54% positive vs 49% base,
+  p=0.045, **netR +0.126 in-sample (POSITIVE — the carry premium is real)** but **holdout
+  −0.164 → DEAD.** Textbook carry: a crash-prone risk premium that pays for years then unwinds;
+  the embargoed 2025–26 holdout caught a USD-carry drawdown. The closest any family came to an
+  edge — but not robust under the discipline. **Cross-sectional currency-strength added**
+  (currency-decomposed over a 22-pair basket, nets USD out — `audit_currency_strength`):
+  n=1254, 45% vs 48% base (BELOW base), netR −0.18, holdout −0.12 → DEAD. **Five families
+  tested, all DEAD.** Verdict converging: no robust directional FX edge in classic signals;
+  carry is the one real-but-unreliable premium. Remaining honest avenues: D1/weekly for the
+  price signals, a vol/risk-regime conditioner on carry (works in calm, crashes in stress), or
+  accepting the validated defensive layer is the system's only edge.
 - [ ] **3b — Management-as-alpha.** The ONLY thing that validated is defensive (exits/sizing).
   Test whether good exits + a cheap neutral entry (e.g. mean-reversion fade) beats costs —
   i.e. the edge lives in *management*, not entry selection. A genuinely different hypothesis.
