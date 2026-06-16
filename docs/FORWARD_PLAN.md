@@ -118,9 +118,24 @@ The only honest road to profit. Reuse `signature_audit.py` + `rule_stats.py`; sa
   **Track 3b (management-as-alpha)** — the only validated component is defensive, so test whether
   good exits + a cheap neutral entry beats costs. (D1/weekly price signals remain a theoretically
   possible avenue but carry the same fingerprint and lower prior; deprioritized below 3b.)
-- [ ] **3b — Management-as-alpha.** The ONLY thing that validated is defensive (exits/sizing).
-  Test whether good exits + a cheap neutral entry (e.g. mean-reversion fade) beats costs —
-  i.e. the edge lives in *management*, not entry selection. A genuinely different hypothesis.
+- [x] **3b — Management-as-alpha.** *(Concluded 2026-06-16 — 14 cells, all DEAD. Harness:
+  `helix_v3/backtest/management_research.py`, tests `tests/test_management_research.py`, report
+  `logs/management_research.md`.)* The genuinely different hypothesis: hold a **direction-neutral
+  entry fixed** (random-sign null + z-fade) and vary ONLY the exit policy, measuring each against
+  the symmetric-1:1 control on the identical entries — does *management* (not entry) manufacture
+  positive net-R after fill-count-scaled costs? **Tested 7 exit policies × 2 entry streams.
+  VALIDATED = 0.** Findings: (1) "cut quick" (`tp_0p5R`) posts a huge **65% hit-rate vs 49% base,
+  p=0.000 — yet loses** (netR −0.13, holdout −0.11): small wins, rare big losses, the textbook
+  hit-rate≠expectancy trap. (2) **Trailing stops — the Van Tharp folklore — are among the WORST**
+  (`trail_1R` −0.10, `be_1R` −0.11): cutting at noise destroys the marginal entry. (3) One honest
+  flicker — `zfade/time_stop` showed in-sample expectancy (p_exp 0.035, netR +0.16) but **died
+  under BH correction** with a +0.03 holdout (noise); same faint-z-fade-lead/no-survivor
+  fingerprint as 3a. **Verdict: management does not create expectancy from neutral entries. The
+  validated defensive layer reduces losses on a losing stream — it does not make one profitable.**
+  Combined with 3a: **no FX entry edge AND no management edge on these instruments.** A survivor
+  would have been re-run through the production `TradeSimulator` (`engine.py`) before advancing —
+  none did. Next and last FX-adjacent avenue: **Track 3c (multi-asset breadth)**, or accept that
+  the system has no fundable directional edge and stop (already documented in `SYSTEM_STATUS.md`).
 - [ ] **3c — Multi-asset breadth.** The broad CFD universe (equities, indices, commodities,
   crypto) with *instrument-appropriate* signals (momentum, cross-sectional, vol). Highest
   overfit risk and worst costs → do LAST, with the most discipline, only if 3a/3b stall.
