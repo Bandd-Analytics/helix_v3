@@ -85,7 +85,7 @@ none) — to collect **genuine forward out-of-sample outcomes** so the negative 
 The only honest road to profit. Reuse `signature_audit.py` + `rule_stats.py`; same gauntlet.
 **Pick ONE domain to start** (decision below) — do not search all at once (multiple-testing).
 
-- [~] **3a — FX, non-MMM signals.** *(Started 2026-06-15. Harness:
+- [x] **3a — FX, non-MMM signals.** *(Concluded 2026-06-16 — 6 families, all DEAD. Harness:
   `helix_v3/backtest/signal_research.py`, tests `tests/test_signal_research.py`.)* Reusable
   gauntlet for fresh signals: per-entry ATR brackets, first-touch labels, non-overlap,
   binomial + expectancy tests, BH, embargoed walk-forward — identical discipline to Phase 1.
@@ -103,11 +103,21 @@ The only honest road to profit. Reuse `signature_audit.py` + `rule_stats.py`; sa
   the embargoed 2025–26 holdout caught a USD-carry drawdown. The closest any family came to an
   edge — but not robust under the discipline. **Cross-sectional currency-strength added**
   (currency-decomposed over a 22-pair basket, nets USD out — `audit_currency_strength`):
-  n=1254, 45% vs 48% base (BELOW base), netR −0.18, holdout −0.12 → DEAD. **Five families
-  tested, all DEAD.** Verdict converging: no robust directional FX edge in classic signals;
-  carry is the one real-but-unreliable premium. Remaining honest avenues: D1/weekly for the
-  price signals, a vol/risk-regime conditioner on carry (works in calm, crashes in stress), or
-  accepting the validated defensive layer is the system's only edge.
+  n=1254, 45% vs 48% base (BELOW base), netR −0.18, holdout −0.12 → DEAD. **Regime-conditioned
+  carry added** (the most promising lead chased to ground — `audit_carry_regime` +
+  `_vol_percentile_series`, carry gated to the VALIDATED Tier 2.8 vol band [P10,P95] from
+  `regime.py`, point-in-time per entry, control = same calm-regime bars): n=200, 54% vs 46% base,
+  **p_hit 0.020 (now significant above base in-sample, up from 0.207 ungated), netR +0.07
+  in-sample** — but **holdout −0.45 (WORSE than ungated carry's −0.17) → DEAD.** Textbook
+  overfitting fingerprint: the calm-vol gate improved *every* in-sample number while the embargoed
+  holdout collapsed harder — the gate concentrated entries into the worst of the 2025–26 carry
+  unwind. Pre-registered, single hypothesis, no threshold sweep — exactly the discipline that
+  killed Sharpe-4.37. **Six families tested, all DEAD.** **Verdict reached: no robust directional
+  FX edge in classic signals. Carry is a real-but-unreliable premium that does not survive the
+  embargo even when regime-gated. 3a is concluded — the price-signal/carry well is dry.** Next:
+  **Track 3b (management-as-alpha)** — the only validated component is defensive, so test whether
+  good exits + a cheap neutral entry beats costs. (D1/weekly price signals remain a theoretically
+  possible avenue but carry the same fingerprint and lower prior; deprioritized below 3b.)
 - [ ] **3b — Management-as-alpha.** The ONLY thing that validated is defensive (exits/sizing).
   Test whether good exits + a cheap neutral entry (e.g. mean-reversion fade) beats costs —
   i.e. the edge lives in *management*, not entry selection. A genuinely different hypothesis.

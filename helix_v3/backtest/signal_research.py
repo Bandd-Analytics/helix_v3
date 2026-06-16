@@ -32,6 +32,8 @@ from typing import Callable, Dict, List, Optional, Sequence, Tuple
 import numpy as np
 import pandas as pd
 
+from helix_v3.core.regime import REGIME_LOOKBACK_DAYS, VOL_PCT_MAX, VOL_PCT_MIN
+from helix_v3.core.tdi import _wilder_atr
 from helix_v3.training.rule_stats import (
     benjamini_hochberg,
     binomial_p_at_least,
@@ -420,6 +422,85 @@ def audit_carry(
     return _grade([_make_cell(f"carry_h{holding}", "POOLED", pooled, base_rate)])
 
 
+def _vol_percentile_series(
+    df: pd.DataFrame, lookback: int = REGIME_LOOKBACK_DAYS,
+) -> np.ndarray:
+    """Point-in-time realized-vol percentile per bar — the Tier 2.8 measure.
+
+    Wilder ATR(20) (matching regime.py exactly) ranked, as-of each bar, against
+    its own trailing `lookback`-bar window. Mid-rank with ties split, identical
+    to `regime.assess_regime`. No future data enters any bar's percentile. NaN
+    where there is too little history to rank.
+    """
+    atr_w = _wilder_atr(df["High"], df["Low"], df["Close"], 20).values
+    out = np.full(len(df), np.nan)
+    min_obs = lookback // 4
+    for i in range(len(df)):
+        cur = atr_w[i]
+        if np.isnan(cur):
+            continue
+        win = atr_w[max(0, i - lookback + 1): i + 1]
+        win = win[~np.isnan(win)]
+        if len(win) < min_obs:
+            continue
+        out[i] = float((win < cur).mean() + 0.5 * (win == cur).mean())
+    return out
+
+
+def audit_carry_regime(
+    symbols: Sequence[str] = MAJORS, timeframe: str = "D1",
+    n_bars: int = 1500, cost_r: float = COST_R_DEFAULT, holding: int = 20,
+) -> List[CellResult]:
+    """Carry, gated to a non-stress vol regime (Forward Plan Track 3a).
+
+    Carry is the one FX family that paid in-sample (netR +0.126) but failed the
+    embargoed holdout (−0.164) — a textbook crash-prone premium: it earns in
+    calm vol and unwinds in stress. This conditions carry on the VALIDATED Tier
+    2.8 vol band [P10, P95] (regime.py), computed point-in-time per entry bar,
+    keeping only calm-regime entries.
+
+    Discipline (Forward Plan guardrail — no threshold sweeping): the band is the
+    pre-validated one, reused verbatim; the ER/trendiness leg is deliberately
+    omitted because the carry-crash mechanism is vol/risk, not range-cycling.
+    The control is the unconditional holding return on the SAME calm-regime
+    bars, so the test isolates the carry DIRECTION's contribution within the
+    regime — not the regime filter's own effect. Same gauntlet as every family:
+    first-touch holding label, non-overlap, binomial + expectancy, BH, embargo.
+    """
+    import MetaTrader5 as mt5
+    mt5.initialize()
+    pooled: List[Tuple[datetime, bool, float]] = []
+    base_pos, base_n = 0, 0
+    for symbol in symbols:
+        direction = carry_direction(symbol)
+        if direction is None:
+            continue
+        df = fetch_bars(symbol, timeframe, n_bars)
+        if df.empty or len(df) < holding + ATR_PERIOD + 30:
+            continue
+        a = atr(df)
+        pip = pip_size_for(symbol)
+        volp = _vol_percentile_series(df)
+
+        def _calm(i: int) -> bool:
+            p = volp[i]
+            return (not np.isnan(p)) and VOL_PCT_MIN <= p <= VOL_PCT_MAX
+
+        bars = range(ATR_PERIOD, len(df) - holding, holding)
+        entries = [(i, direction) for i in bars if _calm(i)]
+        pooled.extend(_label_holding_return(
+            df, a, entries, pip_size=pip, cost_r=cost_r, horizon=holding))
+        # control: unconditional BUY holding return on the SAME calm-regime bars
+        ctrl = _label_holding_return(
+            df, a, [(i, "BUY") for i in bars if _calm(i)],
+            pip_size=pip, cost_r=cost_r, horizon=holding)
+        ctrl_in = [c for c in ctrl if c[0] < IN_SAMPLE_END]
+        base_pos += sum(f for _, f, _ in ctrl_in)
+        base_n += len(ctrl_in)
+    base_rate = base_pos / base_n if base_n else 0.0
+    return _grade([_make_cell(f"carry_regime_h{holding}", "POOLED", pooled, base_rate)])
+
+
 # ---------------------------------------------------------------------------
 # Cross-sectional currency strength (currency-decomposed momentum)
 # ---------------------------------------------------------------------------
@@ -543,6 +624,7 @@ def main() -> None:
         timeframe=args.timeframe, n_bars=args.bars, cost_r=args.cost_r
     )
     results += audit_carry(cost_r=args.cost_r)   # D1 holding-return, its own bars
+    results += audit_carry_regime(cost_r=args.cost_r)   # carry gated to calm vol
     md = format_report(results, args.timeframe)
     from pathlib import Path
     Path(args.out).write_text(md, encoding="utf-8")

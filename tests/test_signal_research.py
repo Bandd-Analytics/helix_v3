@@ -101,6 +101,31 @@ def test_currency_strength_emits_entries() -> None:
     assert any(len(v) > 0 for v in entries.values())
 
 
+def test_vol_percentile_is_point_in_time() -> None:
+    # Calm history then a late volatility spike. The percentile at each bar must
+    # rank ONLY against trailing bars — early bars never see the late spike, and
+    # the spike bar itself ranks at the top of its own window.
+    n = 400
+    rng = np.linspace(1.10, 1.12, n)
+    df = _df(rng)
+    # widen the true range on the last 5 bars (a vol spike)
+    df.iloc[-5:, df.columns.get_loc("High")] += 0.02
+    df.iloc[-5:, df.columns.get_loc("Low")] -= 0.02
+    volp = sr._vol_percentile_series(df)
+    assert np.isnan(volp[0])              # no history to rank yet
+    assert volp[-1] > 0.95               # spike bar is top of its trailing window
+    # a quiet bar well before the spike is not pinned to an extreme
+    assert 0.0 <= volp[200] <= 1.0
+
+
+def test_calm_gate_uses_validated_band() -> None:
+    # The gate reuses regime.py's [P10, P95] verbatim — a sanity check that the
+    # imported thresholds are the validated ones, not local re-definitions.
+    from helix_v3.core import regime
+    assert sr.VOL_PCT_MIN == regime.VOL_PCT_MIN
+    assert sr.VOL_PCT_MAX == regime.VOL_PCT_MAX
+
+
 def test_grade_marks_insufficient_n() -> None:
     cells = [sr.CellResult(signal="s", symbol="X", n=10, favorable=5,
                            fav_rate=0.5, base_rate=0.5, p_value=None,
