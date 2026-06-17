@@ -85,12 +85,16 @@ none) — to collect **genuine forward out-of-sample outcomes** so the negative 
 The only honest road to profit. Reuse `signature_audit.py` + `rule_stats.py`; same gauntlet.
 **Pick ONE domain to start** (decision below) — do not search all at once (multiple-testing).
 
-> **EDGE HUNT COMPLETE (2026-06-17): no fundable directional edge found.** All three
+> **EDGE HUNT COMPLETE (2026-06-17): no fundable edge found.** All FOUR
 > structurally-distinct avenues were tested under the same discipline and all DIED:
 > **3a** FX entry signals (6 families), **3b** management-as-alpha (14 cells), **3c** multi-asset
-> momentum (no alpha over buy-and-hold). The one nominal survivor (3c pooled TSMOM) was a
-> benchmark artifact — beta to a bull market, not alpha. The conclusion is now *thorough*, not
-> narrow: this system has no validated entry edge on any instrument or method tested. The
+> momentum (no alpha over buy-and-hold), **3d** relative-value / cointegration (5 pre-registered
+> pairs, all failed the Engle-Granger gate). The one nominal survivor (3c pooled TSMOM) was a
+> benchmark artifact — beta to a bull market, not alpha. The four categories span *direction*
+> (3a), *management of a neutral entry* (3b), *trend* (3c) and *market-neutral spread reversion*
+> (3d) — the complete structural map of systematic edge in Chan's taxonomy. The conclusion is now
+> *thorough*, not narrow: this system has no validated entry edge on any instrument or method
+> tested. The
 > validated **defensive** layer (regime gate, timing exits, sizing/safety) remains its only real
 > value. **Status unchanged and reinforced: capital-safe, entry-edge unproven, DEMO ONLY**
 > (`docs/SYSTEM_STATUS.md`). No real capital. Track 2 keeps collecting forward demo truth; revisit
@@ -164,6 +168,24 @@ The only honest road to profit. Reuse `signature_audit.py` + `rule_stats.py`; sa
   **3c DEAD.**
 - [ ] *(superseded — broad CFD breadth not pursued: the narrow, highest-prior version above
   found no alpha, so the wider/worse-cost search is not justified.)*
+- [x] **3d — Relative value / cointegration.** *(Concluded 2026-06-17 — 5 pre-registered pairs,
+  all DEAD. Pre-registration: `docs/EDGE_3D_COINTEGRATION.md` (approved before any code/data).
+  Harness: `helix_v3/backtest/cointegration_research.py`, tests `tests/test_cointegration_research.py`,
+  report `logs/cointegration_research.md`.)* The one structural category the hunt never touched:
+  **market-neutral spread reversion**, not direction. Hedge ratio frozen in-sample, Engle-Granger
+  ADF gate (hand-rolled, MacKinnon N=2 crit −3.34) required to hold IN-SAMPLE **and** survive the
+  embargoed holdout with β frozen; then a two-leg round-trip cost test. **VALIDATED = 0 — all five
+  died at the COINTEGRATION gate, before cost even mattered.** AUDUSD/NZDUSD (the classic pair) was
+  cointegrated in-sample (ADF −4.23) but **shattered out of sample (ADF +0.21)** — the exact
+  in-sample-lead/holdout-collapse fingerprint the embargo exists to catch; the 2025–26 window broke
+  the relationship. EURUSD/GBPUSD (−2.17), USDCHF/EURUSD (−2.35) and XAUUSD/XAGUSD (−0.88) were not
+  even cointegrated in-sample over the 6-year window. USDCAD/USDNOK dropped (no USDNOK history;
+  reported, not swapped). **Notable inversion of the prior:** cost was expected to be the killer but
+  was not — the spreads are wide relative to FX costs (gross/cost 660–6700×); the binding constraint
+  was cointegration *instability*, exactly the regime-shift breakdown the literature warns of. Per
+  the pre-registered kill bar: zero survivors → no simulator written, no thresholds tuned. **The
+  relative-value category is falsified; the edge hunt is now complete across all four structural
+  categories.**
 - [ ] **3.x — Per candidate**: define signal → first-touch label → audit (BH + embargo +
   cost) → survivors only advance to Track 2 forward demo. Most candidates will die; that's
   the process working.

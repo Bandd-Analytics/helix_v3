@@ -8,12 +8,14 @@ All major code changes and evaluation results are logged here.
 
 ### EDGE HUNT COMPLETE — no fundable directional edge found (thorough negative)
 
-The Forward-Plan Track 3 search for a real entry edge is concluded. Three structurally
-distinct avenues were tested under one discipline — first-touch labels, non-overlapping
-samples, binomial + expectancy tests, Benjamini-Hochberg, embargoed walk-forward, realistic
-costs — and **all three are DEAD**. The system has **no validated directional edge** on any
-instrument or method tested. Status reinforced: **capital-safe, entry-edge UNPROVEN, DEMO ONLY**
-(`docs/SYSTEM_STATUS.md`, `docs/FORWARD_PLAN.md`).
+The Forward-Plan Track 3 search for a real entry edge is concluded. **Four** structurally
+distinct avenues — spanning every category in Chan's taxonomy of systematic edge: *direction*
+(3a), *management of a neutral entry* (3b), *trend* (3c), and *market-neutral spread reversion*
+(3d) — were tested under one discipline (first-touch labels, non-overlapping samples, binomial +
+expectancy tests, Benjamini-Hochberg, embargoed walk-forward, realistic costs) and **all four are
+DEAD**. The system has **no validated directional edge** on any instrument or method tested.
+Status reinforced: **capital-safe, entry-edge UNPROVEN, DEMO ONLY** (`docs/SYSTEM_STATUS.md`,
+`docs/FORWARD_PLAN.md`).
 
 #### Track 3a — FX non-MMM signals (`helix_v3/backtest/signal_research.py`) — 6 families, all DEAD
 - Donchian breakout, MA-cross, z-score fade, cross-sectional momentum, carry, regime-gated carry.
@@ -43,8 +45,18 @@ instrument or method tested. Status reinforced: **capital-safe, entry-edge UNPRO
   6 instruments. The apparent edge was beta to a 2025 bull market, not alpha.
   Tests: `tests/test_multiasset_research.py`.
 
+#### Track 3d — Relative value / cointegration (`helix_v3/backtest/cointegration_research.py`) — DEAD
+- The one *market-neutral* category: spread reversion, not direction. Pre-registered in
+  `docs/EDGE_3D_COINTEGRATION.md` — 5 economically-chosen pairs, hedge ratio (beta) frozen
+  in-sample, Engle-Granger ADF gate required **in-sample AND across the embargoed holdout**.
+- **All five failed the cointegration gate.** AUDUSD/NZDUSD was stationary in-sample (ADF −4.23)
+  but broke out of sample (ADF +0.21); the others weren't cointegrated even in-sample;
+  USDCAD/USDNOK dropped (leg unavailable on the feed). Cost was expected to be the killer but
+  never bit — instability did. Zero candidates advanced, so no spread simulator was built.
+  Tests: `tests/test_cointegration_research.py`; report: `logs/cointegration_research.md`.
+
 #### Operating consequence
-- Track 3 is **complete and exhausted** — do NOT re-test 3a/3b/3c. A new candidate must be a
+- Track 3 is **complete and exhausted** — do NOT re-test 3a/3b/3c/3d. A new candidate must be a
   *genuinely new hypothesis*, benchmarked against the **right null** (e.g. buy-and-hold for
   drifting assets, not zero), then forward-validated on demo before any funding.
 - Track 2 keeps accruing live/demo outcomes; the monthly signature re-audit stays armed, so any
