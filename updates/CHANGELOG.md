@@ -4,6 +4,54 @@ All major code changes and evaluation results are logged here.
 
 ---
 
+## [v2.4.0] - 2026-06-17
+
+### EDGE HUNT COMPLETE — no fundable directional edge found (thorough negative)
+
+The Forward-Plan Track 3 search for a real entry edge is concluded. Three structurally
+distinct avenues were tested under one discipline — first-touch labels, non-overlapping
+samples, binomial + expectancy tests, Benjamini-Hochberg, embargoed walk-forward, realistic
+costs — and **all three are DEAD**. The system has **no validated directional edge** on any
+instrument or method tested. Status reinforced: **capital-safe, entry-edge UNPROVEN, DEMO ONLY**
+(`docs/SYSTEM_STATUS.md`, `docs/FORWARD_PLAN.md`).
+
+#### Track 3a — FX non-MMM signals (`helix_v3/backtest/signal_research.py`) — 6 families, all DEAD
+- Donchian breakout, MA-cross, z-score fade, cross-sectional momentum, carry, regime-gated carry.
+- Carry was the closest (a real but crash-prone premium: netR +0.13 in-sample) — failed the
+  embargoed holdout (−0.16), and **regime-gating it made the holdout WORSE** (−0.45): the
+  calm-vol gate improved every in-sample number while the out-of-sample collapsed harder, the
+  textbook overfitting fingerprint. Tests: `tests/test_signal_research.py`.
+
+#### Track 3b — Management-as-alpha (`helix_v3/backtest/management_research.py`) — 14 cells, all DEAD
+- New hypothesis: hold a **direction-neutral** entry fixed (random-sign null + z-fade), vary ONLY
+  the exit policy, measure each against the symmetric-1:1 control on identical entries. Costs scale
+  with fill count so churn is penalised.
+- 7 exit policies × 2 entry streams, VALIDATED = 0. "Cut quick" hit 65% favorable vs 49% base
+  (p=0.000) yet **still lost** (hit-rate ≠ expectancy); trailing stops (the Van Tharp folklore)
+  were among the worst. Management does not create expectancy from neutral entries.
+  Tests: `tests/test_management_research.py`.
+
+#### Track 3c — Multi-asset momentum (`helix_v3/backtest/multiasset_research.py`) — no alpha, DEAD
+- Narrow, single-signal: D1 time-series momentum (lookback 120 / holding 20, no sweep) on 6
+  trending CFDs (US500, USTEC, DE40, XAUUSD, BTCUSD, ETHUSD). Costs from **median historical
+  spread**, robust to the closed-market quote snapshot.
+- The harness first flagged the pooled cell **VALIDATED** (netR +0.42, holdout +0.23) — the only
+  nominal survivor of the whole hunt. **It was a benchmark artifact:** the expectancy test uses a
+  zero null, trivially passed by assets with upward drift; momentum's hit rate (57%) was *below*
+  buy-and-hold (62%). Added `audit_alpha_vs_buyhold` (the correct null): **alpha over
+  buy-and-hold = NO** — pooled mean diff −0.29 in-sample (p=0.89), −0.30 holdout, negative on all
+  6 instruments. The apparent edge was beta to a 2025 bull market, not alpha.
+  Tests: `tests/test_multiasset_research.py`.
+
+#### Operating consequence
+- Track 3 is **complete and exhausted** — do NOT re-test 3a/3b/3c. A new candidate must be a
+  *genuinely new hypothesis*, benchmarked against the **right null** (e.g. buy-and-hold for
+  drifting assets, not zero), then forward-validated on demo before any funding.
+- Track 2 keeps accruing live/demo outcomes; the monthly signature re-audit stays armed, so any
+  latent forward signal would still surface on its own.
+
+---
+
 ## [v2.3.0] - 2026-06-05
 
 ### CRITICAL FIX — M/W Direction Override
