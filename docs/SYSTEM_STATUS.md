@@ -1,6 +1,6 @@
 # Helix V3 — Honest System Status
 
-Last updated: 2026-06-15.
+Last updated: 2026-06-17.
 
 ## One-line status
 
@@ -9,8 +9,8 @@ Last updated: 2026-06-15.
 ## What this means
 
 The system will not blow up — the audit (`docs/AUDIT_FIX_PLAN.md`, closed) hardened every
-capital-loss path. But two independent honest analyses proved it has **no validated
-directional edge**:
+capital-loss path. But a **completed, thorough edge hunt** proved it has **no validated
+directional edge** — not in the original MMM rules, and not in any alternative searched:
 
 - **Tier 2.4** killed every directional MMM *rule* (mw_direction, midweek_reversal,
   pivot_day_map, asian_accumulation) on every pair.
@@ -21,8 +21,24 @@ directional edge**:
   configuration: **−5.8% with the advisory gate demoted, −7.1% with it on**, both tripping
   the 8% drawdown breaker.
 
-So the system's directional entries are **no better than chance after costs.** Running it on
-real money would be funding a coin flip with a spread.
+**The Forward-Plan Track 3 edge hunt is now COMPLETE (2026-06-17) — three structurally
+distinct avenues, the same gauntlet (first-touch labels, non-overlap, binomial + expectancy,
+Benjamini-Hochberg, embargoed walk-forward, realistic costs), all DEAD:**
+
+- **3a — FX non-MMM signals** (`signal_research.py`): 6 families — Donchian, MA-cross, z-fade,
+  cross-sectional momentum, carry, regime-gated carry. Carry was the closest (real but
+  crash-prone premium); none survived the embargoed holdout.
+- **3b — Management-as-alpha** (`management_research.py`): 14 cells — can exit management turn a
+  *direction-neutral* entry profitable? No. "Cut quick" hits 65% but still loses (hit-rate ≠
+  expectancy); trailing stops were among the worst.
+- **3c — Multi-asset momentum** (`multiasset_research.py`): D1 time-series momentum on index /
+  gold / crypto CFDs. The harness flagged a nominal survivor — but the benchmark-relative test
+  showed **no alpha over buy-and-hold** (pooled mean diff −0.29 in-sample, −0.30 holdout,
+  negative on all 6 instruments). The apparent edge was *beta to a 2025 bull market*, not alpha.
+
+So the system's directional entries are **no better than chance after costs**, and no tested
+alternative beats a passive benchmark. Running it on real money would be funding a coin flip
+with a spread. The negative is now thorough, not provisional.
 
 ## What IS validated (and is genuinely valuable)
 
@@ -43,13 +59,23 @@ Purely *defensive* machinery — it protects capital, it does not generate alpha
 2. **Advisory grade is a logger, not a gate** (`ADVISORY_GATE=false`, default). It is
    journaled for research; it does not block entries.
 3. **Do not expand pairs/instruments to chase edge.** That is the forking-paths trap that
-   produced the original Sharpe-4.37 illusion. Edge candidates come only from the disciplined
-   Track 3 search.
-4. **The path to a real edge is `docs/FORWARD_PLAN.md` Track 3** (currently 3a: FX non-MMM
-   signals), validated through the same gauntlet, then forward-validated on demo (Track 2).
+   produced the original Sharpe-4.37 illusion. 3c already tested the disciplined multi-asset
+   case and found no alpha — do not reopen it as an unconstrained instrument sweep.
+4. **Track 3 is complete and exhausted** (`docs/FORWARD_PLAN.md`). Do NOT re-test 3a/3b/3c —
+   they are settled negatives. A new edge candidate must be a *genuinely new hypothesis*, run
+   through the same gauntlet AND benchmarked against the right null (e.g. buy-and-hold for
+   drifting assets, not zero), then forward-validated on demo (Track 2) before any funding.
+5. **Track 2 keeps running** — live/demo outcomes accrue to the replay store and the monthly
+   signature re-audit stays armed, so any latent forward signal would still surface on its own.
 
 ## The honest framing
 
-The audit and Phase 1 did not fail — they prevented trading a no-edge system as if it had one.
-The system today is a well-built, capital-safe *execution and risk* platform that is still
-*searching for* its alpha. That search is the real work ahead.
+The audit, Phase 1, and the completed Track 3 hunt did not fail — they prevented trading a
+no-edge system as if it had one, and they did so *thoroughly*: every plausible directional
+hypothesis we could pose was tested and honestly rejected, including one that briefly looked
+like a winner until the correct benchmark exposed it. The system today is a well-built,
+capital-safe *execution and risk* platform for which **no directional alpha has been found to
+exist** on the instruments and methods available to it. That is not a gap waiting to be filled
+by more searching of the same ground — it is a measured result. Any future work must bring a
+genuinely new edge hypothesis to the table; absent that, the honest use of this system is as a
+disciplined, defensive, demo-only research platform.
