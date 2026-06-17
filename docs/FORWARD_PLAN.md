@@ -85,6 +85,17 @@ none) — to collect **genuine forward out-of-sample outcomes** so the negative 
 The only honest road to profit. Reuse `signature_audit.py` + `rule_stats.py`; same gauntlet.
 **Pick ONE domain to start** (decision below) — do not search all at once (multiple-testing).
 
+> **EDGE HUNT COMPLETE (2026-06-17): no fundable directional edge found.** All three
+> structurally-distinct avenues were tested under the same discipline and all DIED:
+> **3a** FX entry signals (6 families), **3b** management-as-alpha (14 cells), **3c** multi-asset
+> momentum (no alpha over buy-and-hold). The one nominal survivor (3c pooled TSMOM) was a
+> benchmark artifact — beta to a bull market, not alpha. The conclusion is now *thorough*, not
+> narrow: this system has no validated entry edge on any instrument or method tested. The
+> validated **defensive** layer (regime gate, timing exits, sizing/safety) remains its only real
+> value. **Status unchanged and reinforced: capital-safe, entry-edge unproven, DEMO ONLY**
+> (`docs/SYSTEM_STATUS.md`). No real capital. Track 2 keeps collecting forward demo truth; revisit
+> only if a genuinely new hypothesis (not a re-test of the above) appears.
+
 - [x] **3a — FX, non-MMM signals.** *(Concluded 2026-06-16 — 6 families, all DEAD. Harness:
   `helix_v3/backtest/signal_research.py`, tests `tests/test_signal_research.py`.)* Reusable
   gauntlet for fresh signals: per-entry ATR brackets, first-touch labels, non-overlap,
@@ -136,9 +147,23 @@ The only honest road to profit. Reuse `signature_audit.py` + `rule_stats.py`; sa
   would have been re-run through the production `TradeSimulator` (`engine.py`) before advancing —
   none did. Next and last FX-adjacent avenue: **Track 3c (multi-asset breadth)**, or accept that
   the system has no fundable directional edge and stop (already documented in `SYSTEM_STATUS.md`).
-- [ ] **3c — Multi-asset breadth.** The broad CFD universe (equities, indices, commodities,
-  crypto) with *instrument-appropriate* signals (momentum, cross-sectional, vol). Highest
-  overfit risk and worst costs → do LAST, with the most discipline, only if 3a/3b stall.
+- [x] **3c — Multi-asset breadth (narrow).** *(Concluded 2026-06-17 — no alpha. Harness:
+  `helix_v3/backtest/multiasset_research.py`, tests `tests/test_multiasset_research.py`, report
+  `logs/multiasset_research.md`.)* Ran the deliberately NARROW version the plan demands: ONE
+  signal (D1 time-series momentum, lookback 120 / holding 20, no sweep) on 6 trending-asset CFDs
+  (US500, USTEC, DE40, XAUUSD, BTCUSD, ETHUSD — no single stocks), instrument-appropriate costs
+  from **median historical spread** (robust to the closed-market snapshot). **The harness first
+  flagged the pooled cell VALIDATED (netR +0.42, holdout +0.23, p_exp 0.010) — the only nominal
+  survivor of the whole hunt — but it was a BENCHMARK ARTIFACT.** The expectancy test uses a
+  *zero* null, trivially passed by assets with upward drift; TSMOM's hit rate (57%) is BELOW
+  unconditional buy-and-hold (62%, p_hit 0.986). Added the correct test (`audit_alpha_vs_buyhold`:
+  per-entry `tsmom_r - buyhold_r`): **alpha over buy-and-hold = NO — pooled mean diff −0.290
+  in-sample (p=0.891) and −0.301 holdout, NEGATIVE on all 6 instruments.** Momentum is strictly
+  worse than passively holding; its short signals give up return. The apparent edge was beta to a
+  2025 bull market, not a tradeable systematic edge (and not what an MMM execution system is for).
+  **3c DEAD.**
+- [ ] *(superseded — broad CFD breadth not pursued: the narrow, highest-prior version above
+  found no alpha, so the wider/worse-cost search is not justified.)*
 - [ ] **3.x — Per candidate**: define signal → first-touch label → audit (BH + embargo +
   cost) → survivors only advance to Track 2 forward demo. Most candidates will die; that's
   the process working.
